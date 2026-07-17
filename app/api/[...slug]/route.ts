@@ -1,28 +1,50 @@
 const API_ORIGIN = "https://school-management-system-api-xs24.onrender.com"
 
+/** CORS headers added to every response so browsers on other devices/origins can fetch. */
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
+
 /** Headers from the client that we forward to the external API. */
 const ALLOWED_FORWARD_HEADERS = [
   "authorization",
   "content-type",
   "accept",
-  "cookie",
   "user-agent",
-  "x-clerk-auth-status",
-  "x-clerk-auth-reason",
-  "x-clerk-auth-token",
-  "x-clerk-claims",
 ]
+
+/** Hop-by-hop & encoding headers that must NOT be forwarded from the upstream response. */
+const STRIP_RESPONSE_HEADERS = [
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "upgrade",
+  // These are stripped because Node's fetch() transparently decompresses the body,
+  // so forwarding them would make the browser attempt to decompress already-plain bytes.
+  "content-encoding",
+  "content-length",
+]
+
+/** Handle CORS preflight requests. */
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS })
+}
 
 async function handleRequest(
   request: Request,
   { params }: { params: Promise<{ slug: string[] }> }
 ) {
   const { slug } = await params
+  // Reconstruct the path — keep the trailing slash if the client sent one,
+  // because the external API may 308-redirect without it.
   const pathname = `/api/${slug.join("/")}`
-
-  // Strip trailing slash so the external API doesn't 308-redirect us
-  const cleanPath = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname
-  const proxyUrl = new URL(cleanPath, API_ORIGIN)
+  const proxyUrl = new URL(pathname, API_ORIGIN)
 
   // Copy query params from the original request
   if (request.url.includes("?")) {
@@ -36,7 +58,6 @@ async function handleRequest(
     if (value) headers.set(key, value)
   }
 
-  // Forward the request to the external API (follow redirects server-side)
   try {
     const response = await fetch(proxyUrl, {
       method: request.method,
@@ -50,25 +71,27 @@ async function handleRequest(
       duplex: "half",
     })
 
-    // Build the response, stripping problematic hop-by-hop headers
+    // Read the response body as a buffer.
+    // Node's fetch() transparently decompresses gzip/br, so `body` is plain bytes.
+    // Streaming `response.body` while forwarding the original content-encoding
+    // header caused "decoding failed" in browsers. Reading as ArrayBuffer and
+    // stripping content-encoding/content-length avoids the mismatch.
+    const body = await response.arrayBuffer()
+
+    // Build the response headers, stripping problematic ones
     const responseHeaders = new Headers()
-    const HOP_BY_HOP = [
-      "transfer-encoding",
-      "connection",
-      "keep-alive",
-      "proxy-authenticate",
-      "proxy-authorization",
-      "te",
-      "trailer",
-      "upgrade",
-    ]
     for (const [key, value] of response.headers) {
-      if (!HOP_BY_HOP.includes(key.toLowerCase())) {
+      if (!STRIP_RESPONSE_HEADERS.includes(key.toLowerCase())) {
         responseHeaders.set(key, value)
       }
     }
 
-    return new Response(response.body, {
+    // Add CORS headers
+    for (const [key, value] of Object.entries(CORS_HEADERS)) {
+      responseHeaders.set(key, value)
+    }
+
+    return new Response(body, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,
@@ -78,7 +101,7 @@ async function handleRequest(
       err instanceof Error ? err.message : "An unexpected error occurred"
     return new Response(JSON.stringify({ error: message }), {
       status: 502,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     })
   }
 }

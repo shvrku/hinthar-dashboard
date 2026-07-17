@@ -1,6 +1,16 @@
 import { clerkMiddleware } from "@clerk/nextjs/server"
 
-export default clerkMiddleware()
+// In Next.js 16, "middleware" is renamed to "proxy".
+// clerkMiddleware() returns a NextMiddleware function, which is
+// type-aliased as NextProxy — so it works directly as the export.
+const clerkHandler = clerkMiddleware()
+
+export function proxy(
+  request: Parameters<typeof clerkHandler>[0],
+  event: Parameters<typeof clerkHandler>[1]
+) {
+  return clerkHandler(request, event)
+}
 
 export const config = {
   matcher: [
