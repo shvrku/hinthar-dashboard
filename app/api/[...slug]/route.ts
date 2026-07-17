@@ -91,7 +91,8 @@ async function handleRequest(
       responseHeaders.set(key, value)
     }
 
-    return new Response(body, {
+    const hasNoBody = response.status === 204 || response.status === 205 || response.status === 304
+    return new Response(hasNoBody ? null : body, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,

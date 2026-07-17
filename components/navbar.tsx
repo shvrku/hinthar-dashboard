@@ -78,13 +78,15 @@ function ListItem({
   return (
     <li>
       <NavigationMenuLink
-        href={href}
+        render={<Link href={href} />}
         className="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-muted hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground"
       >
-        <div className="mb-1 text-sm font-medium leading-none">{title}</div>
-        <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-          {children}
-        </p>
+        <div>
+          <div className="mb-1 text-sm font-medium leading-none">{title}</div>
+          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+            {children}
+          </p>
+        </div>
       </NavigationMenuLink>
     </li>
   )

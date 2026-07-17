@@ -98,7 +98,13 @@ async function request<T>(
   }
 
   if (res.status === 204) return undefined as T
-  return (await res.json()) as T
+  const raw = await res.text().catch(() => "")
+  if (!raw) return undefined as T
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return raw as unknown as T
+  }
 }
 
 export function createApi(token: string) {
