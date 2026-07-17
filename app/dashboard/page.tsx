@@ -2,14 +2,17 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarCheck, GraduationCap, Users, UserPlus, RotateCcw } from "lucide-react"
+import { CalendarCheck, GraduationCap, Users, UserPlus, RotateCcw, QrCode, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
+import type { Stats } from "@/lib/types"
 
 const statCards = [
   { key: "sessions" as const, label: "Sessions", icon: CalendarCheck },
   { key: "classes" as const, label: "Classes", icon: GraduationCap },
   { key: "teachers" as const, label: "Teachers", icon: Users },
   { key: "students" as const, label: "Students", icon: UserPlus },
+  { key: "check_ins" as const, label: "Check-ins", icon: QrCode },
+  { key: "subjects" as const, label: "Subjects", icon: BookOpen },
 ]
 
 function StatSkeleton() {
@@ -24,7 +27,7 @@ function StatSkeleton() {
 
 export default function DashboardPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
-  const [stats, setStats] = React.useState<Record<string, number> | null>(null)
+  const [stats, setStats] = React.useState<Stats | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -36,18 +39,8 @@ export default function DashboardPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const [sessions, classes, teachers, students] = await Promise.all([
-        api.listSessions(),
-        api.listClasses(),
-        api.listTeachers(),
-        api.listStudents(),
-      ])
-      setStats({
-        sessions: sessions.length,
-        classes: classes.length,
-        teachers: teachers.length,
-        students: students.length,
-      })
+      const data = await api.getStats()
+      setStats(data)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -64,7 +57,9 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 h-8 w-48 animate-pulse rounded bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded bg-muted" />
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <StatSkeleton />
+          <StatSkeleton />
           <StatSkeleton />
           <StatSkeleton />
           <StatSkeleton />
@@ -125,14 +120,14 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {loading && !stats
           ? statCards.map((card) => <StatSkeleton key={card.key} />)
           : stats
             ? statCards.map((card) => {
                 const Icon = card.icon
                 return (
-                  <div key={card.key} className="rounded-lg border p-6 transition-colors hover:bg-muted/50">
+                  <div key={card.key} className="rounded-lg border p-6 transition-colors hover:bg-muted/50 bg-card shadow-sm">
                     <div className="mb-3 flex size-10 items-center justify-center rounded-lg border bg-background">
                       <Icon className="size-5 text-foreground" />
                     </div>
@@ -144,7 +139,7 @@ export default function DashboardPage() {
             : statCards.map((card) => {
                 const Icon = card.icon
                 return (
-                  <div key={card.key} className="rounded-lg border border-dashed p-6">
+                  <div key={card.key} className="rounded-lg border border-dashed p-6 bg-card shadow-sm">
                     <div className="mb-3 flex size-10 items-center justify-center rounded-lg border bg-background">
                       <Icon className="size-5 text-muted-foreground" />
                     </div>

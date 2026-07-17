@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { RotateCcw, RefreshCw, Download, Eye, X, Loader2 } from "lucide-react"
+import { RotateCcw, RefreshCw, Download, Eye, X, Loader2, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Student } from "@/lib/types"
 import QRCode from "qrcode"
@@ -39,6 +39,8 @@ export default function CheckInManagementPage() {
   const [selected, setSelected] = React.useState<Student | null>(null)
   const [regenerating, setRegenerating] = React.useState(false)
   const [success, setSuccess] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   const loadStudents = React.useCallback(async () => {
     if (!isSignedIn) return
@@ -50,6 +52,7 @@ export default function CheckInManagementPage() {
       const api = createApi(token)
       const data = await api.listStudents()
       setStudents(data)
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
       else setError(err instanceof Error ? err.message : "Failed to load data")
@@ -57,6 +60,16 @@ export default function CheckInManagementPage() {
       setLoading(false)
     }
   }, [getToken, isSignedIn])
+
+  const filteredStudents = React.useMemo(() => {
+    if (searchQuery.trim() === "") return students
+    const query = searchQuery.toLowerCase().trim()
+    return students.filter(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        String(s.id).includes(query)
+    )
+  }, [students, searchQuery])
 
   const selectStudent = React.useCallback(async (student: Student) => {
     setSelected(student)
@@ -134,27 +147,44 @@ export default function CheckInManagementPage() {
         </p>
       </div>
 
-      <div className="mb-6 flex items-center gap-3">
-        <button
-          onClick={loadStudents}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              {students.length > 0 ? "Refresh" : "Load Data"}
-            </>
-          )}
-        </button>
-        {students.length > 0 && !loading && (
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        {/* Left side actions (Buttons + Search) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={loadStudents}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="size-4" />
+                Refresh
+              </>
+            )}
+          </button>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+            />
+          </div>
+        </div>
+
+        {/* Right side info (Timestamp/Status) */}
+        {lastLoaded && students && (
           <span className="text-xs text-muted-foreground">
-            {students.length} student{students.length !== 1 ? "s" : ""}
+            {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""} &bull; Loaded {lastLoaded}
           </span>
         )}
       </div>
@@ -190,15 +220,15 @@ export default function CheckInManagementPage() {
               <tbody>
                 {loading && students.length === 0
                   ? [1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)
-                  : students.length === 0
+                  : filteredStudents.length === 0
                     ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
-                          No students found. Click &quot;Load Data&quot; to fetch.
+                          No students found.
                         </td>
                       </tr>
                     )
-                    : students.map((student) => (
+                    : filteredStudents.map((student) => (
                         <tr
                           key={student.id}
                           className={`border-b last:border-b-0 transition-colors hover:bg-muted/30 cursor-pointer ${

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, X, RotateCcw, Loader2 } from "lucide-react"
+import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Student, StudentPayload } from "@/lib/types"
 
@@ -198,6 +198,8 @@ export default function StudentsPage() {
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   // Modal & form state
   const [modalOpen, setModalOpen] = React.useState(false)
@@ -229,6 +231,7 @@ export default function StudentsPage() {
       const api = await getApi()
       const data = await api.listStudents()
       setStudents(data)
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -239,6 +242,18 @@ export default function StudentsPage() {
       setLoading(false)
     }
   }, [getApi])
+
+  const filteredStudents = React.useMemo(() => {
+    if (!students) return []
+    if (searchQuery.trim() === "") return students
+    const query = searchQuery.toLowerCase().trim()
+    return students.filter(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        String(s.id).includes(query) ||
+        (s.contact && s.contact.toLowerCase().includes(query))
+    )
+  }, [students, searchQuery])
 
   const handleSave = React.useCallback(
     async (payload: StudentPayload) => {
@@ -348,26 +363,27 @@ export default function StudentsPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              Load Data
-            </>
-          )}
-        </button>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        {/* Left side actions (Buttons + Search) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="size-4" />
+                Load Data
+              </>
+            )}
+          </button>
 
-        {students && !loading && (
           <button
             onClick={openCreateModal}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
@@ -375,13 +391,24 @@ export default function StudentsPage() {
             <Plus className="size-4" />
             Add Student
           </button>
-        )}
 
-        {students !== null && !loading && (
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+            />
+          </div>
+        </div>
+
+        {/* Right side info (Timestamp/Status) */}
+        {lastLoaded && students && (
           <span className="text-xs text-muted-foreground">
-            {students.length} student{students.length !== 1 ? "s" : ""}
-            {" loaded at "}
-            {new Date().toLocaleTimeString()}
+            {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""} &bull; Loaded {lastLoaded}
           </span>
         )}
       </div>
@@ -430,15 +457,15 @@ export default function StudentsPage() {
           <tbody>
             {loading && !students
               ? Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-              : students && students.length === 0
+              : filteredStudents && filteredStudents.length === 0
                 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                    No students found. Click &quot;Add Student&quot; to create one.
+                    No students found.
                   </td>
                 </tr>
                   )
-                : students?.map((student) => (
+                : filteredStudents?.map((student) => (
                 <tr key={student.id} className="border-b transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3 font-medium">{student.id}</td>
                   <td className="px-4 py-3">{student.name}</td>

@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, X, RotateCcw, Loader2 } from "lucide-react"
+import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Search, Users, ArrowLeft } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { Class, ClassPayload, EDUCATION_LEVELS } from "@/lib/types"
+import { Class, ClassPayload, EDUCATION_LEVELS, Student, ClassStudent } from "@/lib/types"
 
 function TableSkeleton() {
   return (
@@ -33,14 +33,22 @@ export default function ClassesPage() {
 
   // Data
   const [classes, setClasses] = React.useState<Class[]>([])
+  const [students, setStudents] = React.useState<Student[]>([])
+  const [classStudents, setClassStudents] = React.useState<ClassStudent[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
+  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
-  // Modal
+  // Search
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [rosterSearchQuery, setRosterSearchQuery] = React.useState("")
+
+  // Modals / Selection
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editingClass, setEditingClass] = React.useState<Class | null>(null)
   const [formSubmitting, setFormSubmitting] = React.useState(false)
+  const [activeRosterClass, setActiveRosterClass] = React.useState<Class | null>(null)
 
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<number | null>(null)
@@ -59,7 +67,7 @@ export default function ClassesPage() {
     return () => clearTimeout(timer)
   }, [successMessage])
 
-  const loadClasses = React.useCallback(async () => {
+  const loadData = React.useCallback(async () => {
     if (!isSignedIn) return
     setLoading(true)
     setError(null)
@@ -67,13 +75,20 @@ export default function ClassesPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const data = await api.listClasses()
-      setClasses(data)
+      const [classesData, studentsData, classStudentsData] = await Promise.all([
+        api.listClasses(),
+        api.listStudents(),
+        api.listClassStudents(),
+      ])
+      setClasses(classesData)
+      setStudents(studentsData)
+      setClassStudents(classStudentsData)
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
       } else {
-        setError(err instanceof Error ? err.message : "Failed to load classes")
+        setError(err instanceof Error ? err.message : "Failed to load data")
       }
     } finally {
       setLoading(false)
@@ -127,7 +142,7 @@ export default function ClassesPage() {
       }
 
       closeModal()
-      await loadClasses()
+      await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -151,7 +166,7 @@ export default function ClassesPage() {
       await api.deleteClass(id)
       setSuccessMessage("Class deleted successfully.")
       setDeleteConfirmId(null)
-      await loadClasses()
+      await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -162,6 +177,90 @@ export default function ClassesPage() {
       setDeleteSubmitting(false)
     }
   }
+
+  // Roster assignment logic
+  const handleAssign = async (studentId: number) => {
+    if (!activeRosterClass) return
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      const newEntry = await api.createClassStudent(activeRosterClass.id, studentId)
+      setClassStudents((prev) => [...prev, newEntry])
+      setSuccessMessage("Student enrolled in class successfully.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign student")
+    }
+  }
+
+  const handleUnassign = async (classStudentId: number) => {
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      await api.deleteClassStudent(classStudentId)
+      setClassStudents((prev) => prev.filter((cs) => cs.id !== classStudentId))
+      setSuccessMessage("Student removed from class successfully.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to unassign student")
+    }
+  }
+
+  // Roster helpers
+  const currentRoster = React.useMemo(() => {
+    if (!activeRosterClass) return []
+    return classStudents.filter((cs) => {
+      const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj.id : cs.class_obj
+      return classId === activeRosterClass.id
+    }).map((cs) => {
+      const studentId = typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
+      const student = students.find((s) => s.id === studentId)
+      return {
+        classStudentId: cs.id,
+        studentId,
+        studentName: student ? student.name : `Student #${studentId}`,
+      }
+    })
+  }, [activeRosterClass, classStudents, students])
+
+  const filteredRoster = React.useMemo(() => {
+    if (rosterSearchQuery.trim() === "") return currentRoster
+    const query = rosterSearchQuery.toLowerCase().trim()
+    return currentRoster.filter(
+      (item) =>
+        item.studentName.toLowerCase().includes(query) ||
+        String(item.studentId).includes(query)
+    )
+  }, [currentRoster, rosterSearchQuery])
+
+  const unassignedStudents = React.useMemo(() => {
+    const assignedStudentIds = new Set(
+      classStudents.map((cs) => typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student)
+    )
+    return students.filter((s) => !assignedStudentIds.has(s.id))
+  }, [students, classStudents])
+
+  const filteredUnassigned = React.useMemo(() => {
+    if (rosterSearchQuery.trim() === "") return unassignedStudents
+    const query = rosterSearchQuery.toLowerCase().trim()
+    return unassignedStudents.filter(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        String(s.id).includes(query)
+    )
+  }, [unassignedStudents, rosterSearchQuery])
+
+  // Filtered classes
+  const filteredClasses = React.useMemo(() => {
+    if (searchQuery.trim() === "") return classes
+    const query = searchQuery.toLowerCase().trim()
+    return classes.filter(
+      (c) =>
+        c.education_level.toLowerCase().includes(query) ||
+        c.cohort_identifier.toLowerCase().includes(query) ||
+        (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(query))
+    )
+  }, [classes, searchQuery])
 
   if (!isLoaded) {
     return (
@@ -184,41 +283,14 @@ export default function ClassesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Classes</h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage class groups and cohorts.
-        </p>
-      </div>
-
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={loadClasses}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              Load Data
-            </>
-          )}
-        </button>
-
-        <button
-          onClick={openAddModal}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-        >
-          <Plus className="size-4" />
-          Add Class
-        </button>
-      </div>
+      {!activeRosterClass && (
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight">Classes</h1>
+          <p className="mt-1 text-muted-foreground">
+            Manage class groups and cohorts.
+          </p>
+        </div>
+      )}
 
       {/* Success message */}
       {successMessage && (
@@ -240,60 +312,226 @@ export default function ClassesPage() {
         </div>
       )}
 
-      {/* Table */}
-      {loading && classes.length === 0 ? (
-        <TableSkeleton />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Education Level</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cohort Identifier</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Sub Category</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {classes.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                    {loading ? "Loading..." : 'No classes found. Click "Load Data" to fetch.'}
-                  </td>
-                </tr>
-              ) : (
-                classes.map((cls) => (
-                  <tr key={cls.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="px-4 py-3">{cls.id}</td>
-                    <td className="px-4 py-3">{cls.education_level}</td>
-                    <td className="px-4 py-3 font-medium">{cls.cohort_identifier}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {cls.cohort_sub_category ?? "\u2014"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => openEditModal(cls)}
-                          className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          title="Edit"
-                        >
-                          <Pencil className="size-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmId(cls.id)}
-                          className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/50"
-                          title="Delete"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+      {activeRosterClass ? (
+        /* Detailed Roster View */
+        <div>
+          <button
+            onClick={() => {
+              setActiveRosterClass(null)
+              setRosterSearchQuery("")
+            }}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted mb-6"
+          >
+            <ArrowLeft className="size-4" />
+            Back to Classes
+          </button>
+
+          <div className="mb-6 flex flex-wrap items-baseline justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">
+                Roster: {activeRosterClass.education_level} {activeRosterClass.cohort_identifier}
+                {activeRosterClass.cohort_sub_category && ` (${activeRosterClass.cohort_sub_category})`}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage students enrolled in this class.
+              </p>
+            </div>
+            
+            {/* Search Input for Roster */}
+            <div className="relative">
+              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search students..."
+                value={rosterSearchQuery}
+                onChange={(e) => setRosterSearchQuery(e.target.value)}
+                className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Left: Enrolled */}
+            <div className="rounded-lg border bg-card p-6 shadow-sm">
+              <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                <span>Enrolled Students</span>
+                <span className="text-xs font-normal text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
+                  {filteredRoster.length} student{filteredRoster.length !== 1 ? "s" : ""}
+                </span>
+              </h3>
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                {filteredRoster.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-12 border border-dashed rounded-lg">
+                    {rosterSearchQuery ? "No matching enrolled students." : "No students assigned to this class."}
+                  </p>
+                ) : (
+                  filteredRoster.map((item) => (
+                    <div key={item.studentId} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                      <div>
+                        <p className="font-semibold text-sm">{item.studentName}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {item.studentId}</p>
                       </div>
-                    </td>
+                      <button
+                        onClick={() => handleUnassign(item.classStudentId)}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg px-3 py-1.5 transition-colors border border-red-200/50 dark:border-red-900/50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Right: Unassigned */}
+            <div className="rounded-lg border bg-card p-6 shadow-sm">
+              <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                <span>Unassigned Students</span>
+                <span className="text-xs font-normal text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
+                  {filteredUnassigned.length} student{filteredUnassigned.length !== 1 ? "s" : ""}
+                </span>
+              </h3>
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                {filteredUnassigned.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-12 border border-dashed rounded-lg">
+                    {rosterSearchQuery ? "No matching unassigned students." : "No unassigned students available."}
+                  </p>
+                ) : (
+                  filteredUnassigned.map((student) => (
+                    <div key={student.id} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                      <div>
+                        <p className="font-semibold text-sm">{student.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {student.id}</p>
+                      </div>
+                      <button
+                        onClick={() => handleAssign(student.id)}
+                        className="text-xs font-semibold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-900/40 rounded-lg px-3 py-1.5 transition-colors border border-green-200/50 dark:border-green-900/50"
+                      >
+                        Enroll
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Class list table */
+        <div>
+          {/* Toolbar */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={loadData}
+                disabled={loading}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="size-4" />
+                    Load Data
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={openAddModal}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
+              >
+                <Plus className="size-4" />
+                Add Class
+              </button>
+
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search classes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+                />
+              </div>
+            </div>
+
+            {/* Right side info (Timestamp/Status) */}
+            {lastLoaded && (
+              <span className="text-xs text-muted-foreground">
+                {classes.length} class{classes.length !== 1 ? "es" : ""} &bull; Loaded {lastLoaded}
+              </span>
+            )}
+          </div>
+
+          {/* Table */}
+          {loading && classes.length === 0 ? (
+            <TableSkeleton />
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Education Level</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cohort Identifier</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Sub Category</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filteredClasses.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                        {loading ? "Loading..." : 'No classes found. Click "Load Data" to fetch.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredClasses.map((cls) => (
+                      <tr key={cls.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <td className="px-4 py-3">{cls.id}</td>
+                        <td className="px-4 py-3">{cls.education_level}</td>
+                        <td className="px-4 py-3 font-medium">{cls.cohort_identifier}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {cls.cohort_sub_category ?? "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => setActiveRosterClass(cls)}
+                              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              title="Manage Roster"
+                            >
+                              <Users className="size-4" />
+                            </button>
+                            <button
+                              onClick={() => openEditModal(cls)}
+                              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              title="Edit"
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(cls.id)}
+                              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/50"
+                              title="Delete"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

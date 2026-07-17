@@ -5,140 +5,13 @@ info:
   description: Core API for managing classes, timetabling, sessions, attendance, and
     payroll.
 paths:
-  /api/v1/adjustments/:
-    get:
-      operationId: adjustments_list
-      tags:
-      - adjustments
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Adjustment'
-          description: ''
-    post:
-      operationId: adjustments_create
-      tags:
-      - adjustments
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Adjustment'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Adjustment'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Adjustment'
-        required: true
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Adjustment'
-          description: ''
-  /api/v1/adjustments/{id}/:
-    get:
-      operationId: adjustments_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this adjustment.
-        required: true
-      tags:
-      - adjustments
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Adjustment'
-          description: ''
-    put:
-      operationId: adjustments_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this adjustment.
-        required: true
-      tags:
-      - adjustments
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Adjustment'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Adjustment'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Adjustment'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Adjustment'
-          description: ''
-    patch:
-      operationId: adjustments_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this adjustment.
-        required: true
-      tags:
-      - adjustments
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedAdjustment'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedAdjustment'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedAdjustment'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Adjustment'
-          description: ''
-    delete:
-      operationId: adjustments_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this adjustment.
-        required: true
-      tags:
-      - adjustments
-      responses:
-        '204':
-          description: No response body
   /api/v1/audit-logs/:
     get:
       operationId: audit_logs_list
       tags:
       - audit-logs
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -160,6 +33,8 @@ paths:
         required: true
       tags:
       - audit-logs
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -172,6 +47,8 @@ paths:
       operationId: check_ins_list
       tags:
       - check-ins
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -180,29 +57,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CheckIn'
-          description: ''
-    post:
-      operationId: check_ins_create
-      tags:
-      - check-ins
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckIn'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CheckIn'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CheckIn'
-        required: true
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckIn'
           description: ''
   /api/v1/check-ins/{id}/:
     get:
@@ -216,6 +70,8 @@ paths:
         required: true
       tags:
       - check-ins
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -223,79 +79,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/CheckIn'
           description: ''
-    put:
-      operationId: check_ins_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Check In.
-        required: true
-      tags:
-      - check-ins
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckIn'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CheckIn'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CheckIn'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckIn'
-          description: ''
-    patch:
-      operationId: check_ins_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Check In.
-        required: true
-      tags:
-      - check-ins
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedCheckIn'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedCheckIn'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedCheckIn'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckIn'
-          description: ''
-    delete:
-      operationId: check_ins_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Check In.
-        required: true
-      tags:
-      - check-ins
-      responses:
-        '204':
-          description: No response body
   /api/v1/check-ins/manual/:
     post:
       operationId: check_ins_manual_create
@@ -314,6 +97,8 @@ paths:
                   description: The numeric student ID
               required:
               - student_id
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -326,24 +111,42 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: {}
-                description: Unspecified response body
+                properties:
+                  error:
+                    type: string
+              examples:
+                MissingOrInvalidStudentId:
+                  value:
+                    error: student_id must be a valid integer
+                  summary: Missing or invalid student_id
           description: ''
         '404':
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties: {}
-                description: Unspecified response body
+                properties:
+                  error:
+                    type: string
+              examples:
+                StudentNotFound:
+                  value:
+                    error: Student not found
+                  summary: Student not found
           description: ''
         '409':
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties: {}
-                description: Unspecified response body
+                properties:
+                  error:
+                    type: string
+              examples:
+                AlreadyCheckedIn:
+                  value:
+                    error: Student already checked in today
+                  summary: Already checked in
           description: ''
   /api/v1/check-ins/qr/:
     post:
@@ -363,6 +166,8 @@ paths:
                   description: The student's unique QR check-in token
               required:
               - check_in_token
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -375,30 +180,36 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: {}
-                description: Unspecified response body
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: {}
-                description: Unspecified response body
+                properties:
+                  error:
+                    type: string
+              examples:
+                MissingOrInvalidToken:
+                  value:
+                    error: check_in_token is required
+                  summary: Missing or invalid token
           description: ''
         '409':
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties: {}
-                description: Unspecified response body
+                properties:
+                  error:
+                    type: string
+              examples:
+                AlreadyCheckedIn:
+                  value:
+                    error: Student already checked in today
+                  summary: Already checked in
           description: ''
   /api/v1/class-students/:
     get:
       operationId: class_students_list
       tags:
       - class-students
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -423,6 +234,9 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/ClassStudent'
+        required: true
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -442,6 +256,8 @@ paths:
         required: true
       tags:
       - class-students
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -471,6 +287,9 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/ClassStudent'
+        required: true
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -500,6 +319,8 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedClassStudent'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -518,6 +339,8 @@ paths:
         required: true
       tags:
       - class-students
+      security:
+      - clerk_jwt: []
       responses:
         '204':
           description: No response body
@@ -526,6 +349,8 @@ paths:
       operationId: classes_list
       tags:
       - classes
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -551,6 +376,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Class'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -570,6 +397,8 @@ paths:
         required: true
       tags:
       - classes
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -600,6 +429,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Class'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -629,6 +460,8 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedClass'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -647,6 +480,8 @@ paths:
         required: true
       tags:
       - classes
+      security:
+      - clerk_jwt: []
       responses:
         '204':
           description: No response body
@@ -658,6 +493,8 @@ paths:
       summary: Get current user details
       tags:
       - me
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -665,11 +502,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
           description: ''
-  /api/v1/pay-periods/:
+  /api/v1/session-attendances/:
     get:
-      operationId: pay_periods_list
+      operationId: session_attendances_list
       tags:
-      - pay-periods
+      - session-attendances
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -677,290 +516,138 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PayPeriod'
+                  $ref: '#/components/schemas/SessionAttendanceList'
           description: ''
     post:
-      operationId: pay_periods_create
+      operationId: session_attendances_create
       tags:
-      - pay-periods
+      - session-attendances
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PayPeriod'
+              $ref: '#/components/schemas/SessionAttendance'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PayPeriod'
+              $ref: '#/components/schemas/SessionAttendance'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PayPeriod'
-        required: true
+              $ref: '#/components/schemas/SessionAttendance'
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayPeriod'
+                $ref: '#/components/schemas/SessionAttendance'
           description: ''
-  /api/v1/pay-periods/{id}/:
+  /api/v1/session-attendances/{id}/:
     get:
-      operationId: pay_periods_retrieve
+      operationId: session_attendances_retrieve
       parameters:
       - in: path
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Pay Period.
+        description: A unique integer value identifying this session attendance.
         required: true
       tags:
-      - pay-periods
+      - session-attendances
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayPeriod'
+                $ref: '#/components/schemas/SessionAttendance'
           description: ''
     put:
-      operationId: pay_periods_update
+      operationId: session_attendances_update
       parameters:
       - in: path
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Pay Period.
+        description: A unique integer value identifying this session attendance.
         required: true
       tags:
-      - pay-periods
+      - session-attendances
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PayPeriod'
+              $ref: '#/components/schemas/SessionAttendance'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PayPeriod'
+              $ref: '#/components/schemas/SessionAttendance'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PayPeriod'
-        required: true
+              $ref: '#/components/schemas/SessionAttendance'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayPeriod'
+                $ref: '#/components/schemas/SessionAttendance'
           description: ''
     patch:
-      operationId: pay_periods_partial_update
+      operationId: session_attendances_partial_update
       parameters:
       - in: path
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Pay Period.
+        description: A unique integer value identifying this session attendance.
         required: true
       tags:
-      - pay-periods
+      - session-attendances
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedPayPeriod'
+              $ref: '#/components/schemas/PatchedSessionAttendance'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedPayPeriod'
+              $ref: '#/components/schemas/PatchedSessionAttendance'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedPayPeriod'
+              $ref: '#/components/schemas/PatchedSessionAttendance'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PayPeriod'
+                $ref: '#/components/schemas/SessionAttendance'
           description: ''
     delete:
-      operationId: pay_periods_destroy
+      operationId: session_attendances_destroy
       parameters:
       - in: path
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Pay Period.
+        description: A unique integer value identifying this session attendance.
         required: true
       tags:
-      - pay-periods
+      - session-attendances
+      security:
+      - clerk_jwt: []
       responses:
         '204':
           description: No response body
-  /api/v1/payslips/:
-    get:
-      operationId: payslips_list
-      tags:
-      - payslips
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Payslip'
-          description: ''
-    post:
-      operationId: payslips_create
-      tags:
-      - payslips
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Payslip'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Payslip'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Payslip'
-        required: true
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Payslip'
-          description: ''
-  /api/v1/payslips/{id}/:
-    get:
-      operationId: payslips_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Payslip.
-        required: true
-      tags:
-      - payslips
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Payslip'
-          description: ''
-    put:
-      operationId: payslips_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Payslip.
-        required: true
-      tags:
-      - payslips
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Payslip'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Payslip'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Payslip'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Payslip'
-          description: ''
-    patch:
-      operationId: payslips_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Payslip.
-        required: true
-      tags:
-      - payslips
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedPayslip'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedPayslip'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedPayslip'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Payslip'
-          description: ''
-    delete:
-      operationId: payslips_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Payslip.
-        required: true
-      tags:
-      - payslips
-      responses:
-        '204':
-          description: No response body
-  /api/v1/reports/:
-    get:
-      operationId: reports_list
-      tags:
-      - reports
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Report'
-          description: ''
-  /api/v1/reports/{id}/:
-    get:
-      operationId: reports_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Report.
-        required: true
-      tags:
-      - reports
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Report'
-          description: ''
   /api/v1/sessions/:
     get:
       operationId: sessions_list
       tags:
       - sessions
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -986,6 +673,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Session'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -1001,10 +690,12 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Session.
+        description: A unique integer value identifying this session.
         required: true
       tags:
       - sessions
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1019,7 +710,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Session.
+        description: A unique integer value identifying this session.
         required: true
       tags:
       - sessions
@@ -1035,6 +726,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Session'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1049,7 +742,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Session.
+        description: A unique integer value identifying this session.
         required: true
       tags:
       - sessions
@@ -1064,6 +757,8 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedSession'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1078,18 +773,271 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this Session.
+        description: A unique integer value identifying this session.
         required: true
       tags:
       - sessions
+      security:
+      - clerk_jwt: []
       responses:
         '204':
           description: No response body
+  /api/v1/sessions/{id}/status/:
+    patch:
+      operationId: sessions_status_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this session.
+        required: true
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSession'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSession'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSession'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /api/v1/sessions/generate/:
+    post:
+      operationId: sessions_generate_create
+      description: Batch-generate dated sessions from timetable templates for a date
+        range.
+      summary: Generate sessions
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  description: Defaults to today
+                end_date:
+                  type: string
+                  format: date
+                  description: Defaults to start_date + 14 days
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created_sessions:
+                    type: integer
+          description: ''
+  /api/v1/staff/:
+    get:
+      operationId: staff_list
+      tags:
+      - staff
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Staff'
+          description: ''
+    post:
+      operationId: staff_create
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Staff'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Staff'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Staff'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Staff'
+          description: ''
+  /api/v1/staff/{id}/:
+    get:
+      operationId: staff_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this staff.
+        required: true
+      tags:
+      - staff
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Staff'
+          description: ''
+    put:
+      operationId: staff_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this staff.
+        required: true
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Staff'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Staff'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Staff'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Staff'
+          description: ''
+    patch:
+      operationId: staff_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this staff.
+        required: true
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStaff'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStaff'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStaff'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Staff'
+          description: ''
+    delete:
+      operationId: staff_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this staff.
+        required: true
+      tags:
+      - staff
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/stats/:
+    get:
+      operationId: stats_retrieve
+      description: Returns record counts for all tables in the system. Terminal, admin,
+        and staff roles only.
+      summary: System statistics
+      tags:
+      - stats
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: integer
+                  students:
+                    type: integer
+                  teachers:
+                    type: integer
+                  staff:
+                    type: integer
+                  subjects:
+                    type: integer
+                  classes:
+                    type: integer
+                  class_students:
+                    type: integer
+                  timetable_slots:
+                    type: integer
+                  timetable_students:
+                    type: integer
+                  sessions:
+                    type: integer
+                  session_attendances:
+                    type: integer
+                  check_ins:
+                    type: integer
+          description: ''
   /api/v1/students/:
     get:
       operationId: students_list
       tags:
       - students
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1115,6 +1063,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Student'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -1134,6 +1084,8 @@ paths:
         required: true
       tags:
       - students
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1164,6 +1116,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Student'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1193,6 +1147,8 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedStudent'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1211,6 +1167,8 @@ paths:
         required: true
       tags:
       - students
+      security:
+      - clerk_jwt: []
       responses:
         '204':
           description: No response body
@@ -1228,6 +1186,8 @@ paths:
         required: true
       tags:
       - students
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1248,6 +1208,20 @@ paths:
         required: true
       tags:
       - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Student'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Student'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Student'
+        required: true
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1255,11 +1229,154 @@ paths:
               schema:
                 $ref: '#/components/schemas/Student'
           description: ''
+  /api/v1/subjects/:
+    get:
+      operationId: subjects_list
+      tags:
+      - subjects
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subject'
+          description: ''
+    post:
+      operationId: subjects_create
+      tags:
+      - subjects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Subject'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Subject'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Subject'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+          description: ''
+  /api/v1/subjects/{id}/:
+    get:
+      operationId: subjects_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this subject.
+        required: true
+      tags:
+      - subjects
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+          description: ''
+    put:
+      operationId: subjects_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this subject.
+        required: true
+      tags:
+      - subjects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Subject'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Subject'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Subject'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+          description: ''
+    patch:
+      operationId: subjects_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this subject.
+        required: true
+      tags:
+      - subjects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubject'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubject'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubject'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+          description: ''
+    delete:
+      operationId: subjects_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this subject.
+        required: true
+      tags:
+      - subjects
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/teachers/:
     get:
       operationId: teachers_list
       tags:
       - teachers
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1285,6 +1402,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Teacher'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '201':
           content:
@@ -1304,6 +1423,8 @@ paths:
         required: true
       tags:
       - teachers
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1334,6 +1455,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Teacher'
         required: true
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1363,6 +1486,8 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedTeacher'
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1381,14 +1506,346 @@ paths:
         required: true
       tags:
       - teachers
+      security:
+      - clerk_jwt: []
       responses:
         '204':
           description: No response body
+  /api/v1/timetable-slots/:
+    get:
+      operationId: timetable_slots_list
+      tags:
+      - timetable-slots
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+    post:
+      operationId: timetable_slots_create
+      tags:
+      - timetable-slots
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+  /api/v1/timetable-slots/{id}/:
+    get:
+      operationId: timetable_slots_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable slot.
+        required: true
+      tags:
+      - timetable-slots
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+    put:
+      operationId: timetable_slots_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable slot.
+        required: true
+      tags:
+      - timetable-slots
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+    patch:
+      operationId: timetable_slots_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable slot.
+        required: true
+      tags:
+      - timetable-slots
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTimetableSlot'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTimetableSlot'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTimetableSlot'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+    delete:
+      operationId: timetable_slots_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable slot.
+        required: true
+      tags:
+      - timetable-slots
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/timetable-students/:
+    get:
+      operationId: timetable_students_list
+      tags:
+      - timetable-students
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimetableStudent'
+          description: ''
+    post:
+      operationId: timetable_students_create
+      tags:
+      - timetable-students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimetableStudent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimetableStudent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimetableStudent'
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableStudent'
+          description: ''
+  /api/v1/timetable-students/{id}/:
+    get:
+      operationId: timetable_students_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable student.
+        required: true
+      tags:
+      - timetable-students
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableStudent'
+          description: ''
+    put:
+      operationId: timetable_students_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable student.
+        required: true
+      tags:
+      - timetable-students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimetableStudent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimetableStudent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimetableStudent'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableStudent'
+          description: ''
+    patch:
+      operationId: timetable_students_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable student.
+        required: true
+      tags:
+      - timetable-students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTimetableStudent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTimetableStudent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTimetableStudent'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableStudent'
+          description: ''
+    delete:
+      operationId: timetable_students_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this timetable student.
+        required: true
+      tags:
+      - timetable-students
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/timetable/class/{class_id}/:
+    get:
+      operationId: timetable_class_list
+      description: Get all timetable slots for a specific class.
+      summary: Class timetable
+      parameters:
+      - in: path
+        name: class_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timetable
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+  /api/v1/timetable/teacher/{teacher_id}/:
+    get:
+      operationId: timetable_teacher_list
+      description: Get all timetable slots for a specific teacher.
+      summary: Teacher timetable
+      parameters:
+      - in: path
+        name: teacher_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timetable
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimetableSlot'
+          description: ''
   /api/v1/users/:
     get:
       operationId: users_list
       tags:
       - users
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1397,6 +1854,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/User'
+          description: ''
+    post:
+      operationId: users_create
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
           description: ''
   /api/v1/users/{id}/:
     get:
@@ -1410,6 +1891,8 @@ paths:
         required: true
       tags:
       - users
+      security:
+      - clerk_jwt: []
       responses:
         '200':
           content:
@@ -1417,50 +1900,147 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
           description: ''
+    put:
+      operationId: users_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: users_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
 components:
   schemas:
-    Adjustment:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        payslip:
-          type: integer
-        description:
-          type: string
-        amount:
-          type: string
-      required:
-      - payslip
-      - description
-      - amount
+    ActionEnum:
+      enum:
+      - create
+      - update
+      - delete
+      type: string
+      description: |-
+        * `create` - Create
+        * `update` - Update
+        * `delete` - Delete
     AuditLog:
       type: object
       properties:
         id:
           type: integer
           readOnly: true
+        user:
+          type: integer
+          readOnly: true
+          nullable: true
         user_email:
+          type: string
+          nullable: true
+          readOnly: true
+        model_name:
+          type: string
+          readOnly: true
+        record_id:
           type: string
           readOnly: true
         action:
+          allOf:
+          - $ref: '#/components/schemas/ActionEnum'
+          readOnly: true
+        field_name:
           type: string
-        resource_type:
+          readOnly: true
+          nullable: true
+        old_value:
           type: string
-        resource_id:
+          readOnly: true
+          nullable: true
+        new_value:
           type: string
-        details:
-          type: object
-          additionalProperties: {}
+          readOnly: true
+          nullable: true
         timestamp:
           type: string
           format: date-time
           readOnly: true
       required:
       - action
-      - resource_type
-      - resource_id
+      - field_name
+      - id
+      - model_name
+      - new_value
+      - old_value
+      - record_id
+      - timestamp
+      - user
+      - user_email
     CheckIn:
       type: object
       properties:
@@ -1481,23 +2061,26 @@ components:
           format: date-time
           readOnly: true
         check_in_type:
-          type: string
-          enum:
-          - qr
-          - manual
-      required:
-      - student
-      - check_in_type
-    PatchedCheckIn:
-      type: object
-      properties:
-        student:
+          $ref: '#/components/schemas/CheckInTypeEnum'
+        checked_by:
           type: integer
-        check_in_type:
-          type: string
-          enum:
-          - qr
-          - manual
+          readOnly: true
+          nullable: true
+      required:
+      - checked_by
+      - date
+      - id
+      - student
+      - student_name
+      - timestamp
+    CheckInTypeEnum:
+      enum:
+      - qr
+      - manual
+      type: string
+      description: |-
+        * `qr` - QR Code
+        * `manual` - Manual
     Class:
       type: object
       properties:
@@ -1505,158 +2088,348 @@ components:
           type: integer
           readOnly: true
         education_level:
-          type: string
-          enum:
-          - IAL
-          - IG
-          - Year1
-          - Year2
-          - Year3
-          - Year4
-          - Year5
-          - Year6
-          - Year7
-          - Year8
-          - Year9
+          $ref: '#/components/schemas/EducationLevelEnum'
         cohort_identifier:
           type: string
+          maxLength: 1
         cohort_sub_category:
           type: string
           nullable: true
+          maxLength: 1
       required:
-      - education_level
       - cohort_identifier
-    PatchedClass:
-      type: object
-      properties:
-        education_level:
-          type: string
-          enum:
-          - IAL
-          - IG
-          - Year1
-          - Year2
-          - Year3
-          - Year4
-          - Year5
-          - Year6
-          - Year7
-          - Year8
-          - Year9
-        cohort_identifier:
-          type: string
-        cohort_sub_category:
-          type: string
-          nullable: true
+      - education_level
+      - id
     ClassStudent:
       type: object
       properties:
         id:
           type: integer
           readOnly: true
-        student:
-          type: integer
         class_obj:
+          allOf:
+          - $ref: '#/components/schemas/Class'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        class_obj_id:
           type: integer
+          writeOnly: true
+        student_id:
+          type: integer
+          writeOnly: true
       required:
-      - student
       - class_obj
+      - class_obj_id
+      - id
+      - student
+      - student_id
+    DayOfWeekEnum:
+      enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      type: integer
+      description: |-
+        * `0` - Monday
+        * `1` - Tuesday
+        * `2` - Wednesday
+        * `3` - Thursday
+        * `4` - Friday
+        * `5` - Saturday
+        * `6` - Sunday
+    EducationLevelEnum:
+      enum:
+      - IAL
+      - IG
+      - Year1
+      - Year2
+      - Year3
+      - Year4
+      - Year5
+      - Year6
+      - Year7
+      - Year8
+      - Year9
+      type: string
+      description: |-
+        * `IAL` - IAL
+        * `IG` - IG
+        * `Year1` - Year 1
+        * `Year2` - Year 2
+        * `Year3` - Year 3
+        * `Year4` - Year 4
+        * `Year5` - Year 5
+        * `Year6` - Year 6
+        * `Year7` - Year 7
+        * `Year8` - Year 8
+        * `Year9` - Year 9
+    EmploymentTypeEnum:
+      enum:
+      - full_time
+      - tutor
+      type: string
+      description: |-
+        * `full_time` - Full Time
+        * `tutor` - Tutor
+    PatchedClass:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        education_level:
+          $ref: '#/components/schemas/EducationLevelEnum'
+        cohort_identifier:
+          type: string
+          maxLength: 1
+        cohort_sub_category:
+          type: string
+          nullable: true
+          maxLength: 1
     PatchedClassStudent:
       type: object
       properties:
-        student:
+        id:
           type: integer
+          readOnly: true
         class_obj:
+          allOf:
+          - $ref: '#/components/schemas/Class'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        class_obj_id:
           type: integer
-    PayPeriod:
+          writeOnly: true
+        student_id:
+          type: integer
+          writeOnly: true
+    PatchedSession:
       type: object
       properties:
         id:
           type: integer
           readOnly: true
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-      required:
-      - start_date
-      - end_date
-    PatchedPayPeriod:
-      type: object
-      properties:
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-    Payslip:
-      type: object
-      properties:
-        id:
-          type: integer
+        timetable_slot:
+          allOf:
+          - $ref: '#/components/schemas/TimetableSlot'
           readOnly: true
         teacher:
-          type: integer
-        teacher_name:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/Teacher'
           readOnly: true
-        pay_period:
-          type: integer
-        total_sessions:
-          type: integer
+        class_obj:
+          allOf:
+          - $ref: '#/components/schemas/Class'
           readOnly: true
-        hourly_rate:
-          type: string
-        total_amount:
-          type: string
-          readOnly: true
-        status:
-          type: string
-          enum:
-          - draft
-          - paid
-          - cancelled
-      required:
-      - teacher
-      - pay_period
-    PatchedPayslip:
-      type: object
-      properties:
-        teacher:
-          type: integer
-        pay_period:
-          type: integer
-        hourly_rate:
-          type: string
-        status:
-          type: string
-          enum:
-          - draft
-          - paid
-          - cancelled
-    Report:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        title:
-          type: string
-        description:
-          type: string
-        file:
-          type: string
-          format: uri
-          readOnly: true
-        generated_at:
+        start_time:
           type: string
           format: date-time
+        end_time:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/SessionStatusEnum'
+        paid:
+          type: boolean
+    PatchedSessionAttendance:
+      type: object
+      properties:
+        id:
+          type: integer
           readOnly: true
-      required:
-      - title
+        session:
+          allOf:
+          - $ref: '#/components/schemas/Session'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+    PatchedStaff:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        contact:
+          type: string
+          nullable: true
+        user_id:
+          type: integer
+          readOnly: true
+    PatchedStudent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        dob:
+          type: string
+          format: date
+          nullable: true
+        enrollment_date:
+          type: string
+          format: date
+          readOnly: true
+        contact:
+          type: string
+          nullable: true
+        user_id:
+          type: integer
+          readOnly: true
+        check_in_token:
+          type: string
+          readOnly: true
+    PatchedSubject:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+    PatchedTeacher:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        employment_type:
+          $ref: '#/components/schemas/EmploymentTypeEnum'
+        default_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        contact:
+          type: string
+          nullable: true
+        bank_details:
+          type: string
+          nullable: true
+        user_id:
+          type: integer
+          readOnly: true
+    PatchedTimetableSlot:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        class_obj:
+          allOf:
+          - $ref: '#/components/schemas/Class'
+          readOnly: true
+        subject:
+          allOf:
+          - $ref: '#/components/schemas/Subject'
+          readOnly: true
+        teacher:
+          allOf:
+          - $ref: '#/components/schemas/Teacher'
+          readOnly: true
+        day_of_week:
+          allOf:
+          - $ref: '#/components/schemas/DayOfWeekEnum'
+          minimum: -2147483648
+          maximum: 2147483647
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        room:
+          type: string
+          nullable: true
+          maxLength: 100
+    PatchedTimetableStudent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        timetable_slot:
+          allOf:
+          - $ref: '#/components/schemas/TimetableSlot'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+    PatchedUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Email address
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        clerk_id:
+          type: string
+          readOnly: true
+        teacher_profile_id:
+          type: integer
+          readOnly: true
+        student_profile_id:
+          type: integer
+          readOnly: true
+        staff_profile_id:
+          type: integer
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
+    RoleEnum:
+      enum:
+      - admin
+      - staff
+      - teacher
+      - student
+      - terminal
+      type: string
+      description: |-
+        * `admin` - Admin
+        * `staff` - Staff
+        * `teacher` - Teacher
+        * `student` - Student
+        * `terminal` - Terminal
     Session:
       type: object
       properties:
@@ -1664,12 +2437,17 @@ components:
           type: integer
           readOnly: true
         timetable_slot:
-          type: object
-          additionalProperties: {}
+          allOf:
+          - $ref: '#/components/schemas/TimetableSlot'
+          readOnly: true
         teacher:
-          type: integer
+          allOf:
+          - $ref: '#/components/schemas/Teacher'
+          readOnly: true
         class_obj:
-          type: integer
+          allOf:
+          - $ref: '#/components/schemas/Class'
+          readOnly: true
         start_time:
           type: string
           format: date-time
@@ -1677,47 +2455,118 @@ components:
           type: string
           format: date-time
         status:
-          type: string
-          nullable: true
-          enum:
-          - scheduled
-          - completed
-          - cancelled
-          - no_show
+          $ref: '#/components/schemas/SessionStatusEnum'
         paid:
           type: boolean
-          nullable: true
-        payslip:
-          type: integer
-          nullable: true
-          readOnly: true
       required:
-      - start_time
+      - class_obj
       - end_time
-    PatchedSession:
+      - id
+      - start_time
+      - teacher
+      - timetable_slot
+    SessionAttendance:
       type: object
       properties:
-        teacher:
+        id:
           type: integer
-        class_obj:
-          type: integer
-        start_time:
-          type: string
-          format: date-time
-        end_time:
-          type: string
-          format: date-time
+          readOnly: true
+        session:
+          allOf:
+          - $ref: '#/components/schemas/Session'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
         status:
+          $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+      required:
+      - id
+      - session
+      - student
+    SessionAttendanceList:
+      type: object
+      description: Lightweight serializer for listing attendance records.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+        session_id:
+          type: integer
+        session_start_time:
+          type: string
+          format: date-time
+        session_end_time:
+          type: string
+          format: date-time
+        session_status:
+          type: string
+        teacher_name:
           type: string
           nullable: true
-          enum:
-          - scheduled
-          - completed
-          - cancelled
-          - no_show
-        paid:
-          type: boolean
+          readOnly: true
+        class_name:
+          type: string
           nullable: true
+          readOnly: true
+        student_id:
+          type: integer
+        student_name:
+          type: string
+      required:
+      - class_name
+      - id
+      - session_end_time
+      - session_id
+      - session_start_time
+      - session_status
+      - student_id
+      - student_name
+      - teacher_name
+    SessionAttendanceStatusEnum:
+      enum:
+      - present
+      - absent
+      - late
+      type: string
+      description: |-
+        * `present` - Present
+        * `absent` - Absent
+        * `late` - Late
+    SessionStatusEnum:
+      enum:
+      - scheduled
+      - completed
+      - cancelled
+      - no_show
+      type: string
+      description: |-
+        * `scheduled` - Scheduled
+        * `completed` - Completed
+        * `cancelled` - Cancelled
+        * `no_show` - No Show
+    Staff:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        contact:
+          type: string
+          nullable: true
+        user_id:
+          type: integer
+          readOnly: true
+      required:
+      - id
+      - name
+      - user_id
     Student:
       type: object
       properties:
@@ -1726,6 +2575,7 @@ components:
           readOnly: true
         name:
           type: string
+          maxLength: 255
         dob:
           type: string
           format: date
@@ -1744,19 +2594,23 @@ components:
           type: string
           readOnly: true
       required:
+      - check_in_token
+      - enrollment_date
+      - id
       - name
-    PatchedStudent:
+      - user_id
+    Subject:
       type: object
       properties:
+        id:
+          type: integer
+          readOnly: true
         name:
           type: string
-        dob:
-          type: string
-          format: date
-          nullable: true
-        contact:
-          type: string
-          nullable: true
+          maxLength: 255
+      required:
+      - id
+      - name
     Teacher:
       type: object
       properties:
@@ -1765,15 +2619,13 @@ components:
           readOnly: true
         name:
           type: string
+          maxLength: 255
         employment_type:
-          type: string
-          nullable: true
-          enum:
-          - full_time
-          - tutor
+          $ref: '#/components/schemas/EmploymentTypeEnum'
         default_rate:
           type: string
-          nullable: true
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         contact:
           type: string
           nullable: true
@@ -1784,48 +2636,119 @@ components:
           type: integer
           readOnly: true
       required:
+      - id
       - name
-    PatchedTeacher:
+      - user_id
+    TimetableSlot:
       type: object
       properties:
-        name:
+        id:
+          type: integer
+          readOnly: true
+        class_obj:
+          allOf:
+          - $ref: '#/components/schemas/Class'
+          readOnly: true
+        subject:
+          allOf:
+          - $ref: '#/components/schemas/Subject'
+          readOnly: true
+        teacher:
+          allOf:
+          - $ref: '#/components/schemas/Teacher'
+          readOnly: true
+        day_of_week:
+          allOf:
+          - $ref: '#/components/schemas/DayOfWeekEnum'
+          minimum: -2147483648
+          maximum: 2147483647
+        start_time:
           type: string
-        employment_type:
+          format: time
+        end_time:
+          type: string
+          format: time
+        room:
           type: string
           nullable: true
-          enum:
-          - full_time
-          - tutor
-        default_rate:
-          type: string
-          nullable: true
-        contact:
-          type: string
-          nullable: true
-        bank_details:
-          type: string
-          nullable: true
+          maxLength: 100
+      required:
+      - class_obj
+      - day_of_week
+      - end_time
+      - id
+      - start_time
+      - subject
+      - teacher
+    TimetableStudent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        timetable_slot:
+          allOf:
+          - $ref: '#/components/schemas/TimetableSlot'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+      required:
+      - id
+      - student
+      - timetable_slot
     User:
       type: object
       properties:
         id:
           type: integer
           readOnly: true
+        username:
+          type: string
+          readOnly: true
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
         email:
           type: string
           format: email
           readOnly: true
-        user_type:
-          type: string
-          enum:
-          - admin
-          - staff
-          - teacher
-          - student
-          - parent
+          title: Email address
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
         clerk_id:
           type: string
           readOnly: true
+        teacher_profile_id:
+          type: integer
+          readOnly: true
+        student_profile_id:
+          type: integer
+          readOnly: true
+        staff_profile_id:
+          type: integer
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
       required:
+      - clerk_id
       - email
-      - user_type
+      - id
+      - is_active
+      - role
+      - staff_profile_id
+      - student_profile_id
+      - teacher_profile_id
+      - username
+  securitySchemes:
+    clerk_jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Clerk-issued JWT token.

@@ -41,9 +41,9 @@ async function handleRequest(
   { params }: { params: Promise<{ slug: string[] }> }
 ) {
   const { slug } = await params
-  // Reconstruct the path — keep the trailing slash if the client sent one,
-  // because the external API may 308-redirect without it.
-  const pathname = `/api/${slug.join("/")}`
+  // Reconstruct the path. Upstream Django API endpoints always expect a trailing slash
+  // (APPEND_SLASH=True). So we ensure the proxied path always ends with a slash.
+  const pathname = `/api/${slug.join("/")}/`
   const proxyUrl = new URL(pathname, API_ORIGIN)
 
   // Copy query params from the original request

@@ -71,7 +71,6 @@ export interface Session {
   end_time: string
   status: SessionStatus | null
   paid: boolean | null
-  payslip: number | null
 }
 
 // --- Create/Update payloads (only writable fields) ---
@@ -101,7 +100,6 @@ export interface SessionPayload {
   end_time: string
   status?: SessionStatus | null
   paid?: boolean | null
-  payslip?: number | null
 }
 
 // --- CheckIn ---
@@ -113,7 +111,7 @@ export interface CheckIn {
   date: string
   timestamp: string
   check_in_type: "qr" | "manual"
-  checked_by: string | null
+  checked_by: number | null
 }
 
 export interface CheckInPayload {
@@ -125,6 +123,35 @@ export interface CheckInPayload {
 
 export interface ClassStudent {
   id: number
-  student: number
-  class_obj: number
+  student: Student | number
+  class_obj: Class | number
+}
+
+// --- User ---
+export interface User {
+  id: number
+  username: string
+  email: string
+  role: "admin" | "staff" | "teacher" | "student" | "terminal"
+  clerk_id: string
+  teacher_profile_id: number | null
+  student_profile_id: number | null
+  staff_profile_id: number | null
+  is_active: boolean
+}
+
+// --- Dashboard Stats ---
+export interface Stats {
+  users: number
+  students: number
+  teachers: number
+  staff: number
+  subjects: number
+  classes: number
+  class_students: number
+  timetable_slots: number
+  timetable_students: number
+  sessions: number
+  session_attendances: number
+  check_ins: number
 }

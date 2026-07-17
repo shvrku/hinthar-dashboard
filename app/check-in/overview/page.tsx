@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Check, X, RotateCcw, Loader2 } from "lucide-react"
+import { Check, X, RotateCcw, Loader2, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { EDUCATION_LEVELS, type EducationLevel, type Student, type CheckIn, type Class, type ClassStudent } from "@/lib/types"
 
@@ -15,7 +15,7 @@ interface StudentRow {
 function RowSkeleton() {
   return (
     <tr className="border-b last:border-b-0">
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-5 w-full animate-pulse rounded bg-muted" />
         </td>
@@ -33,6 +33,8 @@ export default function CheckInOverviewPage() {
   const [classStudents, setClassStudents] = React.useState<ClassStudent[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   // Build map: student_id → student name
   const studentNameMap = React.useMemo(() => {
@@ -43,40 +45,97 @@ export default function CheckInOverviewPage() {
     return map
   }, [students])
 
-  // Build map: student_id → latest check-in
-  const latestCheckInMap = React.useMemo(() => {
+
+  // Build map: student_id → check-in for TODAY
+  const todayCheckInMap = React.useMemo(() => {
     const map = new Map<number, CheckIn>()
+    
+    // Get local today's date string YYYY-MM-DD
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const todayStr = `${year}-${month}-${day}`
+    
     for (const ci of checkIns) {
-      const existing = map.get(ci.student)
-      if (!existing || new Date(ci.timestamp) > new Date(existing.timestamp)) {
-        map.set(ci.student, ci)
+      if (ci.date === todayStr) {
+        const existing = map.get(ci.student)
+        if (!existing || new Date(ci.timestamp) > new Date(existing.timestamp)) {
+          map.set(ci.student, ci)
+        }
       }
     }
     return map
   }, [checkIns])
 
-  // Build map: class_id → education_level
-  const classCohortMap = React.useMemo(() => {
-    const map = new Map<number, EducationLevel>()
-    for (const c of classes) map.set(c.id, c.education_level)
-    return map
-  }, [classes])
+  // Group class-student entries by dynamic class cohort, sorted
+  const sortedGroupedClasses = React.useMemo(() => {
+    if (!students || classes.length === 0) return []
 
-  // Group class-student entries by cohort (driven by class-student table)
-  const grouped = React.useMemo(() => {
-    if (!students) return null
-    const groups = new Map<EducationLevel, StudentRow[]>()
+    const classMap = new Map<number, Class>()
+    for (const c of classes) classMap.set(c.id, c)
+
+    // Build the groups: classId -> array of StudentRow
+    const groups = new Map<number, StudentRow[]>()
     for (const cs of classStudents) {
-      const level = classCohortMap.get(cs.class_obj)
-      if (!level) continue
-      const name = studentNameMap.get(cs.student)
-      if (!name) continue // student fetched but no name? skip
-      const checkIn = latestCheckInMap.get(cs.student) ?? null
-      if (!groups.has(level)) groups.set(level, [])
-      groups.get(level)!.push({ studentId: cs.student, studentName: name, checkIn })
+      const cls = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj : classMap.get(cs.class_obj)
+      if (!cls) continue
+
+      const studentId = typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
+      const name = typeof cs.student === "object" && cs.student !== null ? cs.student.name : studentNameMap.get(studentId)
+      if (!name) continue
+
+      // Filter by search query
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase().trim()
+        const matchesName = name.toLowerCase().includes(query)
+        const matchesId = String(studentId).includes(query)
+        if (!matchesName && !matchesId) continue
+      }
+
+      const checkIn = todayCheckInMap.get(studentId) ?? null
+      
+      if (!groups.has(cls.id)) {
+        groups.set(cls.id, [])
+      }
+      groups.get(cls.id)!.push({ studentId, studentName: name, checkIn })
     }
-    return groups
-  }, [students, classStudents, classCohortMap, studentNameMap, latestCheckInMap])
+
+    // Convert to array of { classObj, label, rows }
+    const result: { classObj: Class; label: string; rows: StudentRow[] }[] = []
+    for (const [classId, rows] of groups.entries()) {
+      let cls = classMap.get(classId)
+      if (!cls) {
+        const found = classStudents.find(
+          (cs) => typeof cs.class_obj === "object" && cs.class_obj !== null && cs.class_obj.id === classId
+        )
+        if (found && typeof found.class_obj === "object") {
+          cls = found.class_obj
+        }
+      }
+      if (!cls) continue
+
+      const foundLevel = EDUCATION_LEVELS.find((el) => el.value === cls.education_level)
+      const baseLabel = foundLevel ? foundLevel.label : cls.education_level
+      const label = `${baseLabel} ${cls.cohort_identifier}`.trim()
+      result.push({ classObj: cls, label, rows })
+    }
+
+    // Sort the result by position of education_level in EDUCATION_LEVELS, then alphabetical identifier
+    const levelOrder = EDUCATION_LEVELS.map((el) => el.value)
+    result.sort((a, b) => {
+      const idxA = levelOrder.indexOf(a.classObj.education_level)
+      const idxB = levelOrder.indexOf(b.classObj.education_level)
+      if (idxA !== idxB) {
+        const orderA = idxA === -1 ? 999 : idxA
+        const orderB = idxB === -1 ? 999 : idxB
+        return orderA - orderB
+      }
+      return a.classObj.cohort_identifier.localeCompare(b.classObj.cohort_identifier)
+    })
+
+    return result
+  }, [students, classes, classStudents, studentNameMap, todayCheckInMap, searchQuery])
 
   const loadData = React.useCallback(async () => {
     if (!isSignedIn) return
@@ -92,10 +151,12 @@ export default function CheckInOverviewPage() {
         api.listClasses(),
         api.listClassStudents(),
       ])
+
       setStudents(studs)
       setCheckIns(cis)
       setClasses(cls)
       setClassStudents(css)
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
       else setError(err instanceof Error ? err.message : "Failed to load data")
@@ -137,27 +198,44 @@ export default function CheckInOverviewPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="mb-6 flex items-center gap-3">
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              Load Data
-            </>
-          )}
-        </button>
-        {grouped !== null && !loading && (
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        {/* Left side actions (Buttons + Search) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="size-4" />
+                Load Data
+              </>
+            )}
+          </button>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+            />
+          </div>
+        </div>
+
+        {/* Right side info (Timestamp/Status) */}
+        {lastLoaded && (
           <span className="text-xs text-muted-foreground">
-            {Array.from(grouped.values()).reduce((sum, rows) => sum + rows.length, 0)} students across {grouped.size} cohorts
+            {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts &bull; Loaded {lastLoaded}
           </span>
         )}
       </div>
@@ -187,7 +265,6 @@ export default function CheckInOverviewPage() {
                         <th className="px-4 py-3 text-left font-medium">Name</th>
                         <th className="px-4 py-3 text-left font-medium">Check-In Time</th>
                         <th className="px-4 py-3 text-left font-medium">Status</th>
-                        <th className="px-4 py-3 text-left font-medium">Checked By</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -199,30 +276,32 @@ export default function CheckInOverviewPage() {
             ))}
           </div>
         )
-        : grouped === null
+        : students === null
           ? (
             <div className="flex items-center justify-center rounded-lg border border-dashed py-16">
               <p className="text-sm text-muted-foreground">Click &quot;Load Data&quot; to view check-in status.</p>
             </div>
           )
-          : grouped.size === 0
+          : sortedGroupedClasses.length === 0
             ? (
               <div className="flex items-center justify-center rounded-lg border border-dashed py-16">
-                <p className="text-sm text-muted-foreground">No students found in any cohort.</p>
+                <p className="text-sm text-muted-foreground">No students found in any cohort classes.</p>
               </div>
             )
             : (
               <div className="space-y-8">
-                {EDUCATION_LEVELS.map(({ value: level, label }) => {
-                  const rows = grouped.get(level)
-                  if (!rows || rows.length === 0) return null
-
+                {sortedGroupedClasses.map(({ classObj, label, rows }) => {
                   const checkedIn = rows.filter((r) => r.checkIn !== null).length
 
                   return (
-                    <section key={level}>
+                    <section key={classObj.id}>
                       <div className="mb-3 flex items-baseline gap-3">
                         <h2 className="text-xl font-semibold tracking-tight">{label}</h2>
+                        {classObj.cohort_sub_category && (
+                          <span className="text-xs font-normal text-muted-foreground">
+                            ({classObj.cohort_sub_category})
+                          </span>
+                        )}
                         <span className="text-xs text-muted-foreground">
                           {checkedIn}/{rows.length} checked in
                         </span>
@@ -235,7 +314,6 @@ export default function CheckInOverviewPage() {
                               <th className="px-4 py-3 text-left font-medium">Name</th>
                               <th className="px-4 py-3 text-left font-medium">Check-In Time</th>
                               <th className="px-4 py-3 text-left font-medium">Status</th>
-                              <th className="px-4 py-3 text-left font-medium">Checked By</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -257,12 +335,17 @@ export default function CheckInOverviewPage() {
                                     : <span className="text-muted-foreground">—</span>}
                                 </td>
                                 <td className="px-4 py-3">
-                                  {checkIn
-                                    ? <Check className="size-5 text-green-600 dark:text-green-400" />
-                                    : <X className="size-5 text-muted-foreground/50" />}
-                                </td>
-                                <td className="px-4 py-3 text-muted-foreground">
-                                  {checkIn?.checked_by ?? "—"}
+                                  {checkIn ? (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
+                                      <Check className="size-3.5" />
+                                      Checked In
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
+                                      <X className="size-3.5" />
+                                      Absent
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             ))}

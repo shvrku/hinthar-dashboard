@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Check, Minus } from "lucide-react"
+import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Check, Minus, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus } from "@/lib/types"
 
@@ -41,6 +41,8 @@ export default function SessionsPage() {
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   // Modal state
   const [modalOpen, setModalOpen] = React.useState(false)
@@ -75,6 +77,7 @@ export default function SessionsPage() {
       const api = createApi(token)
       const data = await api.listSessions()
       setSessions(data)
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -85,6 +88,21 @@ export default function SessionsPage() {
       setLoading(false)
     }
   }, [getToken, isSignedIn])
+
+  const filteredSessions = React.useMemo(() => {
+    if (!sessions) return []
+    if (searchQuery.trim() === "") return sessions
+    const query = searchQuery.toLowerCase().trim()
+    return sessions.filter(
+      (s) =>
+        (s.teacher && s.teacher.name.toLowerCase().includes(query)) ||
+        (s.class_obj &&
+          (`${s.class_obj.education_level} ${s.class_obj.cohort_identifier}`)
+            .toLowerCase()
+            .includes(query)) ||
+        (s.status && s.status.toLowerCase().includes(query))
+    )
+  }, [sessions, searchQuery])
 
   const openAddModal = () => {
     setEditingSession(null)
@@ -207,34 +225,52 @@ export default function SessionsPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="mb-6 flex items-center gap-3">
-        <button
-          onClick={loadSessions}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              Load Data
-            </>
-          )}
-        </button>
-        <button
-          onClick={openAddModal}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-muted/50"
-        >
-          <Plus className="size-4" />
-          Add Session
-        </button>
-        {sessions !== null && !loading && (
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        {/* Left side actions (Buttons + Search) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={loadSessions}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="size-4" />
+                Load Data
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={openAddModal}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <Plus className="size-4" />
+            Add Session
+          </button>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+            />
+          </div>
+        </div>
+
+        {/* Right side info (Timestamp/Status) */}
+        {lastLoaded && sessions && (
           <span className="text-xs text-muted-foreground">
-            {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+            {filteredSessions.length} of {sessions.length} session{sessions.length !== 1 ? "s" : ""} &bull; Loaded {lastLoaded}
           </span>
         )}
       </div>
@@ -286,7 +322,7 @@ export default function SessionsPage() {
                     </td>
                   </tr>
                 )
-                : sessions.length === 0
+                : filteredSessions.length === 0
                   ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
@@ -294,7 +330,7 @@ export default function SessionsPage() {
                       </td>
                     </tr>
                   )
-                  : sessions.map((session) => (
+                  : filteredSessions.map((session) => (
                       <tr key={session.id} className="border-b last:border-b-0 transition-colors hover:bg-muted/30">
                         <td className="px-4 py-3 font-mono text-xs">{session.id}</td>
                         <td className="px-4 py-3">{session.teacher?.name ?? "—"}</td>

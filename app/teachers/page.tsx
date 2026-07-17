@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, X, RotateCcw, Loader2 } from "lucide-react"
+import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import {
   type Teacher,
@@ -267,6 +267,8 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = React.useState<Teacher[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   // ── Success message ──────────────────────────────────────────────
   const [success, setSuccess] = React.useState<string | null>(null)
@@ -303,6 +305,7 @@ export default function TeachersPage() {
       const api = createApi(token)
       const data = await api.listTeachers()
       setTeachers(data)
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -315,6 +318,18 @@ export default function TeachersPage() {
       setLoading(false)
     }
   }, [getToken, isSignedIn])
+
+  const filteredTeachers = React.useMemo(() => {
+    if (searchQuery.trim() === "") return teachers
+    const query = searchQuery.toLowerCase().trim()
+    return teachers.filter(
+      (t) =>
+        t.name.toLowerCase().includes(query) ||
+        String(t.id).includes(query) ||
+        (t.contact && t.contact.toLowerCase().includes(query)) ||
+        (t.employment_type && t.employment_type.toLowerCase().includes(query))
+    )
+  }, [teachers, searchQuery])
 
   // ── Not loaded / signed out ───────────────────────────────────────
   if (!isLoaded) {
@@ -443,31 +458,53 @@ export default function TeachersPage() {
 
       {/* Toolbar */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <button
-          onClick={loadTeachers}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              Load Data
-            </>
-          )}
-        </button>
+        {/* Left side actions (Buttons + Search) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={loadTeachers}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="size-4" />
+                Load Data
+              </>
+            )}
+          </button>
 
-        <button
-          onClick={openAddModal}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
-        >
-          <Plus className="size-4" />
-          Add Teacher
-        </button>
+          <button
+            onClick={openAddModal}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <Plus className="size-4" />
+            Add Teacher
+          </button>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search teachers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
+            />
+          </div>
+        </div>
+
+        {/* Right side info (Timestamp/Status) */}
+        {lastLoaded && teachers && (
+          <span className="text-xs text-muted-foreground">
+            {filteredTeachers.length} of {teachers.length} teacher{teachers.length !== 1 ? "s" : ""} &bull; Loaded {lastLoaded}
+          </span>
+        )}
       </div>
 
       {/* Success banner */}
@@ -515,19 +552,17 @@ export default function TeachersPage() {
                   <TableSkeleton />
                 </td>
               </tr>
-            ) : teachers.length === 0 ? (
+            ) : filteredTeachers.length === 0 ? (
               <tr>
                 <td
                   colSpan={7}
                   className="px-4 py-12 text-center text-muted-foreground"
                 >
-                  {teachers.length === 0 && !loading
-                    ? 'Click "Load Data" to fetch teachers.'
-                    : "No teachers found."}
+                  No teachers found.
                 </td>
               </tr>
             ) : (
-              teachers.map((teacher) => (
+              filteredTeachers.map((teacher) => (
                 <tr
                   key={teacher.id}
                   className="border-b transition-colors hover:bg-muted/30"

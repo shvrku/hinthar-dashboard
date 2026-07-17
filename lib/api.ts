@@ -12,13 +12,37 @@ export class ApiError extends Error {
   }
 
   get userMessage(): string {
-    if (this.status === 401) return "[401] Your session has expired. Please sign in again."
-    if (this.status === 403) return "[403] You don't have permission to perform this action."
-    if (this.status === 404) return "[404] The requested resource was not found."
-    if (this.status === 409) return `[409] ${this.detail || "Conflict — the student may already be checked in today."}`
-    if (this.status === 502) return `[502] ${this.detail || "Failed to reach the API server. It may be down or restarting."}`
-    if (this.status === 0) return this.detail || "[Network] Unable to connect to the server."
-    if (this.status >= 500) return "[500] The server encountered an error. Please try again later."
+    const detailText = this.detail ? `: ${this.detail}` : ""
+
+    if (this.status === 401) {
+      return this.detail
+        ? `[401] Unauthorized${detailText}`
+        : "[401] Your session has expired. Please sign in again."
+    }
+    if (this.status === 403) {
+      return this.detail
+        ? `[403] Permission Denied${detailText}`
+        : "[403] You don't have permission to perform this action."
+    }
+    if (this.status === 404) {
+      return this.detail
+        ? `[404] Not Found${detailText}`
+        : "[404] The requested resource was not found."
+    }
+    if (this.status === 409) {
+      return `[409] ${this.detail || "Conflict — the student may already be checked in today."}`
+    }
+    if (this.status === 502) {
+      return `[502] ${this.detail || "Failed to reach the API server. It may be down or restarting."}`
+    }
+    if (this.status === 0) {
+      return this.detail || "[Network] Unable to connect to the server."
+    }
+    if (this.status >= 500) {
+      return this.detail
+        ? `[${this.status}] Server Error${detailText}`
+        : `[${this.status}] The server encountered an error. Please try again later.`
+    }
     return `[${this.status}] ${this.detail || "An unexpected error occurred."}`
   }
 }
@@ -151,6 +175,15 @@ export function createApi(token: string) {
     listClassStudents: () =>
       request<import("./types").ClassStudent[]>(`/class-students/`, token),
 
+    createClassStudent: (classId: number, studentId: number) =>
+      request<import("./types").ClassStudent>(`/class-students/`, token, {
+        method: "POST",
+        body: JSON.stringify({ class_obj_id: classId, student_id: studentId }),
+      }),
+
+    deleteClassStudent: (id: number) =>
+      request<void>(`/class-students/${id}/`, token, { method: "DELETE" }),
+
     // --- Teachers ---
     listTeachers: () =>
       request<import("./types").Teacher[]>(`/teachers/`, token),
@@ -194,6 +227,21 @@ export function createApi(token: string) {
 
     deleteSession: (id: number) =>
       request<void>(`/sessions/${id}/`, token, { method: "DELETE" }),
+
+    // --- Users ---
+    listUsers: () =>
+      request<import("./types").User[]>(`/users/`, token),
+
+    getUser: (id: number) =>
+      request<import("./types").User>(`/users/${id}/`, token),
+
+    // --- Stats ---
+    getStats: () =>
+      request<import("./types").Stats>(`/stats/`, token),
+
+    // --- Me ---
+    getMe: () =>
+      request<import("./types").User>(`/me/`, token),
   }
 }
 
