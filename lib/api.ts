@@ -1,4 +1,4 @@
-const API_BASE = "https://school-management-system-api-xs24.onrender.com/api/v1"
+const API_BASE = "/api/v1"
 
 export class ApiError extends Error {
   status: number
@@ -16,6 +16,7 @@ export class ApiError extends Error {
     if (this.status === 403) return "[403] You don't have permission to perform this action."
     if (this.status === 404) return "[404] The requested resource was not found."
     if (this.status === 409) return `[409] ${this.detail || "Conflict — the student may already be checked in today."}`
+    if (this.status === 502) return `[502] ${this.detail || "Failed to reach the API server. It may be down or restarting."}`
     if (this.status === 0) return this.detail || "[Network] Unable to connect to the server."
     if (this.status >= 500) return "[500] The server encountered an error. Please try again later."
     return `[${this.status}] ${this.detail || "An unexpected error occurred."}`
