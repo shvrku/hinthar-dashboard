@@ -4,7 +4,7 @@ import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Check, X, RotateCcw, Loader2, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { EDUCATION_LEVELS, type EducationLevel, type Student, type CheckIn, type Class, type ClassStudent } from "@/lib/types"
+import { EDUCATION_LEVELS, type Student, type CheckIn, type Class, type ClassStudent } from "@/lib/types"
 
 interface StudentRow {
   studentId: number

@@ -82,13 +82,30 @@ async function request<T>(
         // Try common response formats
         if (typeof body === "string") {
           detail = body
-        } else {
-          detail =
-            (body as { detail?: string }).detail ??
-            (body as { message?: string }).message ??
-            (body as { error?: string }).error ??
-            (body as { non_field_errors?: string[] }).non_field_errors?.join("; ") ??
-            detail
+        } else if (body && typeof body === "object" && !Array.isArray(body)) {
+          const dict = body as Record<string, unknown>
+          if (typeof dict.detail === "string") {
+            detail = dict.detail
+          } else if (typeof dict.message === "string") {
+            detail = dict.message
+          } else if (typeof dict.error === "string") {
+            detail = dict.error
+          } else {
+            const messages: string[] = []
+            for (const [key, value] of Object.entries(dict)) {
+              const fieldName = key === "__all__" || key === "non_field_errors" ? "" : `${key}: `
+              if (Array.isArray(value)) {
+                messages.push(`${fieldName}${value.join(", ")}`)
+              } else if (typeof value === "string") {
+                messages.push(`${fieldName}${value}`)
+              } else {
+                messages.push(`${fieldName}${JSON.stringify(value)}`)
+              }
+            }
+            if (messages.length > 0) {
+              detail = messages.join("; ")
+            }
+          }
         }
       } catch {
         detail = raw // use raw text if not JSON
@@ -107,11 +124,52 @@ async function request<T>(
   }
 }
 
+interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
+async function requestAllPages<T>(
+  path: string,
+  token: string,
+  options: RequestInit = {}
+): Promise<T[]> {
+  const allResults: T[] = []
+  let nextUrl: string | null = path
+
+  while (nextUrl) {
+    const currentUrl: string = nextUrl as string
+    let fetchPath: string = currentUrl
+    if (currentUrl.startsWith("http")) {
+      const urlObj = new URL(currentUrl)
+      fetchPath = `${urlObj.pathname}${urlObj.search}`
+      if (fetchPath.startsWith("/api/v1")) {
+        fetchPath = fetchPath.substring(7)
+      }
+    }
+
+    const res = await request<PaginatedResponse<T> | T[]>(fetchPath, token, options)
+    if (Array.isArray(res)) {
+      allResults.push(...res)
+      break
+    } else if (res && Array.isArray(res.results)) {
+      allResults.push(...res.results)
+      nextUrl = res.next
+    } else {
+      break
+    }
+  }
+
+  return allResults
+}
+
 export function createApi(token: string) {
   return {
     // --- Classes ---
     listClasses: () =>
-      request<import("./types").Class[]>(`/classes/`, token),
+      requestAllPages<import("./types").Class>(`/classes/`, token),
 
     getClass: (id: number) =>
       request<import("./types").Class>(`/classes/${id}/`, token),
@@ -133,7 +191,7 @@ export function createApi(token: string) {
 
     // --- Students ---
     listStudents: () =>
-      request<import("./types").Student[]>(`/students/`, token),
+      requestAllPages<import("./types").Student>(`/students/`, token),
 
     getStudent: (id: number) =>
       request<import("./types").Student>(`/students/${id}/`, token),
@@ -154,16 +212,16 @@ export function createApi(token: string) {
       request<void>(`/students/${id}/`, token, { method: "DELETE" }),
 
     getCheckInToken: (id: number) =>
-      request<import("./types").Student>(`/students/${id}/check_in_token/`, token),
+      request<{ check_in_token: string }>(`/students/${id}/check_in_token/`, token),
 
     regenerateCheckInToken: (id: number) =>
-      request<import("./types").Student>(`/students/${id}/regenerate_check_in_token/`, token, {
+      request<{ check_in_token: string }>(`/students/${id}/regenerate_check_in_token/`, token, {
         method: "POST",
       }),
 
     // --- Check-Ins ---
     listCheckIns: () =>
-      request<import("./types").CheckIn[]>(`/check-ins/`, token),
+      requestAllPages<import("./types").CheckIn>(`/check-ins/`, token),
 
     createCheckInManual: (studentId: number) =>
       request<import("./types").CheckIn>(`/check-ins/manual/`, token, {
@@ -179,7 +237,7 @@ export function createApi(token: string) {
 
     // --- Class-Students ---
     listClassStudents: () =>
-      request<import("./types").ClassStudent[]>(`/class-students/`, token),
+      requestAllPages<import("./types").ClassStudent>(`/class-students/`, token),
 
     createClassStudent: (classId: number, studentId: number) =>
       request<import("./types").ClassStudent>(`/class-students/`, token, {
@@ -192,7 +250,7 @@ export function createApi(token: string) {
 
     // --- Teachers ---
     listTeachers: () =>
-      request<import("./types").Teacher[]>(`/teachers/`, token),
+      requestAllPages<import("./types").Teacher>(`/teachers/`, token),
 
     getTeacher: (id: number) =>
       request<import("./types").Teacher>(`/teachers/${id}/`, token),
@@ -214,7 +272,7 @@ export function createApi(token: string) {
 
     // --- Sessions ---
     listSessions: () =>
-      request<import("./types").Session[]>(`/sessions/`, token),
+      requestAllPages<import("./types").Session>(`/sessions/`, token),
 
     getSession: (id: number) =>
       request<import("./types").Session>(`/sessions/${id}/`, token),
@@ -234,9 +292,13 @@ export function createApi(token: string) {
     deleteSession: (id: number) =>
       request<void>(`/sessions/${id}/`, token, { method: "DELETE" }),
 
+    // --- Timetable Slots ---
+    listTimetableSlots: () =>
+      requestAllPages<import("./types").TimetableSlot>(`/timetable-slots/`, token),
+
     // --- Users ---
     listUsers: () =>
-      request<import("./types").User[]>(`/users/`, token),
+      requestAllPages<import("./types").User>(`/users/`, token),
 
     getUser: (id: number) =>
       request<import("./types").User>(`/users/${id}/`, token),

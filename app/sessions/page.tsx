@@ -4,7 +4,7 @@ import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Check, Minus, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus } from "@/lib/types"
+import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot } from "@/lib/types"
 
 const STATUS_COLORS: Record<SessionStatus, string> = {
   scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
@@ -13,13 +13,61 @@ const STATUS_COLORS: Record<SessionStatus, string> = {
   no_show: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 }
 
+const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
+  const hour = Math.floor(7 + i / 2)
+  const minute = i % 2 === 0 ? "00" : "30"
+  const hourStr = hour.toString().padStart(2, "0")
+  const value = `${hourStr}:${minute}`
+  const ampm = hour >= 12 ? "PM" : "AM"
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const label = `${displayHour}:${minute} ${ampm}`
+  return { value, label }
+})
+
+const DURATIONS = [
+  { value: "30", label: "30 minutes" },
+  { value: "60", label: "1 hour" },
+  { value: "90", label: "1.5 hours" },
+  { value: "120", label: "2 hours" },
+  { value: "150", label: "2.5 hours" },
+  { value: "180", label: "3 hours" },
+  { value: "custom", label: "Custom End Time" },
+]
+
+function parseBackendDateTime(str: string): Date {
+  if (!str) return new Date(NaN)
+  if (str.includes("T") || str.includes("-")) {
+    const d = new Date(str)
+    if (!isNaN(d.getTime())) return d
+  }
+  const parts = str.split(" ")
+  if (parts.length === 2) {
+    const dateParts = parts[0].split("/")
+    const timeParts = parts[1].split(":")
+    if (dateParts.length === 3 && timeParts.length === 3) {
+      const day = parseInt(dateParts[0], 10)
+      const month = parseInt(dateParts[1], 10) - 1
+      const year = parseInt(dateParts[2], 10) + 2000
+      const hours = parseInt(timeParts[0], 10)
+      const minutes = parseInt(timeParts[1], 10)
+      const seconds = parseInt(timeParts[2], 10)
+      
+      const date = new Date(year, month, day, hours, minutes, seconds)
+      if (!isNaN(date.getTime())) return date
+    }
+  }
+  return new Date(str)
+}
+
 function statusLabel(value: SessionStatus | null): string {
   if (!value) return "—"
   return SESSION_STATUSES.find((s) => s.value === value)?.label ?? value
 }
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString()
+  const d = parseBackendDateTime(iso)
+  if (isNaN(d.getTime())) return "—"
+  return d.toLocaleString()
 }
 
 function RowSkeleton() {
@@ -38,6 +86,9 @@ export default function SessionsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
   const [sessions, setSessions] = React.useState<Session[] | null>(null)
+  const [teachers, setTeachers] = React.useState<Teacher[]>([])
+  const [classes, setClasses] = React.useState<Class[]>([])
+  const [timetableSlots, setTimetableSlots] = React.useState<TimetableSlot[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
@@ -54,10 +105,15 @@ export default function SessionsPage() {
   const [deleting, setDeleting] = React.useState(false)
 
   // Form fields
-  const [formStart, setFormStart] = React.useState("")
-  const [formEnd, setFormEnd] = React.useState("")
+  const [formDate, setFormDate] = React.useState("")
+  const [formStartTime, setFormStartTime] = React.useState("")
+  const [formDuration, setFormDuration] = React.useState("60") // default 1 hour
+  const [formCustomEndTime, setFormCustomEndTime] = React.useState("")
   const [formStatus, setFormStatus] = React.useState<string>("")
   const [formPaid, setFormPaid] = React.useState(false)
+  const [formTeacherId, setFormTeacherId] = React.useState<string>("")
+  const [formClassId, setFormClassId] = React.useState<string>("")
+  const [formTimetableSlotId, setFormTimetableSlotId] = React.useState<string>("")
 
   const successTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -66,6 +122,29 @@ export default function SessionsPage() {
     setSuccess(msg)
     successTimer.current = setTimeout(() => setSuccess(null), 3000)
   }, [])
+
+  const loadInitialData = React.useCallback(async () => {
+    if (!isSignedIn) return
+    try {
+      const token = await getToken()
+      if (!token) return
+      const api = createApi(token)
+      const [teachersData, classesData, slotsData] = await Promise.all([
+        api.listTeachers(),
+        api.listClasses(),
+        api.listTimetableSlots(),
+      ])
+      setTeachers(teachersData)
+      setClasses(classesData)
+      setTimetableSlots(slotsData)
+    } catch {
+      // silent - errors handled by loadSessions or user alerts
+    }
+  }, [getToken, isSignedIn])
+
+  React.useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
 
   const loadSessions = React.useCallback(async () => {
     if (!isSignedIn) return
@@ -104,27 +183,94 @@ export default function SessionsPage() {
     )
   }, [sessions, searchQuery])
 
+  const filteredSlots = React.useMemo(() => {
+    if (!formClassId) return []
+    return timetableSlots.filter((slot) => slot.class_obj?.id.toString() === formClassId)
+  }, [timetableSlots, formClassId])
+
+  const handleClassChange = (classId: string) => {
+    setFormClassId(classId)
+    setFormTimetableSlotId("")
+  }
+
+  const handleSlotChange = (slotId: string) => {
+    setFormTimetableSlotId(slotId)
+    if (!slotId) return
+
+    const slot = timetableSlots.find((s) => s.id.toString() === slotId)
+    if (slot) {
+      if (slot.teacher) {
+        setFormTeacherId(slot.teacher.id.toString())
+      }
+      
+      if (slot.start_time) {
+        const timePart = slot.start_time.split(":")
+        if (timePart.length >= 2) {
+          setFormStartTime(`${timePart[0]}:${timePart[1]}`)
+        }
+      }
+      
+      if (slot.start_time && slot.end_time) {
+        const parseTime = (timeStr: string) => {
+          const [h, m] = timeStr.split(":").map(Number)
+          return h * 60 + m
+        }
+        const diffMin = parseTime(slot.end_time) - parseTime(slot.start_time)
+        const standardDurations = [30, 60, 90, 120, 150, 180]
+        if (standardDurations.includes(diffMin)) {
+          setFormDuration(diffMin.toString())
+          setFormCustomEndTime("")
+        } else {
+          setFormDuration("custom")
+          const timePart = slot.end_time.split(":")
+          if (timePart.length >= 2) {
+            setFormCustomEndTime(`${timePart[0]}:${timePart[1]}`)
+          }
+        }
+      }
+    }
+  }
+
   const openAddModal = () => {
     setEditingSession(null)
-    setFormStart("")
-    setFormEnd("")
-    setFormStatus("")
+    const today = new Date()
+    const pad = (n: number) => n.toString().padStart(2, "0")
+    setFormDate(`${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`)
+    setFormStartTime("09:00")
+    setFormDuration("60")
+    setFormCustomEndTime("")
+    setFormStatus("scheduled")
     setFormPaid(false)
+    setFormTeacherId("")
+    setFormClassId("")
+    setFormTimetableSlotId("")
     setModalOpen(true)
   }
 
   const openEditModal = (session: Session) => {
     setEditingSession(session)
-    // Convert ISO to datetime-local format
-    const toDatetimeLocal = (iso: string) => {
-      const d = new Date(iso)
-      const pad = (n: number) => n.toString().padStart(2, "0")
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const dStart = parseBackendDateTime(session.start_time)
+    const dEnd = parseBackendDateTime(session.end_time)
+    const pad = (n: number) => n.toString().padStart(2, "0")
+    
+    setFormDate(`${dStart.getFullYear()}-${pad(dStart.getMonth() + 1)}-${pad(dStart.getDate())}`)
+    setFormStartTime(`${pad(dStart.getHours())}:${pad(dStart.getMinutes())}`)
+    
+    const diffMin = Math.round((dEnd.getTime() - dStart.getTime()) / (60 * 1000))
+    const standardDurations = [30, 60, 90, 120, 150, 180]
+    if (standardDurations.includes(diffMin)) {
+      setFormDuration(diffMin.toString())
+      setFormCustomEndTime("")
+    } else {
+      setFormDuration("custom")
+      setFormCustomEndTime(`${pad(dEnd.getHours())}:${pad(dEnd.getMinutes())}`)
     }
-    setFormStart(toDatetimeLocal(session.start_time))
-    setFormEnd(toDatetimeLocal(session.end_time))
+    
     setFormStatus(session.status ?? "")
     setFormPaid(session.paid ?? false)
+    setFormTeacherId(session.teacher?.id.toString() ?? "")
+    setFormClassId(session.class_obj?.id.toString() ?? "")
+    setFormTimetableSlotId(session.timetable_slot?.id.toString() ?? "")
     setModalOpen(true)
   }
 
@@ -133,15 +279,47 @@ export default function SessionsPage() {
     setEditingSession(null)
   }
 
-  const getFormPayload = (): SessionPayload => ({
-    start_time: new Date(formStart).toISOString(),
-    end_time: new Date(formEnd).toISOString(),
-    ...(formStatus ? { status: formStatus as SessionStatus } : {}),
-    ...(formPaid ? { paid: true } : {}),
-  })
+  const getFormPayload = (): SessionPayload => {
+    const startStr = `${formDate}T${formStartTime}`
+    const start = parseBackendDateTime(startStr)
+    let end: Date
+    if (formDuration === "custom") {
+      const endStr = `${formDate}T${formCustomEndTime}`
+      end = parseBackendDateTime(endStr)
+    } else {
+      end = new Date(start.getTime() + parseInt(formDuration, 10) * 60 * 1000)
+    }
+    
+    return {
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      ...(formStatus ? { status: formStatus as SessionStatus } : {}),
+      ...(formPaid ? { paid: true } : {}),
+      ...(formTeacherId ? { teacher_id: parseInt(formTeacherId, 10) } : {}),
+      ...(formClassId ? { class_obj_id: parseInt(formClassId, 10) } : { class_obj_id: null }),
+      timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
+    }
+  }
 
   const handleSave = async () => {
-    if (!formStart || !formEnd) return
+    if (!formDate || !formStartTime || !formTeacherId) return
+    if (formDuration === "custom" && !formCustomEndTime) return
+    
+    const startStr = `${formDate}T${formStartTime}`
+    const start = parseBackendDateTime(startStr)
+    let end: Date
+    if (formDuration === "custom") {
+      const endStr = `${formDate}T${formCustomEndTime}`
+      end = parseBackendDateTime(endStr)
+    } else {
+      end = new Date(start.getTime() + parseInt(formDuration, 10) * 60 * 1000)
+    }
+    
+    if (end <= start) {
+      setError("End time must be after start time.")
+      return
+    }
+
     setSaving(true)
     setError(null)
     try {
@@ -402,32 +580,155 @@ export default function SessionsPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Start time */}
+              {/* Teacher */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
-                  Start Time <span className="text-red-500">*</span>
+                  Teacher <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formStart}
-                  onChange={(e) => setFormStart(e.target.value)}
+                <select
+                  value={formTeacherId}
+                  onChange={(e) => setFormTeacherId(e.target.value)}
                   required
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
+                >
+                  <option value="">— Select Teacher —</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* End time */}
+              {/* Class */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  End Time <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formEnd}
-                  onChange={(e) => setFormEnd(e.target.value)}
-                  required
+                <label className="mb-1.5 block text-sm font-medium">Class</label>
+                <select
+                  value={formClassId}
+                  onChange={(e) => handleClassChange(e.target.value)}
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
+                >
+                  <option value="">— None (Tutor Session) —</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.education_level} {c.cohort_identifier}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Timetable Slot */}
+              {formClassId && (
+                <div>
+                  {filteredSlots.length > 0 ? (
+                    <>
+                      <label className="mb-1.5 block text-sm font-medium">Timetable Slot</label>
+                      <select
+                        value={formTimetableSlotId}
+                        onChange={(e) => handleSlotChange(e.target.value)}
+                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                      >
+                        <option value="">— Select Timetable Slot (Optional) —</option>
+                        {filteredSlots.map((slot) => {
+                          const dayName = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][slot.day_of_week] || `Day ${slot.day_of_week}`
+                          const subjectName = slot.subject?.name || "No Subject"
+                          const teacherName = slot.teacher?.name || "No Teacher"
+                          return (
+                            <option key={slot.id} value={slot.id}>
+                              {subjectName} with {teacherName} ({dayName} {slot.start_time.slice(0,5)}-{slot.end_time.slice(0,5)})
+                            </option>
+                          )
+                        })}
+                      </select>
+                      {!formTimetableSlotId && (
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          ℹ️ No slot selected. This session will be scheduled as an ad-hoc/extra session.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-800 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-300">
+                      ℹ️ This class has no recurring timetable slots. This session will be scheduled as an ad-hoc/extra session.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Date & Start Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    required
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Start Time <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formStartTime}
+                    onChange={(e) => setFormStartTime(e.target.value)}
+                    required
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  >
+                    <option value="">— Select Time —</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={slot.value} value={slot.value}>
+                        {slot.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Duration & End Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Duration <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formDuration}
+                    onChange={(e) => setFormDuration(e.target.value)}
+                    required
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  >
+                    {DURATIONS.map((dur) => (
+                      <option key={dur.value} value={dur.value}>
+                        {dur.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {formDuration === "custom" && (
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Custom End Time <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formCustomEndTime}
+                      onChange={(e) => setFormCustomEndTime(e.target.value)}
+                      required
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                    >
+                      <option value="">— Select Time —</option>
+                      {TIME_SLOTS.map((slot) => (
+                        <option key={slot.value} value={slot.value}>
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Status */}
@@ -470,7 +771,7 @@ export default function SessionsPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !formStart || !formEnd}
+                disabled={saving || !formDate || !formStartTime || !formTeacherId || (formDuration === "custom" && !formCustomEndTime)}
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
               >
                 {saving && <Loader2 className="size-4 animate-spin" />}

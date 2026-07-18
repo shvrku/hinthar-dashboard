@@ -37,7 +37,9 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
   const [error, setError] = React.useState<string | null>(null)
 
   // Keep ref in sync so the effect never needs to re-run
-  onScanRef.current = onScan
+  React.useEffect(() => {
+    onScanRef.current = onScan
+  }, [onScan])
 
   // Expose resetScanLock for parent to call after confirm/reject
   React.useImperativeHandle(ref, () => ({
@@ -129,7 +131,8 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
       </div>
     </div>
   )
-  })
+})
+QrScanner.displayName = "QrScanner"
 
 export default function TerminalPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()

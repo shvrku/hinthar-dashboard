@@ -1,4 +1,4 @@
-const API_ORIGIN = "https://school-management-system-api-xs24.onrender.com"
+const API_ORIGIN = process.env.API_ORIGIN || "https://school-management-system-api-xs24.onrender.com"
 
 /** CORS headers added to every response so browsers on other devices/origins can fetch. */
 const CORS_HEADERS: Record<string, string> = {
@@ -58,17 +58,21 @@ async function handleRequest(
     if (value) headers.set(key, value)
   }
 
+  let requestBody: ArrayBuffer | undefined = undefined
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    try {
+      requestBody = await request.arrayBuffer()
+    } catch {
+      // ignore
+    }
+  }
+
   try {
     const response = await fetch(proxyUrl, {
       method: request.method,
       headers,
-      body:
-        request.method !== "GET" && request.method !== "HEAD"
-          ? request.body
-          : undefined,
+      body: requestBody,
       redirect: "follow",
-      // @ts-expect-error - duplex is required for streaming bodies in some environments
-      duplex: "half",
     })
 
     // Read the response body as a buffer.

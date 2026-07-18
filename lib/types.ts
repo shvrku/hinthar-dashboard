@@ -62,11 +62,27 @@ export interface Teacher {
   user_id: number
 }
 
+export interface Subject {
+  id: number
+  name: string
+}
+
+export interface TimetableSlot {
+  id: number
+  class_obj: Class | null
+  subject: Subject
+  teacher: Teacher
+  day_of_week: number
+  start_time: string
+  end_time: string
+  room: string | null
+}
+
 export interface Session {
   id: number
-  timetable_slot: unknown
+  timetable_slot: TimetableSlot | null
   teacher: Teacher
-  class_obj: Class
+  class_obj: Class | null
   start_time: string
   end_time: string
   status: SessionStatus | null
@@ -100,6 +116,9 @@ export interface SessionPayload {
   end_time: string
   status?: SessionStatus | null
   paid?: boolean | null
+  teacher_id?: number
+  class_obj_id?: number | null
+  timetable_slot_id?: number | null
 }
 
 // --- CheckIn ---

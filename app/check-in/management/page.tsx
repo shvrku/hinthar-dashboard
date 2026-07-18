@@ -85,9 +85,14 @@ export default function CheckInManagementPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const updated = await api.regenerateCheckInToken(selected.id)
-      setSelected(updated)
-      setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+      const res = await api.regenerateCheckInToken(selected.id)
+      const updatedToken = res.check_in_token
+      
+      setSelected((prev) => (prev ? { ...prev, check_in_token: updatedToken } : null))
+      const studentId = selected.id
+      setStudents((prev) =>
+        prev.map((s) => (s.id === studentId ? { ...s, check_in_token: updatedToken } : s))
+      )
       setSuccess("Check-in token regenerated successfully.")
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
