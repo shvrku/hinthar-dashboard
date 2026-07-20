@@ -2,29 +2,41 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Search, Users, ArrowLeft } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, Users, ArrowLeft, GraduationCap } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { Class, ClassPayload, EDUCATION_LEVELS, Student, ClassStudent } from "@/lib/types"
+import { useSortableData } from "@/lib/use-sortable-data"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableHeadSortable,
+  TableCell,
+} from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
-function TableSkeleton() {
+function TableSkeletonRow() {
   return (
-    <div className="rounded-lg border">
-      <div className="border-b px-4 py-3">
-        <div className="h-5 w-32 animate-pulse rounded bg-muted" />
-      </div>
+    <TableRow>
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0">
-          <div className="h-4 w-8 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-12 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-12 animate-pulse rounded bg-muted" />
-          <div className="ml-auto flex gap-2">
-            <div className="size-8 animate-pulse rounded bg-muted" />
-            <div className="size-8 animate-pulse rounded bg-muted" />
-          </div>
-        </div>
+        <TableCell key={i}>
+          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
+        </TableCell>
       ))}
-    </div>
+    </TableRow>
   )
 }
 
@@ -202,72 +214,77 @@ export default function ClassesPage() {
       setClassStudents((prev) => prev.filter((cs) => cs.id !== classStudentId))
       setSuccessMessage("Student removed from class successfully.")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to unassign student")
+      setError(err instanceof Error ? err.message : "Failed to remove student")
     }
   }
 
-  // Roster helpers
-  const currentRoster = React.useMemo(() => {
-    if (!activeRosterClass) return []
-    return classStudents.filter((cs) => {
-      const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj.id : cs.class_obj
-      return classId === activeRosterClass.id
-    }).map((cs) => {
-      const studentId = typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
-      const student = students.find((s) => s.id === studentId)
-      return {
-        classStudentId: cs.id,
-        studentId,
-        studentName: student ? student.name : `Student #${studentId}`,
-      }
-    })
-  }, [activeRosterClass, classStudents, students])
-
-  const filteredRoster = React.useMemo(() => {
-    if (rosterSearchQuery.trim() === "") return currentRoster
-    const query = rosterSearchQuery.toLowerCase().trim()
-    return currentRoster.filter(
-      (item) =>
-        item.studentName.toLowerCase().includes(query) ||
-        String(item.studentId).includes(query)
-    )
-  }, [currentRoster, rosterSearchQuery])
-
-  const unassignedStudents = React.useMemo(() => {
-    const assignedStudentIds = new Set(
-      classStudents.map((cs) => typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student)
-    )
-    return students.filter((s) => !assignedStudentIds.has(s.id))
-  }, [students, classStudents])
-
-  const filteredUnassigned = React.useMemo(() => {
-    if (rosterSearchQuery.trim() === "") return unassignedStudents
-    const query = rosterSearchQuery.toLowerCase().trim()
-    return unassignedStudents.filter(
-      (s) =>
-        s.name.toLowerCase().includes(query) ||
-        String(s.id).includes(query)
-    )
-  }, [unassignedStudents, rosterSearchQuery])
-
-  // Filtered classes
   const filteredClasses = React.useMemo(() => {
-    if (searchQuery.trim() === "") return classes
-    const query = searchQuery.toLowerCase().trim()
+    if (!searchQuery.trim()) return classes
+    const q = searchQuery.toLowerCase().trim()
     return classes.filter(
       (c) =>
-        c.education_level.toLowerCase().includes(query) ||
-        c.cohort_identifier.toLowerCase().includes(query) ||
-        (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(query))
+        c.education_level.toLowerCase().includes(q) ||
+        c.cohort_identifier.toLowerCase().includes(q) ||
+        (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(q))
     )
   }, [classes, searchQuery])
 
+  // Sorting
+  const { items: sortedClasses, requestSort, sortConfig } = useSortableData(filteredClasses, "id", "asc")
+
+  // Roster helpers
+  const assignedStudentIds = React.useMemo(() => {
+    if (!activeRosterClass) return new Set<number>()
+    return new Set(
+      classStudents
+        .filter((cs) => {
+          const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj.id : cs.class_obj
+          return classId === activeRosterClass.id
+        })
+        .map((cs) => (typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student))
+    )
+  }, [classStudents, activeRosterClass])
+
+  const enrolledList = React.useMemo(() => {
+    if (!activeRosterClass) return []
+    const classStudentMap = new Map<number, number>()
+    for (const cs of classStudents) {
+      const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj.id : cs.class_obj
+      const studentId = typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
+      if (classId === activeRosterClass.id) {
+        classStudentMap.set(studentId, cs.id)
+      }
+    }
+    return students
+      .filter((s) => classStudentMap.has(s.id))
+      .map((s) => ({
+        student: s,
+        classStudentId: classStudentMap.get(s.id)!,
+      }))
+  }, [students, classStudents, activeRosterClass])
+
+  const unassignedList = React.useMemo(() => {
+    return students.filter((s) => !assignedStudentIds.has(s.id))
+  }, [students, assignedStudentIds])
+
+  const filteredUnassigned = React.useMemo(() => {
+    if (!rosterSearchQuery.trim()) return unassignedList
+    const q = rosterSearchQuery.toLowerCase().trim()
+    return unassignedList.filter(
+      (s) => s.name.toLowerCase().includes(q) || String(s.id).includes(q)
+    )
+  }, [unassignedList, rosterSearchQuery])
+
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 h-8 w-48 animate-pulse rounded bg-muted" />
-        <div className="mb-6 h-4 w-72 animate-pulse rounded bg-muted" />
-        <TableSkeleton />
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
+        <div className="rounded-xl border p-6 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-6 w-full animate-pulse rounded-md bg-muted" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -275,398 +292,388 @@ export default function ClassesPage() {
   if (!isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view this page.</p>
+        <p className="text-muted-foreground font-medium">Please sign in to view classes.</p>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
-      {!activeRosterClass && (
-        <div className="mb-8">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
           <h1 className="text-3xl font-bold tracking-tight">Classes</h1>
-          <p className="mt-1 text-muted-foreground">
-            Manage class groups and cohorts.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage academic classes, cohorts, and student roster enrollments.
           </p>
         </div>
-      )}
 
-      {/* Success message */}
+        {!activeRosterClass && (
+          <div className="flex items-center gap-3">
+            <Button onClick={loadData} disabled={loading} variant="default" className="shadow-xs">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-2 size-4" />
+                  Load Data
+                </>
+              )}
+            </Button>
+
+            <Button onClick={openAddModal} variant="outline" className="shadow-xs">
+              <Plus className="mr-2 size-4" />
+              Add Class
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Banners */}
       {successMessage && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-          {successMessage}
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <span>{successMessage}</span>
+          <Button size="xs" variant="ghost" onClick={() => setSuccessMessage(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
-      {/* Error banner */}
       {error && (
-        <div className="mb-6 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="ml-3 inline-flex size-5 items-center justify-center rounded hover:bg-red-100 dark:hover:bg-red-900"
-          >
-            <X className="size-4" />
-          </button>
+          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
+      {/* Roster View vs Main Table */}
       {activeRosterClass ? (
-        /* Detailed Roster View */
-        <div>
-          <button
-            onClick={() => {
-              setActiveRosterClass(null)
-              setRosterSearchQuery("")
-            }}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted mb-6"
-          >
-            <ArrowLeft className="size-4" />
-            Back to Classes
-          </button>
-
-          <div className="mb-6 flex flex-wrap items-baseline justify-between gap-4 border-b pb-4">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">
-                Roster: {activeRosterClass.education_level} {activeRosterClass.cohort_identifier}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setActiveRosterClass(null)}
+            >
+              <ArrowLeft className="mr-2 size-4" />
+              Back to Classes
+            </Button>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="px-3 py-1">
+                {activeRosterClass.education_level} - {activeRosterClass.cohort_identifier}
                 {activeRosterClass.cohort_sub_category && ` (${activeRosterClass.cohort_sub_category})`}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage students enrolled in this class.
-              </p>
-            </div>
-            
-            {/* Search Input for Roster */}
-            <div className="relative">
-              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search students..."
-                value={rosterSearchQuery}
-                onChange={(e) => setRosterSearchQuery(e.target.value)}
-                className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
-              />
+              </Badge>
             </div>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Left: Enrolled */}
-            <div className="rounded-lg border bg-card p-6 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                <span>Enrolled Students</span>
-                <span className="text-xs font-normal text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
-                  {filteredRoster.length} student{filteredRoster.length !== 1 ? "s" : ""}
-                </span>
-              </h3>
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                {filteredRoster.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-12 border border-dashed rounded-lg">
-                    {rosterSearchQuery ? "No matching enrolled students." : "No students assigned to this class."}
+            {/* Enrolled Students Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Enrolled Students</span>
+                  <Badge variant="default">{enrolledList.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {enrolledList.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No students currently enrolled.
                   </p>
                 ) : (
-                  filteredRoster.map((item) => (
-                    <div key={item.studentId} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                  enrolledList.map(({ student, classStudentId }) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between rounded-lg border p-3 bg-muted/20"
+                    >
                       <div>
-                        <p className="font-semibold text-sm">{item.studentName}</p>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {item.studentId}</p>
+                        <p className="font-medium text-sm">{student.name}</p>
+                        <p className="text-xs text-muted-foreground">ID: {student.id}</p>
                       </div>
-                      <button
-                        onClick={() => handleUnassign(item.classStudentId)}
-                        className="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg px-3 py-1.5 transition-colors border border-red-200/50 dark:border-red-900/50"
+                      <Button
+                        size="xs"
+                        variant="destructive"
+                        onClick={() => handleUnassign(classStudentId)}
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   ))
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Right: Unassigned */}
-            <div className="rounded-lg border bg-card p-6 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                <span>Unassigned Students</span>
-                <span className="text-xs font-normal text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
-                  {filteredUnassigned.length} student{filteredUnassigned.length !== 1 ? "s" : ""}
-                </span>
-              </h3>
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+            {/* Unassigned Students Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Available Students to Enroll</CardTitle>
+                <div className="relative pt-2">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search available students..."
+                    value={rosterSearchQuery}
+                    onChange={(e) => setRosterSearchQuery(e.target.value)}
+                    className="pl-9 h-8 text-xs"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
                 {filteredUnassigned.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-12 border border-dashed rounded-lg">
-                    {rosterSearchQuery ? "No matching unassigned students." : "No unassigned students available."}
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No matching unassigned students.
                   </p>
                 ) : (
                   filteredUnassigned.map((student) => (
-                    <div key={student.id} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors"
+                    >
                       <div>
-                        <p className="font-semibold text-sm">{student.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {student.id}</p>
+                        <p className="font-medium text-sm">{student.name}</p>
+                        <p className="text-xs text-muted-foreground">ID: {student.id}</p>
                       </div>
-                      <button
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        className="text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-700"
                         onClick={() => handleAssign(student.id)}
-                        className="text-xs font-semibold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-900/40 rounded-lg px-3 py-1.5 transition-colors border border-green-200/50 dark:border-green-900/50"
                       >
                         Enroll
-                      </button>
+                      </Button>
                     </div>
                   ))
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       ) : (
         /* Class list table */
         <div>
           {/* Toolbar */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={loadData}
-                disabled={loading}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="size-4" />
-                    Load Data
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={openAddModal}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
-              >
-                <Plus className="size-4" />
-                Add Class
-              </button>
-
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search classes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
-                />
-              </div>
+          <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search classes by level, cohort, sub-category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
 
-            {/* Right side info (Timestamp/Status) */}
             {lastLoaded && (
-              <span className="text-xs text-muted-foreground">
-                {classes.length} class{classes.length !== 1 ? "es" : ""} &bull; Loaded {lastLoaded}
-              </span>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 text-xs">
+                  <GraduationCap className="mr-1.5 size-3.5" />
+                  {classes.length} class{classes.length !== 1 ? "es" : ""}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Loaded {lastLoaded}
+                </span>
+              </div>
             )}
           </div>
 
           {/* Table */}
-          {loading && classes.length === 0 ? (
-            <TableSkeleton />
-          ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Education Level</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cohort Identifier</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Sub Category</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredClasses.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                        {loading ? "Loading..." : 'No classes found. Click "Load Data" to fetch.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredClasses.map((cls) => (
-                      <tr key={cls.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                        <td className="px-4 py-3">{cls.id}</td>
-                        <td className="px-4 py-3">{cls.education_level}</td>
-                        <td className="px-4 py-3 font-medium">{cls.cohort_identifier}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {cls.cohort_sub_category ?? "\u2014"}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              onClick={() => setActiveRosterClass(cls)}
-                              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                              title="Manage Roster"
-                            >
-                              <Users className="size-4" />
-                            </button>
-                            <button
-                              onClick={() => openEditModal(cls)}
-                              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                              title="Edit"
-                            >
-                              <Pencil className="size-4" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmId(cls.id)}
-                              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/50"
-                              title="Delete"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHeadSortable
+                  className="w-[100px]"
+                  sortKey="id"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  ID
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="education_level"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Education Level
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="cohort_identifier"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Cohort Identifier
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="cohort_sub_category"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Sub Category
+                </TableHeadSortable>
+
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && classes.length === 0 ? (
+                Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+              ) : sortedClasses.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    {classes.length === 0 ? 'Click "Load Data" to fetch classes.' : 'No classes found.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedClasses.map((cls) => (
+                  <TableRow key={cls.id}>
+                    <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{cls.education_level}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{cls.cohort_identifier}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {cls.cohort_sub_category ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setActiveRosterClass(cls)}
+                          title="Manage Roster"
+                        >
+                          <Users className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openEditModal(cls)}
+                          title="Edit"
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmId(cls.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
       )}
 
       {/* Create / Edit Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg border bg-background p-6 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                {editingClass ? "Edit Class" : "Add Class"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      <Dialog open={modalOpen} onOpenChange={(val) => !val && closeModal()}>
+        <DialogContent onClose={closeModal}>
+          <DialogHeader>
+            <DialogTitle>{editingClass ? "Edit Class" : "Add Class"}</DialogTitle>
+            <DialogDescription>
+              {editingClass
+                ? "Update class details below."
+                : "Enter details for the new class cohort."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Education Level</label>
+              <select
+                value={formEducationLevel}
+                onChange={(e) => setFormEducationLevel(e.target.value as ClassPayload["education_level"])}
+                className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                required
               >
-                <X className="size-4" />
-              </button>
+                {EDUCATION_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="education_level"
-                  className="mb-1.5 block text-sm font-medium"
-                >
-                  Education Level
-                </label>
-                <select
-                  id="education_level"
-                  value={formEducationLevel}
-                  onChange={(e) =>
-                    setFormEducationLevel(
-                      e.target.value as ClassPayload["education_level"]
-                    )
-                  }
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  required
-                >
-                  {EDUCATION_LEVELS.map((level) => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Cohort Identifier</label>
+              <Input
+                type="text"
+                value={formCohortIdentifier}
+                onChange={(e) => setFormCohortIdentifier(e.target.value)}
+                maxLength={1}
+                placeholder="e.g. A"
+                required
+              />
+            </div>
 
-              <div>
-                <label
-                  htmlFor="cohort_identifier"
-                  className="mb-1.5 block text-sm font-medium"
-                >
-                  Cohort Identifier
-                </label>
-                <input
-                  id="cohort_identifier"
-                  type="text"
-                  value={formCohortIdentifier}
-                  onChange={(e) => setFormCohortIdentifier(e.target.value)}
-                  maxLength={1}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  placeholder="e.g. A"
-                  required
-                />
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                Sub Category <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                type="text"
+                value={formCohortSubCategory}
+                onChange={(e) => setFormCohortSubCategory(e.target.value)}
+                maxLength={1}
+                placeholder="e.g. 1"
+              />
+            </div>
 
-              <div>
-                <label
-                  htmlFor="cohort_sub_category"
-                  className="mb-1.5 block text-sm font-medium"
-                >
-                  Sub Category{" "}
-                  <span className="text-muted-foreground">(optional)</span>
-                </label>
-                <input
-                  id="cohort_sub_category"
-                  type="text"
-                  value={formCohortSubCategory}
-                  onChange={(e) => setFormCohortSubCategory(e.target.value)}
-                  maxLength={1}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  placeholder="e.g. 1"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="inline-flex h-9 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formSubmitting}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-                >
-                  {formSubmitting && <Loader2 className="size-4 animate-spin" />}
-                  {editingClass ? "Save Changes" : "Create Class"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={formSubmitting}>
+                {formSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {editingClass ? "Save Changes" : "Create Class"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation dialog */}
-      {deleteConfirmId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
-            <h2 className="mb-2 text-lg font-semibold">Confirm Delete</h2>
-            <p className="mb-6 text-sm text-muted-foreground">
-              Are you sure you want to delete this class? This action cannot be
-              undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                disabled={deleteSubmitting}
-                className="inline-flex h-9 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirmId)}
-                disabled={deleteSubmitting}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleteSubmitting && <Loader2 className="size-4 animate-spin" />}
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(val) => !val && setDeleteConfirmId(null)}>
+        <DialogContent onClose={() => setDeleteConfirmId(null)}>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this class? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={deleteSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+              disabled={deleteSubmitting}
+            >
+              {deleteSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

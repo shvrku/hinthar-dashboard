@@ -2,10 +2,24 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { RotateCcw, RefreshCw, Download, Eye, X, Loader2, Search } from "lucide-react"
+import { RotateCcw, RefreshCw, Download, Eye, Loader2, Search, QrCode, UserCheck } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Student } from "@/lib/types"
 import QRCode from "qrcode"
+import { useSortableData } from "@/lib/use-sortable-data"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableHeadSortable,
+  TableCell,
+} from "@/components/ui/table"
 
 function QrCanvas({ value, size = 200 }: { value: string; size?: number }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
@@ -16,18 +30,18 @@ function QrCanvas({ value, size = 200 }: { value: string; size?: number }) {
     }
   }, [value, size])
 
-  return <canvas ref={canvasRef} width={size} height={size} className="rounded-lg" />
+  return <canvas ref={canvasRef} width={size} height={size} className="rounded-lg shadow-xs" />
 }
 
 function RowSkeleton() {
   return (
-    <tr className="border-b">
-      {[1, 2, 3, 4].map((i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="h-4 animate-pulse rounded bg-muted" style={{ width: `${50 + i * 20}px` }} />
-        </td>
+    <TableRow>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <TableCell key={i}>
+          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
+        </TableCell>
       ))}
-    </tr>
+    </TableRow>
   )
 }
 
@@ -70,6 +84,9 @@ export default function CheckInManagementPage() {
         String(s.id).includes(query)
     )
   }, [students, searchQuery])
+
+  // Sorting
+  const { items: sortedStudents, requestSort, sortConfig } = useSortableData(filteredStudents, "id", "asc")
 
   const selectStudent = React.useCallback(async (student: Student) => {
     setSelected(student)
@@ -115,22 +132,20 @@ export default function CheckInManagementPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 h-8 w-48 animate-pulse rounded bg-muted" />
-        <div className="rounded-lg border">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                {["ID", "Name", "Check-in Token", "Actions"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)}
-            </tbody>
-          </table>
-        </div>
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-6 h-8 w-48 animate-pulse rounded-lg bg-muted" />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {["ID", "Name", "Check-in Token", "Actions"].map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)}
+          </TableBody>
+        </Table>
       </div>
     )
   }
@@ -138,178 +153,213 @@ export default function CheckInManagementPage() {
   if (!isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view check-in codes.</p>
+        <p className="text-muted-foreground font-medium">Please sign in to view check-in codes.</p>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Check In Management</h1>
-        <p className="mt-1 text-muted-foreground">
-          View, generate, and manage QR check-in codes for students.
-        </p>
-      </div>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Check In Management</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View, generate, and export QR check-in codes for students.
+          </p>
+        </div>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        {/* Left side actions (Buttons + Search) */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={loadStudents}
-            disabled={loading}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-          >
+        <div className="flex items-center gap-3">
+          <Button onClick={loadStudents} disabled={loading} variant="default" className="shadow-xs">
             {loading ? (
               <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="mr-2 size-4 animate-spin" />
                 Loading...
               </>
             ) : (
               <>
-                <RotateCcw className="size-4" />
+                <RotateCcw className="mr-2 size-4" />
                 Refresh
               </>
             )}
-          </button>
+          </Button>
+        </div>
+      </div>
 
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search students..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
-            />
-          </div>
+      {/* Toolbar */}
+      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search students..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
-        {/* Right side info (Timestamp/Status) */}
         {lastLoaded && students && (
-          <span className="text-xs text-muted-foreground">
-            {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""} &bull; Loaded {lastLoaded}
-          </span>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="px-3 py-1 text-xs">
+              <UserCheck className="mr-1.5 size-3.5" />
+              {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              Loaded {lastLoaded}
+            </span>
+          </div>
         )}
       </div>
 
+      {/* Banners */}
       {error && (
-        <div className="mb-6 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">
-            <X className="size-4" />
-          </button>
+          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
       {success && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-          {success}
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <span>{success}</span>
+          <Button size="xs" variant="ghost" onClick={() => setSuccess(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
-      <div className="flex flex-col gap-6 lg:flex-row">
+      <div className="flex flex-col gap-6 lg:flex-row items-start">
         {/* Student Table */}
-        <div className="min-w-0 flex-1 rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Token</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && students.length === 0
-                  ? [1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)
-                  : filteredStudents.length === 0
-                    ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
-                          No students found.
-                        </td>
-                      </tr>
-                    )
-                    : filteredStudents.map((student) => (
-                        <tr
-                          key={student.id}
-                          className={`border-b last:border-b-0 transition-colors hover:bg-muted/30 cursor-pointer ${
-                            selected?.id === student.id ? "bg-muted/50" : ""
-                          }`}
-                          onClick={() => selectStudent(student)}
-                        >
-                          <td className="px-4 py-3 font-mono text-xs">{student.id}</td>
-                          <td className="px-4 py-3 font-medium">{student.name}</td>
-                          <td className="px-4 py-3">
-                            <code className="rounded bg-muted px-2 py-0.5 text-xs font-mono">
-                              {student.check_in_token.slice(0, 16)}...
-                            </code>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); selectStudent(student) }}
-                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                            >
-                              <Eye className="size-3.5" />
-                              View QR
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="min-w-0 flex-1 w-full">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHeadSortable
+                  className="w-[100px]"
+                  sortKey="id"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  ID
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="name"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Name
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="check_in_token"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Token
+                </TableHeadSortable>
+
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && students.length === 0 ? (
+                [1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)
+              ) : sortedStudents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                    {students.length === 0 ? 'Click "Refresh" to fetch students.' : 'No students found.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedStudents.map((student) => (
+                  <TableRow
+                    key={student.id}
+                    className={`cursor-pointer ${
+                      selected?.id === student.id ? "bg-muted/60 font-medium" : ""
+                    }`}
+                    onClick={() => selectStudent(student)}
+                  >
+                    <TableCell className="font-semibold text-foreground">{student.id}</TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell>
+                      <code className="rounded bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+                        {student.check_in_token.slice(0, 16)}...
+                      </code>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          selectStudent(student)
+                        }}
+                      >
+                        <Eye className="mr-1.5 size-3.5" />
+                        View QR
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
 
-        {/* QR Code Card */}
-        <div className="w-full lg:w-80">
+        {/* QR Code Card (Sticky on scroll) */}
+        <div className="w-full lg:w-80 shrink-0 lg:sticky lg:top-20">
           {selected ? (
-            <div className="sticky top-20 rounded-lg border p-6">
-              <div className="mb-4">
-                <h3 className="font-semibold">{selected.name}</h3>
-                <p className="text-xs text-muted-foreground">Student #{selected.id}</p>
-              </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>{selected.name}</span>
+                  <Badge variant="outline">#{selected.id}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-center p-3.5 rounded-xl bg-muted/60 border border-border/60">
+                  <QrCanvas value={selected.check_in_token} size={200} />
+                </div>
 
-              <div className="mb-4 flex justify-center">
-                <QrCanvas value={selected.check_in_token} size={200} />
-              </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Check-in Token</label>
+                  <code className="block break-all rounded-lg border bg-muted/40 p-2 text-xs font-mono text-muted-foreground">
+                    {selected.check_in_token}
+                  </code>
+                </div>
 
-              <div className="mb-4">
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Token</label>
-                <code className="block break-all rounded border bg-muted/50 px-2 py-1.5 text-xs font-mono">
-                  {selected.check_in_token}
-                </code>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={handleRegenerate}
-                  disabled={regenerating}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
-                >
-                  {regenerating ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-4" />
-                  )}
-                  Regenerate Token
-                </button>
-                <button
-                  onClick={downloadQr}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-                >
-                  <Download className="size-4" />
-                  Download QR
-                </button>
-              </div>
-            </div>
+                <div className="flex flex-col gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleRegenerate}
+                    disabled={regenerating}
+                  >
+                    {regenerating ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 size-4" />
+                    )}
+                    Regenerate Token
+                  </Button>
+                  <Button onClick={downloadQr}>
+                    <Download className="mr-2 size-4" />
+                    Download QR Code
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
-            <div className="flex h-64 items-center justify-center rounded-lg border border-dashed">
-              <p className="text-center text-sm text-muted-foreground">
-                Select a student<br />to view their QR code
+            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center">
+              <QrCode className="mb-3 size-10 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">
+                Select a student to view or download their QR code
               </p>
             </div>
           )}

@@ -2,9 +2,22 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Check, X, RotateCcw, Loader2, Search } from "lucide-react"
+import { Check, X, RotateCcw, Loader2, Search, QrCode } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { EDUCATION_LEVELS, type Student, type CheckIn, type Class, type ClassStudent } from "@/lib/types"
+import { useSortableData } from "@/lib/use-sortable-data"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableHeadSortable,
+  TableCell,
+} from "@/components/ui/table"
 
 interface StudentRow {
   studentId: number
@@ -14,13 +27,93 @@ interface StudentRow {
 
 function RowSkeleton() {
   return (
-    <tr className="border-b last:border-b-0">
+    <TableRow>
       {Array.from({ length: 4 }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="h-5 w-full animate-pulse rounded bg-muted" />
-        </td>
+        <TableCell key={i}>
+          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
+        </TableCell>
       ))}
-    </tr>
+    </TableRow>
+  )
+}
+
+function CohortTable({ rows }: { rows: StudentRow[] }) {
+  const { items: sortedRows, requestSort, sortConfig } = useSortableData(rows, "studentId", "asc")
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHeadSortable
+            className="w-[120px]"
+            sortKey="studentId"
+            currentSortKey={sortConfig.key}
+            currentSortOrder={sortConfig.order}
+            onSort={requestSort}
+          >
+            Student ID
+          </TableHeadSortable>
+
+          <TableHeadSortable
+            sortKey="studentName"
+            currentSortKey={sortConfig.key}
+            currentSortOrder={sortConfig.order}
+            onSort={requestSort}
+          >
+            Name
+          </TableHeadSortable>
+
+          <TableHeadSortable
+            sortKey="checkIn.timestamp"
+            currentSortKey={sortConfig.key}
+            currentSortOrder={sortConfig.order}
+            onSort={requestSort}
+          >
+            Check-In Time
+          </TableHeadSortable>
+
+          <TableHeadSortable
+            sortKey="checkIn"
+            currentSortKey={sortConfig.key}
+            currentSortOrder={sortConfig.order}
+            onSort={requestSort}
+          >
+            Status
+          </TableHeadSortable>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedRows.map(({ studentId, studentName, checkIn }) => (
+          <TableRow key={studentId}>
+            <TableCell className="font-semibold text-foreground">{studentId}</TableCell>
+            <TableCell className="font-medium">{studentName}</TableCell>
+            <TableCell className="text-muted-foreground whitespace-nowrap">
+              {checkIn
+                ? new Date(checkIn.timestamp).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                  })
+                : "—"}
+            </TableCell>
+            <TableCell>
+              {checkIn ? (
+                <Badge variant="success" className="gap-1">
+                  <Check className="size-3.5" />
+                  Checked In
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1 text-muted-foreground">
+                  <X className="size-3.5" />
+                  Absent
+                </Badge>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }
 
@@ -36,7 +129,6 @@ export default function CheckInOverviewPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
-  // Build map: student_id → student name
   const studentNameMap = React.useMemo(() => {
     const map = new Map<number, string>()
     if (students) {
@@ -45,12 +137,8 @@ export default function CheckInOverviewPage() {
     return map
   }, [students])
 
-
-  // Build map: student_id → check-in for TODAY
   const todayCheckInMap = React.useMemo(() => {
     const map = new Map<number, CheckIn>()
-    
-    // Get local today's date string YYYY-MM-DD
     const d = new Date()
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -68,14 +156,12 @@ export default function CheckInOverviewPage() {
     return map
   }, [checkIns])
 
-  // Group class-student entries by dynamic class cohort, sorted
   const sortedGroupedClasses = React.useMemo(() => {
     if (!students || classes.length === 0) return []
 
     const classMap = new Map<number, Class>()
     for (const c of classes) classMap.set(c.id, c)
 
-    // Build the groups: classId -> array of StudentRow
     const groups = new Map<number, StudentRow[]>()
     for (const cs of classStudents) {
       const cls = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj : classMap.get(cs.class_obj)
@@ -85,7 +171,6 @@ export default function CheckInOverviewPage() {
       const name = typeof cs.student === "object" && cs.student !== null ? cs.student.name : studentNameMap.get(studentId)
       if (!name) continue
 
-      // Filter by search query
       if (searchQuery.trim() !== "") {
         const query = searchQuery.toLowerCase().trim()
         const matchesName = name.toLowerCase().includes(query)
@@ -101,7 +186,6 @@ export default function CheckInOverviewPage() {
       groups.get(cls.id)!.push({ studentId, studentName: name, checkIn })
     }
 
-    // Convert to array of { classObj, label, rows }
     const result: { classObj: Class; label: string; rows: StudentRow[] }[] = []
     for (const [classId, rows] of groups.entries()) {
       let cls = classMap.get(classId)
@@ -121,7 +205,6 @@ export default function CheckInOverviewPage() {
       result.push({ classObj: cls, label, rows })
     }
 
-    // Sort the result by position of education_level in EDUCATION_LEVELS, then alphabetical identifier
     const levelOrder = EDUCATION_LEVELS.map((el) => el.value)
     result.sort((a, b) => {
       const idxA = levelOrder.indexOf(a.classObj.education_level)
@@ -165,15 +248,14 @@ export default function CheckInOverviewPage() {
     }
   }, [getToken, isSignedIn])
 
-  // Auth gates
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 h-8 w-64 animate-pulse rounded bg-muted" />
-        <div className="mb-6 h-4 w-80 animate-pulse rounded bg-muted" />
-        <div className="space-y-3">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8 h-8 w-64 animate-pulse rounded-lg bg-muted" />
+        <div className="mb-6 h-4 w-80 animate-pulse rounded-lg bg-muted" />
+        <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-muted" />
+            <div key={i} className="h-12 w-full animate-pulse rounded-md bg-muted" />
           ))}
         </div>
       </div>
@@ -183,180 +265,133 @@ export default function CheckInOverviewPage() {
   if (!isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view check-in overview.</p>
+        <p className="text-muted-foreground font-medium">Please sign in to view check-in overview.</p>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Check-In Overview</h1>
-        <p className="mt-1 text-muted-foreground">
-          View all students and their check-in status, grouped by cohort.
-        </p>
-      </div>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Check-In Overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View all students and their check-in status, grouped by cohort class.
+          </p>
+        </div>
 
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        {/* Left side actions (Buttons + Search) */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-          >
+        <div className="flex items-center gap-3">
+          <Button onClick={loadData} disabled={loading} variant="default" className="shadow-xs">
             {loading ? (
               <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="mr-2 size-4 animate-spin" />
                 Loading...
               </>
             ) : (
               <>
-                <RotateCcw className="size-4" />
+                <RotateCcw className="mr-2 size-4" />
                 Load Data
               </>
             )}
-          </button>
+          </Button>
+        </div>
+      </div>
 
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search students..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
-            />
-          </div>
+      {/* Toolbar */}
+      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search students in overview..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
-        {/* Right side info (Timestamp/Status) */}
         {lastLoaded && (
-          <span className="text-xs text-muted-foreground">
-            {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts &bull; Loaded {lastLoaded}
-          </span>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="px-3 py-1 text-xs">
+              <QrCode className="mr-1.5 size-3.5" />
+              {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              Loaded {lastLoaded}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Error banner */}
+      {/* Banners */}
       {error && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="shrink-0 hover:opacity-70">
-            <span className="text-lg leading-none">&times;</span>
-          </button>
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span>
+          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
       {/* Cohort groups */}
-      {loading && !students
-        ? (
-          <div className="space-y-8">
-            {[1, 2, 3].map((g) => (
-              <div key={g}>
-                <div className="mb-3 h-6 w-32 animate-pulse rounded bg-muted" />
-                <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left font-medium">ID</th>
-                        <th className="px-4 py-3 text-left font-medium">Name</th>
-                        <th className="px-4 py-3 text-left font-medium">Check-In Time</th>
-                        <th className="px-4 py-3 text-left font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 3 }).map((_, i) => <RowSkeleton key={i} />)}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-        : students === null
-          ? (
-            <div className="flex items-center justify-center rounded-lg border border-dashed py-16">
-              <p className="text-sm text-muted-foreground">Click &quot;Load Data&quot; to view check-in status.</p>
+      {loading && !students ? (
+        <div className="space-y-8">
+          {[1, 2, 3].map((g) => (
+            <div key={g} className="space-y-3">
+              <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Check-In Time</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 3 }).map((_, i) => <RowSkeleton key={i} />)}
+                </TableBody>
+              </Table>
             </div>
-          )
-          : sortedGroupedClasses.length === 0
-            ? (
-              <div className="flex items-center justify-center rounded-lg border border-dashed py-16">
-                <p className="text-sm text-muted-foreground">No students found in any cohort classes.</p>
-              </div>
-            )
-            : (
-              <div className="space-y-8">
-                {sortedGroupedClasses.map(({ classObj, label, rows }) => {
-                  const checkedIn = rows.filter((r) => r.checkIn !== null).length
+          ))}
+        </div>
+      ) : students === null ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+          <QrCode className="mb-3 size-10 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Click &quot;Load Data&quot; to view check-in status.</p>
+        </div>
+      ) : sortedGroupedClasses.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+          <p className="text-sm text-muted-foreground">No students found in any cohort classes.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {sortedGroupedClasses.map(({ classObj, label, rows }) => {
+            const checkedIn = rows.filter((r) => r.checkIn !== null).length
 
-                  return (
-                    <section key={classObj.id}>
-                      <div className="mb-3 flex items-baseline gap-3">
-                        <h2 className="text-xl font-semibold tracking-tight">{label}</h2>
-                        {classObj.cohort_sub_category && (
-                          <span className="text-xs font-normal text-muted-foreground">
-                            ({classObj.cohort_sub_category})
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {checkedIn}/{rows.length} checked in
-                        </span>
-                      </div>
-                      <div className="overflow-x-auto rounded-lg border">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b bg-muted/50">
-                              <th className="px-4 py-3 text-left font-medium">Student ID</th>
-                              <th className="px-4 py-3 text-left font-medium">Name</th>
-                              <th className="px-4 py-3 text-left font-medium">Check-In Time</th>
-                              <th className="px-4 py-3 text-left font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rows.map(({ studentId, studentName, checkIn }) => (
-                              <tr
-                                key={studentId}
-                                className="border-b last:border-b-0 transition-colors hover:bg-muted/30"
-                              >
-                                <td className="px-4 py-3 font-mono text-xs">{studentId}</td>
-                                <td className="px-4 py-3 font-medium">{studentName}</td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {checkIn
-                                    ? new Date(checkIn.timestamp).toLocaleTimeString("en-US", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                        second: "2-digit",
-                                        hour12: false,
-                                      })
-                                    : <span className="text-muted-foreground">—</span>}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {checkIn ? (
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
-                                      <Check className="size-3.5" />
-                                      Checked In
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
-                                      <X className="size-3.5" />
-                                      Absent
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </section>
-                  )
-                })}
-              </div>
-            )}
+            return (
+              <section key={classObj.id} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-semibold tracking-tight">{label}</h2>
+                    {classObj.cohort_sub_category && (
+                      <span className="text-xs text-muted-foreground">
+                        ({classObj.cohort_sub_category})
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant={checkedIn > 0 ? "success" : "secondary"}>
+                    {checkedIn}/{rows.length} checked in
+                  </Badge>
+                </div>
+
+                <CohortTable rows={rows} />
+              </section>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

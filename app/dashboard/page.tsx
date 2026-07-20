@@ -2,9 +2,12 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarCheck, GraduationCap, Users, UserPlus, RotateCcw, QrCode, BookOpen } from "lucide-react"
+import { CalendarCheck, GraduationCap, Users, UserPlus, RotateCcw, QrCode, BookOpen, Loader2 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Stats } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 const statCards = [
   { key: "sessions" as const, label: "Sessions", icon: CalendarCheck },
@@ -17,11 +20,11 @@ const statCards = [
 
 function StatSkeleton() {
   return (
-    <div className="rounded-lg border p-6">
-      <div className="mb-3 h-10 w-10 animate-pulse rounded-lg bg-muted" />
-      <div className="mb-2 h-8 w-20 animate-pulse rounded bg-muted" />
+    <Card className="p-6 space-y-3">
+      <div className="size-10 animate-pulse rounded-lg bg-muted" />
+      <div className="h-8 w-20 animate-pulse rounded bg-muted" />
       <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-    </div>
+    </Card>
   )
 }
 
@@ -54,9 +57,9 @@ export default function DashboardPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 h-8 w-48 animate-pulse rounded bg-muted" />
-        <div className="mb-6 h-4 w-72 animate-pulse rounded bg-muted" />
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <StatSkeleton />
           <StatSkeleton />
@@ -72,51 +75,50 @@ export default function DashboardPage() {
   if (!isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view the dashboard.</p>
+        <p className="text-muted-foreground font-medium">Please sign in to view the dashboard.</p>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">
-          Overview of your school management data.
-        </p>
-      </div>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Overview of your school management system metrics.
+          </p>
+        </div>
 
-      <div className="mb-6 flex items-center gap-3">
-        <button
-          onClick={loadStats}
-          disabled={loading}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Loading...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="size-4" />
-              Load Data
-            </>
+        <div className="flex items-center gap-3">
+          <Button onClick={loadStats} disabled={loading} variant="default" className="shadow-xs">
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="mr-2 size-4" />
+                Load Data
+              </>
+            )}
+          </Button>
+
+          {stats !== null && !loading && (
+            <Badge variant="secondary" className="px-3 py-1.5 text-xs">
+              Loaded {new Date().toLocaleTimeString()}
+            </Badge>
           )}
-        </button>
-        {stats !== null && !loading && (
-          <span className="text-xs text-muted-foreground">
-            Loaded {new Date().toLocaleTimeString()}
-          </span>
-        )}
+        </div>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-          {error}
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span>
+          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
@@ -127,27 +129,40 @@ export default function DashboardPage() {
             ? statCards.map((card) => {
                 const Icon = card.icon
                 return (
-                  <div key={card.key} className="rounded-lg border p-6 transition-colors hover:bg-muted/50 bg-card shadow-sm">
-                    <div className="mb-3 flex size-10 items-center justify-center rounded-lg border bg-background">
-                      <Icon className="size-5 text-foreground" />
-                    </div>
-                    <div className="text-3xl font-bold tracking-tight">{stats[card.key]}</div>
-                    <div className="text-sm text-muted-foreground">{card.label}</div>
-                  </div>
+                  <Card key={card.key} className="hover:border-ring/50 transition-all hover:shadow-md">
+                    <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        {card.label}
+                      </CardTitle>
+                      <div className="flex size-9 items-center justify-center rounded-lg border border-border/60 bg-muted/30">
+                        <Icon className="size-4 text-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold tracking-tight">{stats[card.key]}</div>
+                    </CardContent>
+                  </Card>
                 )
               })
             : statCards.map((card) => {
                 const Icon = card.icon
                 return (
-                  <div key={card.key} className="rounded-lg border border-dashed p-6 bg-card shadow-sm">
-                    <div className="mb-3 flex size-10 items-center justify-center rounded-lg border bg-background">
-                      <Icon className="size-5 text-muted-foreground" />
-                    </div>
-                    <div className="text-sm text-muted-foreground">{card.label}</div>
-                    <div className="mt-1 text-xs text-muted-foreground/60">
-                      Click &quot;Load Data&quot; to fetch
-                    </div>
-                  </div>
+                  <Card key={card.key} className="border-dashed bg-muted/20">
+                    <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        {card.label}
+                      </CardTitle>
+                      <div className="flex size-9 items-center justify-center rounded-lg border border-border/50 bg-background/50">
+                        <Icon className="size-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-semibold tracking-tight text-muted-foreground">—</div>
+                      <p className="mt-1 text-xs text-muted-foreground/70">
+                        Click &quot;Load Data&quot; to fetch metrics
+                      </p>
+                    </CardContent>
+                  </Card>
                 )
               })}
       </div>

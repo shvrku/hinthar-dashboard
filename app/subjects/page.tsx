@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import type { Student, StudentPayload } from "@/lib/types"
+import type { Subject, SubjectPayload } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +33,7 @@ import {
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 3 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -82,9 +82,9 @@ function ConfirmDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Student form modal (create / edit)
+// Subject form modal (create / edit)
 // ---------------------------------------------------------------------------
-function StudentFormModal({
+function SubjectFormModal({
   open,
   initial,
   onClose,
@@ -92,74 +92,48 @@ function StudentFormModal({
   saving,
 }: {
   open: boolean
-  initial: Student | null
+  initial: Subject | null
   onClose: () => void
-  onSave: (payload: StudentPayload) => Promise<void>
+  onSave: (payload: SubjectPayload) => Promise<void>
   saving: boolean
 }) {
   const [name, setName] = React.useState("")
-  const [dob, setDob] = React.useState("")
-  const [contact, setContact] = React.useState("")
 
   React.useEffect(() => {
     if (open) {
       setName(initial?.name ?? "")
-      setDob(initial?.dob ?? "")
-      setContact(initial?.contact ?? "")
     }
   }, [open, initial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    const payload: StudentPayload = { name: name.trim() }
-    if (dob) payload.dob = dob
-    if (contact.trim()) payload.contact = contact.trim()
-    await onSave(payload)
+    await onSave({ name: name.trim() })
   }
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent onClose={onClose}>
         <DialogHeader>
-          <DialogTitle>{initial ? "Edit Student" : "Add Student"}</DialogTitle>
+          <DialogTitle>{initial ? "Edit Subject" : "Add Subject"}</DialogTitle>
           <DialogDescription>
             {initial
-              ? "Update student information below."
-              : "Enter details for the new student record."}
+              ? "Update subject details below."
+              : "Enter details for the new curriculum subject."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Name <span className="text-destructive">*</span>
+              Subject Name <span className="text-destructive">*</span>
             </label>
             <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Student full name"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Date of Birth</label>
-            <Input
-              type="date"
-              value={dob}
-              onChange={(e) => setDob(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Contact Information</label>
-            <Input
-              type="text"
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              placeholder="Phone number or email"
+              placeholder="e.g. Mathematics, Physics, Chemistry"
             />
           </div>
 
@@ -169,7 +143,7 @@ function StudentFormModal({
             </Button>
             <Button type="submit" disabled={saving || !name.trim()}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {initial ? "Save Changes" : "Create Student"}
+              {initial ? "Save Changes" : "Create Subject"}
             </Button>
           </DialogFooter>
         </form>
@@ -181,10 +155,10 @@ function StudentFormModal({
 // ===========================================================================
 // Page component
 // ===========================================================================
-export default function StudentsPage() {
+export default function SubjectsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
-  const [students, setStudents] = React.useState<Student[] | null>(null)
+  const [subjects, setSubjects] = React.useState<Subject[] | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
@@ -193,7 +167,7 @@ export default function StudentsPage() {
 
   // Modal & form state
   const [modalOpen, setModalOpen] = React.useState(false)
-  const [editingStudent, setEditingStudent] = React.useState<Student | null>(null)
+  const [editingSubject, setEditingSubject] = React.useState<Subject | null>(null)
   const [saving, setSaving] = React.useState(false)
 
   // Delete confirmation
@@ -219,52 +193,51 @@ export default function StudentsPage() {
     setError(null)
     try {
       const api = await getApi()
-      const data = await api.listStudents()
-      setStudents(data)
+      const data = await api.listSubjects()
+      setSubjects(data)
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
       } else {
-        setError(err instanceof Error ? err.message : "Failed to load students")
+        setError(err instanceof Error ? err.message : "Failed to load subjects")
       }
     } finally {
       setLoading(false)
     }
   }, [getApi])
 
-  const filteredStudents = React.useMemo(() => {
-    if (!students) return []
-    if (searchQuery.trim() === "") return students
+  const filteredSubjects = React.useMemo(() => {
+    if (!subjects) return []
+    if (searchQuery.trim() === "") return subjects
     const query = searchQuery.toLowerCase().trim()
-    return students.filter(
+    return subjects.filter(
       (s) =>
         s.name.toLowerCase().includes(query) ||
-        String(s.id).includes(query) ||
-        (s.contact && s.contact.toLowerCase().includes(query))
+        String(s.id).includes(query)
     )
-  }, [students, searchQuery])
+  }, [subjects, searchQuery])
 
   // Sorting
-  const { items: sortedStudents, requestSort, sortConfig } = useSortableData(filteredStudents, "id", "asc")
+  const { items: sortedSubjects, requestSort, sortConfig } = useSortableData(filteredSubjects, "id", "asc")
 
   const handleSave = React.useCallback(
-    async (payload: StudentPayload) => {
+    async (payload: SubjectPayload) => {
       setSaving(true)
       setError(null)
       try {
         const api = await getApi()
-        if (editingStudent) {
-          await api.updateStudent(editingStudent.id, payload)
-          setSuccess(`Student "${payload.name}" updated successfully.`)
+        if (editingSubject) {
+          await api.updateSubject(editingSubject.id, payload)
+          setSuccess(`Subject "${payload.name}" updated successfully.`)
         } else {
-          await api.createStudent(payload)
-          setSuccess(`Student "${payload.name}" created successfully.`)
+          await api.createSubject(payload)
+          setSuccess(`Subject "${payload.name}" created successfully.`)
         }
         setModalOpen(false)
-        setEditingStudent(null)
-        const data = await api.listStudents()
-        setStudents(data)
+        setEditingSubject(null)
+        const data = await api.listSubjects()
+        setSubjects(data)
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.userMessage)
@@ -275,7 +248,7 @@ export default function StudentsPage() {
         setSaving(false)
       }
     },
-    [getApi, editingStudent],
+    [getApi, editingSubject],
   )
 
   const handleDelete = React.useCallback(async () => {
@@ -284,11 +257,11 @@ export default function StudentsPage() {
     setError(null)
     try {
       const api = await getApi()
-      await api.deleteStudent(deletingId)
-      setSuccess("Student deleted successfully.")
+      await api.deleteSubject(deletingId)
+      setSuccess("Subject deleted successfully.")
       setDeletingId(null)
-      const data = await api.listStudents()
-      setStudents(data)
+      const data = await api.listSubjects()
+      setSubjects(data)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -301,18 +274,18 @@ export default function StudentsPage() {
   }, [getApi, deletingId])
 
   const openCreateModal = () => {
-    setEditingStudent(null)
+    setEditingSubject(null)
     setModalOpen(true)
   }
 
-  const openEditModal = (student: Student) => {
-    setEditingStudent(student)
+  const openEditModal = (subject: Subject) => {
+    setEditingSubject(subject)
     setModalOpen(true)
   }
 
   const closeModal = () => {
     setModalOpen(false)
-    setEditingStudent(null)
+    setEditingSubject(null)
   }
 
   if (!isLoaded) {
@@ -332,19 +305,19 @@ export default function StudentsPage() {
   if (!isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <p className="text-muted-foreground font-medium">Please sign in to view students.</p>
+        <p className="text-muted-foreground font-medium">Please sign in to view subjects.</p>
       </div>
     )
   }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Page title */}
+      {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Students</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Subjects</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage student profiles, contact info, and enrollments.
+            Manage academic subjects, curriculum offerings, and course definitions.
           </p>
         </div>
 
@@ -365,7 +338,7 @@ export default function StudentsPage() {
 
           <Button onClick={openCreateModal} variant="outline" className="shadow-xs">
             <Plus className="mr-2 size-4" />
-            Add Student
+            Add Subject
           </Button>
         </div>
       </div>
@@ -376,18 +349,18 @@ export default function StudentsPage() {
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search students by name, ID or contact..."
+            placeholder="Search subjects by name or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        {lastLoaded && students && (
+        {lastLoaded && subjects && (
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="px-3 py-1 text-xs">
-              <UserCheck className="mr-1.5 size-3.5" />
-              {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
+              <BookOpen className="mr-1.5 size-3.5" />
+              {filteredSubjects.length} of {subjects.length} subject{subjects.length !== 1 ? "s" : ""}
             </Badge>
             <span className="text-xs text-muted-foreground">
               Loaded {lastLoaded}
@@ -435,63 +408,33 @@ export default function StudentsPage() {
               currentSortOrder={sortConfig.order}
               onSort={requestSort}
             >
-              Name
-            </TableHeadSortable>
-
-            <TableHeadSortable
-              sortKey="dob"
-              currentSortKey={sortConfig.key}
-              currentSortOrder={sortConfig.order}
-              onSort={requestSort}
-            >
-              DOB
-            </TableHeadSortable>
-
-            <TableHeadSortable
-              sortKey="contact"
-              currentSortKey={sortConfig.key}
-              currentSortOrder={sortConfig.order}
-              onSort={requestSort}
-            >
-              Contact
-            </TableHeadSortable>
-
-            <TableHeadSortable
-              sortKey="enrollment_date"
-              currentSortKey={sortConfig.key}
-              currentSortOrder={sortConfig.order}
-              onSort={requestSort}
-            >
-              Enrollment Date
+              Subject Name
             </TableHeadSortable>
 
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading && !students ? (
+          {loading && !subjects ? (
             Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-          ) : sortedStudents && sortedStudents.length === 0 ? (
+          ) : sortedSubjects && sortedSubjects.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
+              <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                {subjects === null ? 'Click "Load Data" to fetch subjects.' : 'No subjects found.'}
               </TableCell>
             </TableRow>
           ) : (
-            sortedStudents?.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell className="font-semibold text-foreground">{student.id}</TableCell>
-                <TableCell className="font-medium">{student.name}</TableCell>
-                <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{student.contact ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
+            sortedSubjects?.map((subject) => (
+              <TableRow key={subject.id}>
+                <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
+                <TableCell className="font-medium">{subject.name}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => openEditModal(student)}
-                      aria-label={`Edit ${student.name}`}
+                      onClick={() => openEditModal(subject)}
+                      aria-label={`Edit ${subject.name}`}
                     >
                       <Pencil className="size-4" />
                     </Button>
@@ -499,8 +442,8 @@ export default function StudentsPage() {
                       variant="ghost"
                       size="icon-sm"
                       className="text-destructive hover:text-destructive"
-                      onClick={() => setDeletingId(student.id)}
-                      aria-label={`Delete ${student.name}`}
+                      onClick={() => setDeletingId(subject.id)}
+                      aria-label={`Delete ${subject.name}`}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -513,9 +456,9 @@ export default function StudentsPage() {
       </Table>
 
       {/* Form modal */}
-      <StudentFormModal
+      <SubjectFormModal
         open={modalOpen}
-        initial={editingStudent}
+        initial={editingSubject}
         onClose={closeModal}
         onSave={handleSave}
         saving={saving}
@@ -524,10 +467,10 @@ export default function StudentsPage() {
       {/* Delete confirmation */}
       <ConfirmDialog
         open={deletingId !== null}
-        title="Delete Student"
+        title="Delete Subject"
         message={
           deletingId !== null
-            ? `Are you sure you want to delete student #${deletingId}? This action cannot be undone.`
+            ? `Are you sure you want to delete subject #${deletingId}? This action cannot be undone.`
             : ""
         }
         onConfirm={handleDelete}

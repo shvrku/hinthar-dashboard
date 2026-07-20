@@ -275,6 +275,28 @@ export function createApi(token: string) {
     deleteTeacher: (id: number) =>
       request<void>(`/teachers/${id}/`, token, { method: "DELETE" }),
 
+    // --- Subjects ---
+    listSubjects: () =>
+      requestAllPages<import("./types").Subject>(`/subjects/`, token),
+
+    getSubject: (id: number) =>
+      request<import("./types").Subject>(`/subjects/${id}/`, token),
+
+    createSubject: (data: import("./types").SubjectPayload) =>
+      request<import("./types").Subject>(`/subjects/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateSubject: (id: number, data: import("./types").SubjectPayload) =>
+      request<import("./types").Subject>(`/subjects/${id}/`, token, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+
+    deleteSubject: (id: number) =>
+      request<void>(`/subjects/${id}/`, token, { method: "DELETE" }),
+
     // --- Sessions ---
     listSessions: () =>
       requestAllPages<import("./types").Session>(`/sessions/`, token),

@@ -2,16 +2,30 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, X, RotateCcw, Loader2, Check, Minus, Search } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Minus, Search, CalendarCheck } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot } from "@/lib/types"
-
-const STATUS_COLORS: Record<SessionStatus, string> = {
-  scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  completed: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  cancelled: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-  no_show: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-}
+import { useSortableData } from "@/lib/use-sortable-data"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableHeadSortable,
+  TableCell,
+} from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
   const hour = Math.floor(7 + i / 2)
@@ -64,6 +78,22 @@ function statusLabel(value: SessionStatus | null): string {
   return SESSION_STATUSES.find((s) => s.value === value)?.label ?? value
 }
 
+function renderStatusBadge(status: SessionStatus | null) {
+  if (!status) return <span className="text-muted-foreground">—</span>
+  switch (status) {
+    case "scheduled":
+      return <Badge variant="secondary">{statusLabel(status)}</Badge>
+    case "completed":
+      return <Badge variant="success">{statusLabel(status)}</Badge>
+    case "cancelled":
+      return <Badge variant="destructive">{statusLabel(status)}</Badge>
+    case "no_show":
+      return <Badge variant="outline">{statusLabel(status)}</Badge>
+    default:
+      return <Badge variant="secondary">{statusLabel(status)}</Badge>
+  }
+}
+
 function formatDateTime(iso: string): string {
   const d = parseBackendDateTime(iso)
   if (isNaN(d.getTime())) return "—"
@@ -72,13 +102,13 @@ function formatDateTime(iso: string): string {
 
 function RowSkeleton() {
   return (
-    <tr className="border-b last:border-b-0">
+    <TableRow>
       {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="h-5 w-full animate-pulse rounded bg-muted" />
-        </td>
+        <TableCell key={i}>
+          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
+        </TableCell>
       ))}
-    </tr>
+    </TableRow>
   )
 }
 
@@ -107,7 +137,7 @@ export default function SessionsPage() {
   // Form fields
   const [formDate, setFormDate] = React.useState("")
   const [formStartTime, setFormStartTime] = React.useState("")
-  const [formDuration, setFormDuration] = React.useState("60") // default 1 hour
+  const [formDuration, setFormDuration] = React.useState("60")
   const [formCustomEndTime, setFormCustomEndTime] = React.useState("")
   const [formStatus, setFormStatus] = React.useState<string>("")
   const [formPaid, setFormPaid] = React.useState(false)
@@ -138,7 +168,7 @@ export default function SessionsPage() {
       setClasses(classesData)
       setTimetableSlots(slotsData)
     } catch {
-      // silent - errors handled by loadSessions or user alerts
+      // silent
     }
   }, [getToken, isSignedIn])
 
@@ -183,6 +213,9 @@ export default function SessionsPage() {
     )
   }, [sessions, searchQuery])
 
+  // Sorting
+  const { items: sortedSessions, requestSort, sortConfig } = useSortableData(filteredSessions, "id", "asc")
+
   const filteredSlots = React.useMemo(() => {
     if (!formClassId) return []
     return timetableSlots.filter((slot) => slot.class_obj?.id.toString() === formClassId)
@@ -199,32 +232,21 @@ export default function SessionsPage() {
 
     const slot = timetableSlots.find((s) => s.id.toString() === slotId)
     if (slot) {
-      if (slot.teacher) {
+      if (slot.teacher?.id) {
         setFormTeacherId(slot.teacher.id.toString())
       }
-      
-      if (slot.start_time) {
-        const timePart = slot.start_time.split(":")
-        if (timePart.length >= 2) {
-          setFormStartTime(`${timePart[0]}:${timePart[1]}`)
-        }
-      }
-      
-      if (slot.start_time && slot.end_time) {
-        const parseTime = (timeStr: string) => {
-          const [h, m] = timeStr.split(":").map(Number)
-          return h * 60 + m
-        }
-        const diffMin = parseTime(slot.end_time) - parseTime(slot.start_time)
-        const standardDurations = [30, 60, 90, 120, 150, 180]
-        if (standardDurations.includes(diffMin)) {
-          setFormDuration(diffMin.toString())
-          setFormCustomEndTime("")
-        } else {
-          setFormDuration("custom")
-          const timePart = slot.end_time.split(":")
-          if (timePart.length >= 2) {
-            setFormCustomEndTime(`${timePart[0]}:${timePart[1]}`)
+      if (slot.start_time) setFormStartTime(slot.start_time.substring(0, 5))
+      if (slot.end_time && slot.start_time) {
+        const [sh, sm] = slot.start_time.split(":").map(Number)
+        const [eh, em] = slot.end_time.split(":").map(Number)
+        const durationMins = (eh * 60 + em) - (sh * 60 + sm)
+        if (durationMins > 0) {
+          const match = DURATIONS.find((d) => d.value === durationMins.toString())
+          if (match) {
+            setFormDuration(match.value)
+          } else {
+            setFormDuration("custom")
+            setFormCustomEndTime(slot.end_time.substring(0, 5))
           }
         }
       }
@@ -233,12 +255,10 @@ export default function SessionsPage() {
 
   const openAddModal = () => {
     setEditingSession(null)
-    const today = new Date()
-    const pad = (n: number) => n.toString().padStart(2, "0")
-    setFormDate(`${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`)
+    setFormDate(new Date().toISOString().substring(0, 10))
     setFormStartTime("09:00")
     setFormDuration("60")
-    setFormCustomEndTime("")
+    setFormCustomEndTime("10:00")
     setFormStatus("scheduled")
     setFormPaid(false)
     setFormTeacherId("")
@@ -249,28 +269,42 @@ export default function SessionsPage() {
 
   const openEditModal = (session: Session) => {
     setEditingSession(session)
-    const dStart = parseBackendDateTime(session.start_time)
-    const dEnd = parseBackendDateTime(session.end_time)
-    const pad = (n: number) => n.toString().padStart(2, "0")
-    
-    setFormDate(`${dStart.getFullYear()}-${pad(dStart.getMonth() + 1)}-${pad(dStart.getDate())}`)
-    setFormStartTime(`${pad(dStart.getHours())}:${pad(dStart.getMinutes())}`)
-    
-    const diffMin = Math.round((dEnd.getTime() - dStart.getTime()) / (60 * 1000))
-    const standardDurations = [30, 60, 90, 120, 150, 180]
-    if (standardDurations.includes(diffMin)) {
-      setFormDuration(diffMin.toString())
-      setFormCustomEndTime("")
+    const startDate = parseBackendDateTime(session.start_time)
+    const endDate = parseBackendDateTime(session.end_time)
+
+    if (!isNaN(startDate.getTime())) {
+      const year = startDate.getFullYear()
+      const month = String(startDate.getMonth() + 1).padStart(2, "0")
+      const day = String(startDate.getDate()).padStart(2, "0")
+      setFormDate(`${year}-${month}-${day}`)
+
+      const sh = String(startDate.getHours()).padStart(2, "0")
+      const sm = String(startDate.getMinutes()).padStart(2, "0")
+      setFormStartTime(`${sh}:${sm}`)
+
+      if (!isNaN(endDate.getTime())) {
+        const diffMins = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+        const match = DURATIONS.find((d) => d.value === diffMins.toString())
+        if (match) {
+          setFormDuration(match.value)
+        } else {
+          setFormDuration("custom")
+          const eh = String(endDate.getHours()).padStart(2, "0")
+          const em = String(endDate.getMinutes()).padStart(2, "0")
+          setFormCustomEndTime(`${eh}:${em}`)
+        }
+      }
     } else {
-      setFormDuration("custom")
-      setFormCustomEndTime(`${pad(dEnd.getHours())}:${pad(dEnd.getMinutes())}`)
+      setFormDate("")
+      setFormStartTime("")
+      setFormDuration("60")
     }
-    
+
     setFormStatus(session.status ?? "")
     setFormPaid(session.paid ?? false)
-    setFormTeacherId(session.teacher?.id.toString() ?? "")
-    setFormClassId(session.class_obj?.id.toString() ?? "")
-    setFormTimetableSlotId(session.timetable_slot?.id.toString() ?? "")
+    setFormTeacherId(session.teacher?.id ? session.teacher.id.toString() : "")
+    setFormClassId(session.class_obj?.id ? session.class_obj.id.toString() : "")
+    setFormTimetableSlotId(session.timetable_slot?.id ? session.timetable_slot.id.toString() : "")
     setModalOpen(true)
   }
 
@@ -279,54 +313,45 @@ export default function SessionsPage() {
     setEditingSession(null)
   }
 
-  const getFormPayload = (): SessionPayload => {
-    const startStr = `${formDate}T${formStartTime}`
-    const start = parseBackendDateTime(startStr)
-    let end: Date
-    if (formDuration === "custom") {
-      const endStr = `${formDate}T${formCustomEndTime}`
-      end = parseBackendDateTime(endStr)
-    } else {
-      end = new Date(start.getTime() + parseInt(formDuration, 10) * 60 * 1000)
-    }
-    
-    return {
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      ...(formStatus ? { status: formStatus as SessionStatus } : {}),
-      ...(formPaid ? { paid: true } : {}),
-      ...(formTeacherId ? { teacher_id: parseInt(formTeacherId, 10) } : {}),
-      ...(formClassId ? { class_obj_id: parseInt(formClassId, 10) } : { class_obj_id: null }),
-      timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
-    }
-  }
-
-  const handleSave = async () => {
-    if (!formDate || !formStartTime || !formTeacherId) return
-    if (formDuration === "custom" && !formCustomEndTime) return
-    
-    const startStr = `${formDate}T${formStartTime}`
-    const start = parseBackendDateTime(startStr)
-    let end: Date
-    if (formDuration === "custom") {
-      const endStr = `${formDate}T${formCustomEndTime}`
-      end = parseBackendDateTime(endStr)
-    } else {
-      end = new Date(start.getTime() + parseInt(formDuration, 10) * 60 * 1000)
-    }
-    
-    if (end <= start) {
-      setError("End time must be after start time.")
-      return
-    }
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formDate || !formStartTime) return
     setSaving(true)
     setError(null)
+
     try {
+      const startIso = `${formDate}T${formStartTime}:00`
+      let endIso = ""
+      if (formDuration === "custom") {
+        if (!formCustomEndTime) {
+          setError("Please specify custom end time")
+          setSaving(false)
+          return
+        }
+        endIso = `${formDate}T${formCustomEndTime}:00`
+      } else {
+        const [h, m] = formStartTime.split(":").map(Number)
+        const durationMins = parseInt(formDuration, 10)
+        const totalMins = h * 60 + m + durationMins
+        const endH = String(Math.floor(totalMins / 60) % 24).padStart(2, "0")
+        const endM = String(totalMins % 60).padStart(2, "0")
+        endIso = `${formDate}T${endH}:${endM}:00`
+      }
+
+      const payload: SessionPayload = {
+        start_time: startIso,
+        end_time: endIso,
+        status: formStatus ? (formStatus as SessionStatus) : null,
+        paid: formPaid,
+        teacher_id: formTeacherId ? parseInt(formTeacherId, 10) : undefined,
+        class_obj_id: formClassId ? parseInt(formClassId, 10) : null,
+        timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
+      }
+
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const payload = getFormPayload()
+
       if (editingSession) {
         await api.updateSession(editingSession.id, payload)
         showSuccess("Session updated successfully.")
@@ -334,50 +359,53 @@ export default function SessionsPage() {
         await api.createSession(payload)
         showSuccess("Session created successfully.")
       }
+
       closeModal()
-      await loadSessions()
+      const data = await api.listSessions()
+      setSessions(data)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
       } else {
-        setError(err instanceof Error ? err.message : "Failed to save session")
+        setError(err instanceof Error ? err.message : "An unexpected error occurred")
       }
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async () => {
+    if (deletingId === null) return
     setDeleting(true)
     setError(null)
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      await api.deleteSession(id)
+      await api.deleteSession(deletingId)
       showSuccess("Session deleted successfully.")
       setDeletingId(null)
-      await loadSessions()
+      const data = await api.listSessions()
+      setSessions(data)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
       } else {
-        setError(err instanceof Error ? err.message : "Failed to delete session")
+        setError(err instanceof Error ? err.message : "An unexpected error occurred")
       }
     } finally {
       setDeleting(false)
     }
   }
 
-  // Auth gates
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 h-8 w-48 animate-pulse rounded bg-muted" />
-        <div className="mb-6 h-4 w-72 animate-pulse rounded bg-muted" />
-        <div className="space-y-3">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
+        <div className="rounded-xl border p-6 space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-muted" />
+            <div key={i} className="h-6 w-full animate-pulse rounded-md bg-muted" />
           ))}
         </div>
       </div>
@@ -387,211 +415,288 @@ export default function SessionsPage() {
   if (!isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view sessions.</p>
+        <p className="text-muted-foreground font-medium">Please sign in to view sessions.</p>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Sessions</h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage class sessions and timetable records.
-        </p>
-      </div>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Sessions</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage scheduled class sessions, status records, and payouts.
+          </p>
+        </div>
 
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        {/* Left side actions (Buttons + Search) */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={loadSessions}
-            disabled={loading}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-          >
+        <div className="flex items-center gap-3">
+          <Button onClick={loadSessions} disabled={loading} variant="default" className="shadow-xs">
             {loading ? (
               <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="mr-2 size-4 animate-spin" />
                 Loading...
               </>
             ) : (
               <>
-                <RotateCcw className="size-4" />
+                <RotateCcw className="mr-2 size-4" />
                 Load Data
               </>
             )}
-          </button>
+          </Button>
 
-          <button
-            onClick={openAddModal}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            <Plus className="size-4" />
+          <Button onClick={openAddModal} variant="outline" className="shadow-xs">
+            <Plus className="mr-2 size-4" />
             Add Session
-          </button>
+          </Button>
+        </div>
+      </div>
 
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search sessions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-64 rounded-lg border bg-background pl-9 pr-4 text-sm outline-none ring-offset-background transition-colors focus:border-ring"
-            />
-          </div>
+      {/* Toolbar */}
+      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by teacher, class, status..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
-        {/* Right side info (Timestamp/Status) */}
         {lastLoaded && sessions && (
-          <span className="text-xs text-muted-foreground">
-            {filteredSessions.length} of {sessions.length} session{sessions.length !== 1 ? "s" : ""} &bull; Loaded {lastLoaded}
-          </span>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="px-3 py-1 text-xs">
+              <CalendarCheck className="mr-1.5 size-3.5" />
+              {filteredSessions.length} of {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              Loaded {lastLoaded}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Success banner */}
+      {/* Banners */}
       {success && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-          <Check className="size-4 shrink-0" />
-          <span className="flex-1">{success}</span>
-          <button onClick={() => setSuccess(null)} className="shrink-0 hover:opacity-70">
-            <X className="size-4" />
-          </button>
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-2">
+            <Check className="size-4 shrink-0" />
+            <span>{success}</span>
+          </div>
+          <Button size="xs" variant="ghost" onClick={() => setSuccess(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
-      {/* Error banner */}
       {error && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="shrink-0 hover:opacity-70">
-            <X className="size-4" />
-          </button>
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span>
+          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium">ID</th>
-              <th className="px-4 py-3 text-left font-medium">Teacher Name</th>
-              <th className="px-4 py-3 text-left font-medium">Class</th>
-              <th className="px-4 py-3 text-left font-medium">Start Time</th>
-              <th className="px-4 py-3 text-left font-medium">End Time</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Paid</th>
-              <th className="px-4 py-3 text-left font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !sessions
-              ? Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-              : sessions === null
-                ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
-                      Click &quot;Load Data&quot; to fetch sessions.
-                    </td>
-                  </tr>
-                )
-                : filteredSessions.length === 0
-                  ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
-                        No sessions found.
-                      </td>
-                    </tr>
-                  )
-                  : filteredSessions.map((session) => (
-                      <tr key={session.id} className="border-b last:border-b-0 transition-colors hover:bg-muted/30">
-                        <td className="px-4 py-3 font-mono text-xs">{session.id}</td>
-                        <td className="px-4 py-3">{session.teacher?.name ?? "—"}</td>
-                        <td className="px-4 py-3">
-                          {session.class_obj
-                            ? `${session.class_obj.education_level} ${session.class_obj.cohort_identifier}`
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(session.start_time)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(session.end_time)}</td>
-                        <td className="px-4 py-3">
-                          {session.status
-                            ? (
-                              <span
-                                className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[session.status]}`}
-                              >
-                                {statusLabel(session.status)}
-                              </span>
-                            )
-                            : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          {session.paid === true
-                            ? <Check className="size-4 text-green-600 dark:text-green-400" />
-                            : <Minus className="size-4 text-muted-foreground" />}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => openEditModal(session)}
-                              className="inline-flex size-8 items-center justify-center rounded-md border transition-colors hover:bg-muted/50"
-                              title="Edit"
-                            >
-                              <Pencil className="size-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setDeletingId(session.id)}
-                              className="inline-flex size-8 items-center justify-center rounded-md border text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
-                              title="Delete"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-            {/* Skeleton rows while loading with existing data */}
-            {loading && sessions && sessions.length > 0 && (
-              Array.from({ length: 3 }).map((_, i) => <RowSkeleton key={`skel-${i}`} />)
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHeadSortable
+              className="w-[100px]"
+              sortKey="id"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              ID
+            </TableHeadSortable>
 
-      {/* Add/Edit Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                {editingSession ? "Edit Session" : "Add Session"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="inline-flex size-8 items-center justify-center rounded-md transition-colors hover:bg-muted"
-              >
-                <X className="size-4" />
-              </button>
+            <TableHeadSortable
+              sortKey="teacher.name"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Teacher Name
+            </TableHeadSortable>
+
+            <TableHeadSortable
+              sortKey="class_obj.cohort_identifier"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Class
+            </TableHeadSortable>
+
+            <TableHeadSortable
+              sortKey="start_time"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Start Time
+            </TableHeadSortable>
+
+            <TableHeadSortable
+              sortKey="end_time"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              End Time
+            </TableHeadSortable>
+
+            <TableHeadSortable
+              sortKey="status"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Status
+            </TableHeadSortable>
+
+            <TableHeadSortable
+              sortKey="paid"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Paid
+            </TableHeadSortable>
+
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading && !sessions ? (
+            Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
+          ) : sessions === null ? (
+            <TableRow>
+              <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                Click &quot;Load Data&quot; to fetch sessions.
+              </TableCell>
+            </TableRow>
+          ) : sortedSessions.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                No sessions found.
+              </TableCell>
+            </TableRow>
+          ) : (
+            sortedSessions.map((session) => (
+              <TableRow key={session.id}>
+                <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
+                <TableCell className="font-medium">{session.teacher?.name ?? "—"}</TableCell>
+                <TableCell>
+                  {session.class_obj ? (
+                    <Badge variant="outline">
+                      {session.class_obj.education_level} {session.class_obj.cohort_identifier}
+                    </Badge>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">
+                  {formatDateTime(session.start_time)}
+                </TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">
+                  {formatDateTime(session.end_time)}
+                </TableCell>
+                <TableCell>{renderStatusBadge(session.status)}</TableCell>
+                <TableCell>
+                  {session.paid === true ? (
+                    <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Minus className="size-4 text-muted-foreground" />
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => openEditModal(session)}
+                      title="Edit"
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDeletingId(session.id)}
+                      title="Delete"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Form modal */}
+      <Dialog open={modalOpen} onOpenChange={(val) => !val && closeModal()}>
+        <DialogContent onClose={closeModal} className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{editingSession ? "Edit Session" : "Add Session"}</DialogTitle>
+            <DialogDescription>
+              {editingSession ? "Update session schedule and details." : "Schedule a new class session."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Class</label>
+                <select
+                  value={formClassId}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Select Class</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.education_level} {c.cohort_identifier} {c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Timetable Slot</label>
+                <select
+                  value={formTimetableSlotId}
+                  onChange={(e) => handleSlotChange(e.target.value)}
+                  disabled={!formClassId}
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                >
+                  <option value="">Select Slot</option>
+                  {filteredSlots.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.day_of_week} {s.start_time}-{s.end_time}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {/* Teacher */}
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  Teacher <span className="text-red-500">*</span>
-                </label>
+                <label className="mb-1.5 block text-sm font-medium">Teacher</label>
                 <select
                   value={formTeacherId}
                   onChange={(e) => setFormTeacherId(e.target.value)}
-                  required
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
-                  <option value="">— Select Teacher —</option>
+                  <option value="">Select Teacher</option>
                   {teachers.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -600,146 +705,71 @@ export default function SessionsPage() {
                 </select>
               </div>
 
-              {/* Class */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Class</label>
+                <label className="mb-1.5 block text-sm font-medium">Date</label>
+                <Input
+                  type="date"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Start Time</label>
                 <select
-                  value={formClassId}
-                  onChange={(e) => handleClassChange(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  value={formStartTime}
+                  onChange={(e) => setFormStartTime(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  required
                 >
-                  <option value="">— None (Tutor Session) —</option>
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.education_level} {c.cohort_identifier}
+                  {TIME_SLOTS.map((ts) => (
+                    <option key={ts.value} value={ts.value}>
+                      {ts.label}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Timetable Slot */}
-              {formClassId && (
-                <div>
-                  {filteredSlots.length > 0 ? (
-                    <>
-                      <label className="mb-1.5 block text-sm font-medium">Timetable Slot</label>
-                      <select
-                        value={formTimetableSlotId}
-                        onChange={(e) => handleSlotChange(e.target.value)}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                      >
-                        <option value="">— Select Timetable Slot (Optional) —</option>
-                        {filteredSlots.map((slot) => {
-                          const dayName = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][slot.day_of_week] || `Day ${slot.day_of_week}`
-                          const subjectName = slot.subject?.name || "No Subject"
-                          const teacherName = slot.teacher?.name || "No Teacher"
-                          return (
-                            <option key={slot.id} value={slot.id}>
-                              {subjectName} with {teacherName} ({dayName} {slot.start_time.slice(0,5)}-{slot.end_time.slice(0,5)})
-                            </option>
-                          )
-                        })}
-                      </select>
-                      {!formTimetableSlotId && (
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          ℹ️ No slot selected. This session will be scheduled as an ad-hoc/extra session.
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-800 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-300">
-                      ℹ️ This class has no recurring timetable slots. This session will be scheduled as an ad-hoc/extra session.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Date & Start Time */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    required
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Start Time <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formStartTime}
-                    onChange={(e) => setFormStartTime(e.target.value)}
-                    required
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  >
-                    <option value="">— Select Time —</option>
-                    {TIME_SLOTS.map((slot) => (
-                      <option key={slot.value} value={slot.value}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Duration</label>
+                <select
+                  value={formDuration}
+                  onChange={(e) => setFormDuration(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {DURATIONS.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
 
-              {/* Duration & End Time */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Duration <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formDuration}
-                    onChange={(e) => setFormDuration(e.target.value)}
-                    required
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  >
-                    {DURATIONS.map((dur) => (
-                      <option key={dur.value} value={dur.value}>
-                        {dur.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {formDuration === "custom" && (
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium">
-                      Custom End Time <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formCustomEndTime}
-                      onChange={(e) => setFormCustomEndTime(e.target.value)}
-                      required
-                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    >
-                      <option value="">— Select Time —</option>
-                      {TIME_SLOTS.map((slot) => (
-                        <option key={slot.value} value={slot.value}>
-                          {slot.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+            {formDuration === "custom" && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Custom End Time</label>
+                <Input
+                  type="time"
+                  value={formCustomEndTime}
+                  onChange={(e) => setFormCustomEndTime(e.target.value)}
+                  required
+                />
               </div>
+            )}
 
-              {/* Status */}
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Status</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
-                  <option value="">— None —</option>
+                  <option value="">None</option>
                   {SESSION_STATUSES.map((s) => (
                     <option key={s.value} value={s.value}>
                       {s.label}
@@ -748,68 +778,53 @@ export default function SessionsPage() {
                 </select>
               </div>
 
-              {/* Paid */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={formPaid}
-                    onChange={(e) => setFormPaid(e.target.checked)}
-                    className="size-4 rounded border transition-colors"
-                  />
+              <div className="flex items-center gap-2 pt-6">
+                <input
+                  type="checkbox"
+                  id="paid-check"
+                  checked={formPaid}
+                  onChange={(e) => setFormPaid(e.target.checked)}
+                  className="size-4 rounded border-input text-primary focus:ring-ring"
+                />
+                <label htmlFor="paid-check" className="text-sm font-medium">
                   Paid
                 </label>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={closeModal}
-                className="inline-flex h-9 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-muted/50"
-              >
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={closeModal} disabled={saving}>
                 Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !formDate || !formStartTime || !formTeacherId || (formDuration === "custom" && !formCustomEndTime)}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
-              >
-                {saving && <Loader2 className="size-4 animate-spin" />}
-                {saving ? "Saving..." : editingSession ? "Update" : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {editingSession ? "Save Changes" : "Create Session"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      {deletingId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
-            <h2 className="mb-2 text-lg font-semibold">Confirm Delete</h2>
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete this session? This action cannot be undone.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setDeletingId(null)}
-                disabled={deleting}
-                className="inline-flex h-9 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-muted/50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deletingId)}
-                disabled={deleting}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting && <Loader2 className="size-4 animate-spin" />}
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete confirmation */}
+      <Dialog open={deletingId !== null} onOpenChange={(val) => !val && setDeletingId(null)}>
+        <DialogContent onClose={() => setDeletingId(null)}>
+          <DialogHeader>
+            <DialogTitle>Delete Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete session #{deletingId}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingId(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

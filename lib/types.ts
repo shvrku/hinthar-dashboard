@@ -103,6 +103,10 @@ export interface StudentPayload {
   contact?: string | null
 }
 
+export interface SubjectPayload {
+  name: string
+}
+
 export interface TeacherPayload {
   name: string
   employment_type?: EmploymentType | null

@@ -8,6 +8,13 @@ paths:
   /api/v1/audit-logs/:
     get:
       operationId: audit_logs_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - audit-logs
       security:
@@ -17,9 +24,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AuditLog'
+                $ref: '#/components/schemas/PaginatedAuditLogList'
           description: ''
   /api/v1/audit-logs/{id}/:
     get:
@@ -45,6 +50,13 @@ paths:
   /api/v1/check-ins/:
     get:
       operationId: check_ins_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - check-ins
       security:
@@ -54,9 +66,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CheckIn'
+                $ref: '#/components/schemas/PaginatedCheckInList'
           description: ''
   /api/v1/check-ins/{id}/:
     get:
@@ -206,6 +216,13 @@ paths:
   /api/v1/class-students/:
     get:
       operationId: class_students_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - class-students
       security:
@@ -215,9 +232,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClassStudent'
+                $ref: '#/components/schemas/PaginatedClassStudentList'
           description: ''
     post:
       operationId: class_students_create
@@ -347,6 +362,13 @@ paths:
   /api/v1/classes/:
     get:
       operationId: classes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - classes
       security:
@@ -356,9 +378,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Class'
+                $ref: '#/components/schemas/PaginatedClassList'
           description: ''
     post:
       operationId: classes_create
@@ -505,6 +525,13 @@ paths:
   /api/v1/session-attendances/:
     get:
       operationId: session_attendances_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - session-attendances
       security:
@@ -514,9 +541,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SessionAttendanceList'
+                $ref: '#/components/schemas/PaginatedSessionAttendanceListList'
           description: ''
     post:
       operationId: session_attendances_create
@@ -644,6 +669,13 @@ paths:
   /api/v1/sessions/:
     get:
       operationId: sessions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - sessions
       security:
@@ -653,9 +685,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Session'
+                $ref: '#/components/schemas/PaginatedSessionList'
           description: ''
     post:
       operationId: sessions_create
@@ -814,12 +844,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/Session'
           description: ''
-  /api/v1/sessions/generate/:
+  /api/v1/sessions/generate/{class_id}/:
     post:
       operationId: sessions_generate_create
-      description: Batch-generate dated sessions from timetable templates for a date
-        range.
-      summary: Generate sessions
+      description: Generate dated sessions from timetable slots for a specific class.
+        By default generates from today until the end of the current month. Optionally
+        accepts start_date and end_date to target a different range (e.g. next month).
+      summary: Generate sessions for a class
+      parameters:
+      - in: path
+        name: class_id
+        schema:
+          type: integer
+        required: true
       tags:
       - sessions
       requestBody:
@@ -835,7 +872,7 @@ paths:
                 end_date:
                   type: string
                   format: date
-                  description: Defaults to start_date + 14 days
+                  description: Defaults to end of month
       security:
       - clerk_jwt: []
       responses:
@@ -845,12 +882,32 @@ paths:
               schema:
                 type: object
                 properties:
-                  created_sessions:
+                  class_id:
+                    type: integer
+                  date_range:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        format: date
+                      to:
+                        type: string
+                        format: date
+                  total_created:
+                    type: integer
+                  total_already_existed:
                     type: integer
           description: ''
   /api/v1/staff/:
     get:
       operationId: staff_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - staff
       security:
@@ -860,9 +917,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Staff'
+                $ref: '#/components/schemas/PaginatedStaffList'
           description: ''
     post:
       operationId: staff_create
@@ -1022,8 +1077,6 @@ paths:
                     type: integer
                   timetable_slots:
                     type: integer
-                  timetable_students:
-                    type: integer
                   sessions:
                     type: integer
                   session_attendances:
@@ -1034,6 +1087,13 @@ paths:
   /api/v1/students/:
     get:
       operationId: students_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - students
       security:
@@ -1043,9 +1103,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Student'
+                $ref: '#/components/schemas/PaginatedStudentList'
           description: ''
     post:
       operationId: students_create
@@ -1232,6 +1290,13 @@ paths:
   /api/v1/subjects/:
     get:
       operationId: subjects_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - subjects
       security:
@@ -1241,9 +1306,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Subject'
+                $ref: '#/components/schemas/PaginatedSubjectList'
           description: ''
     post:
       operationId: subjects_create
@@ -1373,6 +1436,13 @@ paths:
   /api/v1/teachers/:
     get:
       operationId: teachers_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - teachers
       security:
@@ -1382,9 +1452,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Teacher'
+                $ref: '#/components/schemas/PaginatedTeacherList'
           description: ''
     post:
       operationId: teachers_create
@@ -1514,6 +1582,13 @@ paths:
   /api/v1/timetable-slots/:
     get:
       operationId: timetable_slots_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - timetable-slots
       security:
@@ -1523,12 +1598,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TimetableSlot'
+                $ref: '#/components/schemas/PaginatedTimetableSlotList'
           description: ''
     post:
       operationId: timetable_slots_create
+      description: Create a timetable slot and auto-generate sessions for the rest
+        of the month. Returns the created slot along with a summary of generated sessions.
+      summary: Create a timetable slot
       tags:
       - timetable-slots
       requestBody:
@@ -1552,6 +1628,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/TimetableSlot'
           description: ''
+        '400':
+          description: Bad Request - Validation Error (e.g., overlapping slots, missing
+            required fields like class_obj)
   /api/v1/timetable-slots/{id}/:
     get:
       operationId: timetable_slots_retrieve
@@ -1575,6 +1654,9 @@ paths:
           description: ''
     put:
       operationId: timetable_slots_update
+      description: Update a timetable slot and auto-generate sessions for the rest
+        of the month.
+      summary: Update a timetable slot
       parameters:
       - in: path
         name: id
@@ -1605,8 +1687,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/TimetableSlot'
           description: ''
+        '400':
+          description: Bad Request - Validation Error (e.g., overlapping slots)
+        '404':
+          description: Not Found
     patch:
       operationId: timetable_slots_partial_update
+      description: Partial update a timetable slot and auto-generate sessions for
+        the rest of the month.
+      summary: Partial update a timetable slot
       parameters:
       - in: path
         name: id
@@ -1636,6 +1725,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/TimetableSlot'
           description: ''
+        '400':
+          description: Bad Request - Validation Error
+        '404':
+          description: Not Found
     delete:
       operationId: timetable_slots_destroy
       parameters:
@@ -1647,145 +1740,6 @@ paths:
         required: true
       tags:
       - timetable-slots
-      security:
-      - clerk_jwt: []
-      responses:
-        '204':
-          description: No response body
-  /api/v1/timetable-students/:
-    get:
-      operationId: timetable_students_list
-      tags:
-      - timetable-students
-      security:
-      - clerk_jwt: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TimetableStudent'
-          description: ''
-    post:
-      operationId: timetable_students_create
-      tags:
-      - timetable-students
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TimetableStudent'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TimetableStudent'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TimetableStudent'
-      security:
-      - clerk_jwt: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TimetableStudent'
-          description: ''
-  /api/v1/timetable-students/{id}/:
-    get:
-      operationId: timetable_students_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this timetable student.
-        required: true
-      tags:
-      - timetable-students
-      security:
-      - clerk_jwt: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TimetableStudent'
-          description: ''
-    put:
-      operationId: timetable_students_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this timetable student.
-        required: true
-      tags:
-      - timetable-students
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TimetableStudent'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TimetableStudent'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TimetableStudent'
-      security:
-      - clerk_jwt: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TimetableStudent'
-          description: ''
-    patch:
-      operationId: timetable_students_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this timetable student.
-        required: true
-      tags:
-      - timetable-students
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedTimetableStudent'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedTimetableStudent'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedTimetableStudent'
-      security:
-      - clerk_jwt: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TimetableStudent'
-          description: ''
-    delete:
-      operationId: timetable_students_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this timetable student.
-        required: true
-      tags:
-      - timetable-students
       security:
       - clerk_jwt: []
       responses:
@@ -1842,6 +1796,13 @@ paths:
   /api/v1/users/:
     get:
       operationId: users_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
       tags:
       - users
       security:
@@ -1851,9 +1812,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/PaginatedUserList'
           description: ''
     post:
       operationId: users_create
@@ -1870,6 +1829,7 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/User'
+        required: true
       security:
       - clerk_jwt: []
       responses:
@@ -1922,6 +1882,7 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/User'
+        required: true
       security:
       - clerk_jwt: []
       responses:
@@ -2178,6 +2139,282 @@ components:
       description: |-
         * `full_time` - Full Time
         * `tutor` - Tutor
+    PaginatedAuditLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+    PaginatedCheckInList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckIn'
+    PaginatedClassList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Class'
+    PaginatedClassStudentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassStudent'
+    PaginatedSessionAttendanceListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionAttendanceList'
+    PaginatedSessionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+    PaginatedStaffList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Staff'
+    PaginatedStudentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Student'
+    PaginatedSubjectList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subject'
+    PaginatedTeacherList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Teacher'
+    PaginatedTimetableSlotList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimetableSlot'
+    PaginatedUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
     PatchedClass:
       type: object
       properties:
@@ -2231,6 +2468,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/Class'
           readOnly: true
+        teacher_id:
+          type: integer
+          writeOnly: true
+        class_obj_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+        timetable_slot_id:
+          type: integer
+          writeOnly: true
+          nullable: true
         start_time:
           type: string
           format: date-time
@@ -2269,6 +2517,7 @@ components:
         contact:
           type: string
           nullable: true
+          maxLength: 500
         user_id:
           type: integer
           readOnly: true
@@ -2292,6 +2541,7 @@ components:
         contact:
           type: string
           nullable: true
+          maxLength: 500
         user_id:
           type: integer
           readOnly: true
@@ -2325,6 +2575,7 @@ components:
         contact:
           type: string
           nullable: true
+          maxLength: 500
         bank_details:
           type: string
           nullable: true
@@ -2349,6 +2600,15 @@ components:
           allOf:
           - $ref: '#/components/schemas/Teacher'
           readOnly: true
+        class_obj_id:
+          type: integer
+          writeOnly: true
+        subject_id:
+          type: integer
+          writeOnly: true
+        teacher_id:
+          type: integer
+          writeOnly: true
         day_of_week:
           allOf:
           - $ref: '#/components/schemas/DayOfWeekEnum'
@@ -2364,20 +2624,6 @@ components:
           type: string
           nullable: true
           maxLength: 100
-    PatchedTimetableStudent:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        timetable_slot:
-          allOf:
-          - $ref: '#/components/schemas/TimetableSlot'
-          readOnly: true
-        student:
-          allOf:
-          - $ref: '#/components/schemas/Student'
-          readOnly: true
     PatchedUser:
       type: object
       properties:
@@ -2386,18 +2632,20 @@ components:
           readOnly: true
         username:
           type: string
-          readOnly: true
           description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
             only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
         email:
-          type: string
-          format: email
-          readOnly: true
           title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
         role:
-          allOf:
-          - $ref: '#/components/schemas/RoleEnum'
-          readOnly: true
+          $ref: '#/components/schemas/RoleEnum'
         clerk_id:
           type: string
           readOnly: true
@@ -2412,7 +2660,6 @@ components:
           readOnly: true
         is_active:
           type: boolean
-          readOnly: true
           title: Active
           description: Designates whether this user should be treated as active. Unselect
             this instead of deleting accounts.
@@ -2448,6 +2695,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/Class'
           readOnly: true
+        teacher_id:
+          type: integer
+          writeOnly: true
+        class_obj_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+        timetable_slot_id:
+          type: integer
+          writeOnly: true
+          nullable: true
         start_time:
           type: string
           format: date-time
@@ -2464,6 +2722,7 @@ components:
       - id
       - start_time
       - teacher
+      - teacher_id
       - timetable_slot
     SessionAttendance:
       type: object
@@ -2560,6 +2819,7 @@ components:
         contact:
           type: string
           nullable: true
+          maxLength: 500
         user_id:
           type: integer
           readOnly: true
@@ -2587,6 +2847,7 @@ components:
         contact:
           type: string
           nullable: true
+          maxLength: 500
         user_id:
           type: integer
           readOnly: true
@@ -2629,6 +2890,7 @@ components:
         contact:
           type: string
           nullable: true
+          maxLength: 500
         bank_details:
           type: string
           nullable: true
@@ -2657,6 +2919,15 @@ components:
           allOf:
           - $ref: '#/components/schemas/Teacher'
           readOnly: true
+        class_obj_id:
+          type: integer
+          writeOnly: true
+        subject_id:
+          type: integer
+          writeOnly: true
+        teacher_id:
+          type: integer
+          writeOnly: true
         day_of_week:
           allOf:
           - $ref: '#/components/schemas/DayOfWeekEnum'
@@ -2674,30 +2945,15 @@ components:
           maxLength: 100
       required:
       - class_obj
+      - class_obj_id
       - day_of_week
       - end_time
       - id
       - start_time
       - subject
+      - subject_id
       - teacher
-    TimetableStudent:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        timetable_slot:
-          allOf:
-          - $ref: '#/components/schemas/TimetableSlot'
-          readOnly: true
-        student:
-          allOf:
-          - $ref: '#/components/schemas/Student'
-          readOnly: true
-      required:
-      - id
-      - student
-      - timetable_slot
+      - teacher_id
     User:
       type: object
       properties:
@@ -2706,18 +2962,20 @@ components:
           readOnly: true
         username:
           type: string
-          readOnly: true
           description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
             only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
         email:
-          type: string
-          format: email
-          readOnly: true
           title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
         role:
-          allOf:
-          - $ref: '#/components/schemas/RoleEnum'
-          readOnly: true
+          $ref: '#/components/schemas/RoleEnum'
         clerk_id:
           type: string
           readOnly: true
@@ -2732,16 +2990,12 @@ components:
           readOnly: true
         is_active:
           type: boolean
-          readOnly: true
           title: Active
           description: Designates whether this user should be treated as active. Unselect
             this instead of deleting accounts.
       required:
       - clerk_id
-      - email
       - id
-      - is_active
-      - role
       - staff_profile_id
       - student_profile_id
       - teacher_profile_id

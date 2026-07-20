@@ -31,6 +31,11 @@ const managementItems: { title: string; href: string; description: string }[] = 
     description: "Manage teacher profiles, assignments, and schedules.",
   },
   {
+    title: "Subjects",
+    href: "/subjects",
+    description: "Manage curriculum subjects and course offerings.",
+  },
+  {
     title: "Sessions",
     href: "/sessions",
     description: "Schedule and manage class sessions and timetables.",
