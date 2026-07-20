@@ -150,14 +150,19 @@ async function requestAllPages<T>(
       }
     }
 
-    const res = await request<PaginatedResponse<T> | T[]>(fetchPath, token, options)
-    if (Array.isArray(res)) {
-      allResults.push(...res)
-      break
-    } else if (res && Array.isArray(res.results)) {
-      allResults.push(...res.results)
-      nextUrl = res.next
-    } else {
+    try {
+      const res = await request<PaginatedResponse<T> | T[]>(fetchPath, token, options)
+      if (Array.isArray(res)) {
+        allResults.push(...res)
+        break
+      } else if (res && Array.isArray(res.results)) {
+        allResults.push(...res.results)
+        nextUrl = res.next
+      } else {
+        break
+      }
+    } catch (err) {
+      console.error(`Error requesting paginated results at ${fetchPath}:`, err)
       break
     }
   }

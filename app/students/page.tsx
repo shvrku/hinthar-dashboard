@@ -88,18 +88,13 @@ function StudentFormModal({
   const [contact, setContact] = React.useState("")
 
   // Reset form when modal opens / initial changes
-  const [prevInitial, setPrevInitial] = React.useState<Student | null>(null)
-  const [prevOpen, setPrevOpen] = React.useState(false)
-
-  if (initial !== prevInitial || open !== prevOpen) {
-    setPrevInitial(initial)
-    setPrevOpen(open)
+  React.useEffect(() => {
     if (open) {
       setName(initial?.name ?? "")
       setDob(initial?.dob ?? "")
       setContact(initial?.contact ?? "")
     }
-  }
+  }, [open, initial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
