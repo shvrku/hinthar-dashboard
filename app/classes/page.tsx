@@ -234,16 +234,12 @@ export default function ClassesPage() {
 
   // Roster helpers
   const assignedStudentIds = React.useMemo(() => {
-    if (!activeRosterClass) return new Set<number>()
     return new Set(
-      classStudents
-        .filter((cs) => {
-          const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj.id : cs.class_obj
-          return classId === activeRosterClass.id
-        })
-        .map((cs) => (typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student))
+      classStudents.map((cs) =>
+        typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
+      )
     )
-  }, [classStudents, activeRosterClass])
+  }, [classStudents])
 
   const enrolledList = React.useMemo(() => {
     if (!activeRosterClass) return []
