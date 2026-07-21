@@ -18,7 +18,7 @@ export function useSortableData<T>(
   })
 
   const sortedItems = React.useMemo(() => {
-    if (!items) return []
+    if (!items || !Array.isArray(items)) return []
     if (!sortConfig.key) return items
 
     const sorted = [...items]
