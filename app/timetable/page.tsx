@@ -673,7 +673,7 @@ export default function TimetablePage() {
           const s = timeToMins(lesson.start_time)
           const e = timeToMins(lesson.end_time)
           const top = (s - dayStart) * pxPerMin
-          const height = Math.max((e - s) * pxPerMin, 32)
+          const height = Math.max((e - s) * pxPerMin, 68)
 
           const wPct = 100 / totalCols
           const lPct = c * wPct
@@ -686,11 +686,11 @@ export default function TimetablePage() {
               }}
               style={{
                 top: `${top}px`,
-                height: `${height}px`,
+                minHeight: `${height}px`,
                 width: `calc(${wPct}% - 4px)`,
                 left: `calc(${lPct}% + 2px)`,
               }}
-              className="absolute p-2 rounded-xl cursor-pointer transition-all duration-200 overflow-hidden flex flex-col group hover:z-30 hover:!w-[calc(100%-8px)] hover:!left-[4px] hover:shadow-xl border border-primary/30 bg-card hover:bg-muted"
+              className="absolute p-2 rounded-xl cursor-pointer transition-all duration-200 flex flex-col group hover:z-30 hover:!w-[calc(100%-8px)] hover:!left-[4px] hover:shadow-xl border border-primary/30 bg-card hover:bg-muted"
             >
               <div className="text-xs font-bold text-foreground truncate">
                 {lesson.subject.name}
