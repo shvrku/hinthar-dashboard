@@ -408,11 +408,11 @@ export default function TerminalPage() {
           )}
 
           {/* Manual entry */}
-          <div className="mt-6 rounded-xl border border-neutral-800 bg-[#0a0a0a] p-5 shadow-xs text-white">
-            <h3 className="mb-1 text-sm font-semibold text-neutral-200">
+          <div className="mt-6 rounded-xl border bg-transparent p-5 shadow-xs text-foreground">
+            <h3 className="mb-1 text-sm font-semibold text-foreground">
               Manual Lookup
             </h3>
-            <p className="mb-4 text-xs text-neutral-400">
+            <p className="mb-4 text-xs text-muted-foreground">
               Not Recognized? Search by typing in the student ID manually
             </p>
             <div className="flex gap-2">
@@ -422,12 +422,12 @@ export default function TerminalPage() {
                 onChange={(e) => setManualId(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleManualLookup() }}
                 placeholder="Student ID (e.g. 101)"
-                className="min-w-0 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-neutral-850 bg-neutral-950 text-white placeholder:text-neutral-500 focus-visible:ring-neutral-800"
+                className="min-w-0 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-background text-foreground placeholder:text-muted-foreground"
               />
               <Button
                 onClick={handleManualLookup}
                 variant="outline"
-                className="shadow-xs gap-1.5 border-neutral-800 text-white hover:bg-neutral-900 hover:text-white"
+                className="shadow-xs gap-1.5"
               >
                 <Search className="size-4" />
                 Look Up
