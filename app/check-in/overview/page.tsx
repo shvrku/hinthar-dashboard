@@ -252,7 +252,7 @@ export default function CheckInOverviewPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl space-y-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-4 w-80" />
         <div className="space-y-4 pt-4">
@@ -277,7 +277,7 @@ export default function CheckInOverviewPage() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="container mx-auto px-4 py-8 max-w-7xl"
+      className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl"
     >
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">

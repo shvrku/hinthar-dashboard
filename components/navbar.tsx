@@ -163,7 +163,7 @@ export function Navbar() {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-md overflow-hidden"
           >
-            <div className="container mx-auto flex h-14 items-center px-4">
+            <div className="container mx-auto flex h-14 items-center px-4 sm:px-6 md:px-8 max-w-7xl">
               {/* Split brand logo & dashboard links */}
               <div className="mr-8 flex items-center gap-1.5">
                 <Link

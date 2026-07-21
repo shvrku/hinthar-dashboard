@@ -289,7 +289,7 @@ export default function TerminalPage() {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: isFocused ? 1.02 : 1 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="container mx-auto px-4 py-8 max-w-7xl"
+      className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl"
     >
       {/* Header with Clock and Focus button only */}
       <div className="mb-8 flex flex-row items-center justify-between gap-4 border-b pb-6">

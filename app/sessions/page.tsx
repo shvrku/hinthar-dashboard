@@ -26,6 +26,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select"
 
 const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
   const hour = Math.floor(7 + i / 2)
@@ -413,7 +420,7 @@ export default function SessionsPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
         <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="rounded-xl border p-6 space-y-4">
@@ -434,7 +441,7 @@ export default function SessionsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -669,53 +676,62 @@ export default function SessionsPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Class</label>
-                <select
+                <Select
                   value={formClassId}
-                  onChange={(e) => handleClassChange(e.target.value)}
-                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  onValueChange={(val) => handleClassChange(val ?? "")}
                 >
-                  <option value="">Select Class</option>
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.education_level} {c.cohort_identifier} {c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.education_level} {c.cohort_identifier} {c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Timetable Slot</label>
-                <select
+                <Select
                   value={formTimetableSlotId}
-                  onChange={(e) => handleSlotChange(e.target.value)}
+                  onValueChange={(val) => handleSlotChange(val ?? "")}
                   disabled={!formClassId}
-                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
                 >
-                  <option value="">Select Slot</option>
-                  {filteredSlots.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.day_of_week} {s.start_time}-{s.end_time}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Slot" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredSlots.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.day_of_week} {s.start_time}-{s.end_time}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Teacher</label>
-                <select
+                <Select
                   value={formTeacherId}
-                  onChange={(e) => setFormTeacherId(e.target.value)}
-                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  onValueChange={(val) => setFormTeacherId(val ?? "")}
                 >
-                  <option value="">Select Teacher</option>
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Teacher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teachers.map((t) => (
+                      <SelectItem key={t.id} value={t.id.toString()}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -732,33 +748,40 @@ export default function SessionsPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Start Time</label>
-                <select
+                <Select
                   value={formStartTime}
-                  onChange={(e) => setFormStartTime(e.target.value)}
-                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                  required
+                  onValueChange={(val) => setFormStartTime(val ?? "")}
                 >
-                  {TIME_SLOTS.map((ts) => (
-                    <option key={ts.value} value={ts.value}>
-                      {ts.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Start Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_SLOTS.map((ts) => (
+                      <SelectItem key={ts.value} value={ts.value}>
+                        {ts.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Duration</label>
-                <select
+                <Select
                   value={formDuration}
-                  onChange={(e) => setFormDuration(e.target.value)}
-                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  onValueChange={(val) => setFormDuration(val ?? "")}
                 >
-                  {DURATIONS.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DURATIONS.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>
+                        {d.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -778,18 +801,22 @@ export default function SessionsPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Status</label>
-                <select
-                  value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value)}
-                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                <Select
+                  value={formStatus || "none"}
+                  onValueChange={(val) => setFormStatus(!val || val === "none" ? "" : val)}
                 >
-                  <option value="">None</option>
-                  {SESSION_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {SESSION_STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

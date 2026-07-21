@@ -290,7 +290,7 @@ export default function SubjectsPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
         <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="rounded-xl border border-border/70 p-6 space-y-4">
@@ -311,7 +311,7 @@ export default function SubjectsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

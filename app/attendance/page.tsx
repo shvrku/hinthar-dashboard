@@ -16,7 +16,14 @@ import {
   BookOpen,
   GraduationCap,
   Users,
-  RotateCcw
+  RotateCcw,
+  LayoutGrid,
+  ListFilter,
+  UserCheck,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Sparkles,
 } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
@@ -110,11 +117,11 @@ function getSessionStartTime(session: Session | AdHocSession): Date {
 function getSelectStyles(status?: string): string {
   switch (status) {
     case "present":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 focus:ring-emerald-500/50"
+      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 focus:ring-emerald-500/50 font-semibold"
     case "late":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 focus:ring-amber-500/50"
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 focus:ring-amber-500/50 font-semibold"
     case "absent":
-      return "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 focus:ring-rose-500/50"
+      return "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 focus:ring-rose-500/50 font-semibold"
     default:
       return "bg-background text-neutral-400 border-neutral-200 dark:border-neutral-800 focus:ring-neutral-400/50 text-center"
   }
@@ -159,6 +166,13 @@ export default function AttendancePage() {
 
   // Mode Switcher: "class" or "adhoc"
   const [attendanceMode, setAttendanceMode] = React.useState<"class" | "adhoc">("class")
+
+  // Dual View Layout Switcher: "matrix" or "roster"
+  const [viewLayout, setViewLayout] = React.useState<"matrix" | "roster">("matrix")
+
+  // Roster View Selected Session ID
+  const [rosterSessionId, setRosterSessionId] = React.useState<number | null>(null)
+  const [rosterSearch, setRosterSearch] = React.useState("")
 
   // Filters
   const [selectedClassId, setSelectedClassId] = React.useState<string>("all")
@@ -312,6 +326,23 @@ export default function AttendancePage() {
     }
   }, [sessions, adhocSessions, attendanceMode, selectedClassId, selectedSubjectId, selectedTeacherId, selectedMonth, selectedYear])
 
+  // Automatically select first session for roster view when sessions update
+  React.useEffect(() => {
+    if (filteredSessions.length > 0) {
+      if (rosterSessionId === null || !filteredSessions.some((s) => s.id === rosterSessionId)) {
+        setRosterSessionId(filteredSessions[0].id)
+      }
+    } else {
+      setRosterSessionId(null)
+    }
+  }, [filteredSessions, rosterSessionId])
+
+  // Selected session object for Roster View
+  const selectedRosterSession = React.useMemo(() => {
+    if (!rosterSessionId) return null
+    return filteredSessions.find((s) => s.id === rosterSessionId) ?? null
+  }, [filteredSessions, rosterSessionId])
+
   // Identify which students should show up as Rows
   const rowStudents = React.useMemo(() => {
     let baseStudents: Student[] = []
@@ -359,7 +390,7 @@ export default function AttendancePage() {
     return unique.sort((a, b) => a.name.localeCompare(b.name))
   }, [students, classStudents, selectedClassId, manuallyAddedStudents, filteredSessions, adhocAttendances, attendanceMode])
 
-  // Update attendance status using the select dropdown
+  // Update attendance status using the select dropdown or roster toggle
   const handleStatusChange = async (studentId: number, sessionId: number, newStatus: SessionAttendanceStatus) => {
     if (!isLoaded || !isSignedIn) {
       setError("Authentication state is loading or user is not signed in.")
@@ -439,6 +470,14 @@ export default function AttendancePage() {
     }
   }
 
+  // Batch action: Mark All Present for a session
+  const handleMarkAllPresent = async (sessionId: number) => {
+    if (rowStudents.length === 0) return
+    for (const student of rowStudents) {
+      await handleStatusChange(student.id, sessionId, "present")
+    }
+  }
+
   // Handle manual creation of ad-hoc session
   const handleCreateAdHocSession = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -498,50 +537,40 @@ export default function AttendancePage() {
     return students
       .filter((s) => s.name.toLowerCase().includes(normalizedQuery) && !currentStudentIds.includes(s.id))
       .slice(0, 5) // Limit to top 5 results
-  }, [students, searchQuery, rowStudents])
+  }, [searchQuery, students, rowStudents])
 
+  // Handle adding student from search to the row list
   const handleAddManualStudent = (student: Student) => {
     setManuallyAddedStudents((prev) => [...prev, student])
     setSearchQuery("")
     setShowSearchDropdown(false)
   }
 
-  // Resolve Names for metadata bar
-  // Select items lists for shadcn dropdown values lookup
   const classItems = React.useMemo(() => {
     return classes.map((c) => ({
       value: c.id.toString(),
-      label: `${c.education_level} - ${c.cohort_identifier}${c.cohort_sub_category ? ` (${c.cohort_sub_category})` : ""}`
+      label: `${c.education_level} - ${c.cohort_identifier} ${c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}`.trim(),
     }))
   }, [classes])
 
   const subjectItems = React.useMemo(() => {
-    const list = subjects.map((sub) => ({
-      value: sub.id.toString(),
-      label: sub.name,
-    }))
+    const list = subjects.map((sub) => ({ value: sub.id.toString(), label: sub.name }))
     if (attendanceMode === "class") {
-      list.unshift({ value: "all", label: "All Subjects" })
+      return [{ value: "all", label: "All Subjects" }, ...list]
     }
     return list
   }, [subjects, attendanceMode])
 
   const teacherItems = React.useMemo(() => {
-    const list = teachers.map((t) => ({
-      value: t.id.toString(),
-      label: t.name,
-    }))
+    const list = teachers.map((t) => ({ value: t.id.toString(), label: t.name }))
     if (attendanceMode === "class") {
-      list.unshift({ value: "all", label: "All Teachers" })
+      return [{ value: "all", label: "All Teachers" }, ...list]
     }
     return list
   }, [teachers, attendanceMode])
 
   const monthItems = React.useMemo(() => {
-    return MONTHS.map((m) => ({
-      value: m.value.toString(),
-      label: m.label,
-    }))
+    return MONTHS.map((m) => ({ value: m.value.toString(), label: m.label }))
   }, [])
 
   const yearItems = React.useMemo(() => {
@@ -550,6 +579,18 @@ export default function AttendancePage() {
       label: y.toString(),
     }))
   }, [currentYear])
+
+  const rosterSessionItems = React.useMemo(() => {
+    return filteredSessions.map((session, idx) => {
+      const d = getSessionStartTime(session)
+      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })
+      const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+      return {
+        value: session.id.toString(),
+        label: `#${idx + 1} • ${dateStr} (${timeStr})`,
+      }
+    })
+  }, [filteredSessions])
 
   const resolvedClassName = React.useMemo(() => {
     if (attendanceMode === "adhoc") return "Ad-Hoc / Tutoring Sessions (No Class)"
@@ -590,7 +631,7 @@ export default function AttendancePage() {
     )
   }
 
-  // Render Splash screen if not loaded yet (manual load behavior consistent with other pages)
+  // Render Splash screen if not loaded yet
   if (!lastLoaded) {
     return (
       <motion.div
@@ -623,7 +664,7 @@ export default function AttendancePage() {
           ) : (
             <>
               <RotateCcw className="mr-2 size-5" />
-              Load Attendance Data
+              Load Attendance Sheet
             </>
           )}
         </Button>
@@ -631,13 +672,18 @@ export default function AttendancePage() {
     )
   }
 
+  // Filtered roster students for Session Roster View
+  const rosterStudentsFiltered = rowStudents.filter((s) =>
+    s.name.toLowerCase().includes(rosterSearch.toLowerCase()),
+  )
+
   return (
     <motion.div
       key={lastLoaded ? "loaded" : "splash"}
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="flex-1 space-y-6 p-8"
+      className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl flex-1 space-y-6"
     >
       {/* Header section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -647,7 +693,7 @@ export default function AttendancePage() {
             Track and log student attendance across monthly course sessions.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {attendanceMode === "adhoc" && (
             <Button size="sm" onClick={() => {
               setIsAddSessionOpen(true)
@@ -660,6 +706,33 @@ export default function AttendancePage() {
               Add Ad-Hoc Session
             </Button>
           )}
+
+          {/* DUAL VIEW SWITCHER: Matrix Grid vs Session Roster */}
+          <div className="flex rounded-xl border border-border bg-muted/50 p-1">
+            <button
+              onClick={() => setViewLayout("matrix")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                viewLayout === "matrix"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <LayoutGrid className="size-3.5" />
+              <span>Matrix Grid</span>
+            </button>
+            <button
+              onClick={() => setViewLayout("roster")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                viewLayout === "roster"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="size-3.5" />
+              <span>Session Roster</span>
+            </button>
+          </div>
+
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -668,7 +741,7 @@ export default function AttendancePage() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-destructive">
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span className="text-sm font-medium">{error}</span>
         </div>
@@ -728,7 +801,7 @@ export default function AttendancePage() {
               <Select 
                 value={newSubjectId} 
                 onValueChange={(val) => setNewSubjectId(val ?? "")}
-                items={subjects.map(s => ({ value: s.id.toString(), label: s.name }))}
+                items={subjects.map((s) => ({ value: s.id.toString(), label: s.name }))}
               >
                 <SelectTrigger className="w-full bg-background">
                   <SelectValue placeholder="Select Subject" />
@@ -748,7 +821,7 @@ export default function AttendancePage() {
               <Select 
                 value={newTeacherId} 
                 onValueChange={(val) => setNewTeacherId(val ?? "")}
-                items={teachers.map(t => ({ value: t.id.toString(), label: t.name }))}
+                items={teachers.map((t) => ({ value: t.id.toString(), label: t.name }))}
               >
                 <SelectTrigger className="w-full bg-background">
                   <SelectValue placeholder="Select Teacher" />
@@ -820,9 +893,9 @@ export default function AttendancePage() {
       </Dialog>
 
       {/* Filters Card */}
-      <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-[#0a0a0a]">
+      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-          {/* Class Filter (Only shown in Class Mode) */}
+          {/* Class Filter */}
           {attendanceMode === "class" && (
             <div className="flex-1 space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -970,9 +1043,9 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* Dynamic Student Adder Section (Show search bar in adhoc mode OR when a specific class is selected) */}
+        {/* Dynamic Student Adder Section */}
         {(attendanceMode === "adhoc" || selectedClassId !== "all") && (
-          <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center gap-4">
+          <div className="mt-4 pt-4 border-t border-border flex items-center gap-4">
             <div className="relative w-80">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1015,150 +1088,334 @@ export default function AttendancePage() {
         )}
       </div>
 
-      {/* Grid Matrix Sheet */}
-      <div className="rounded-xl border border-neutral-200 bg-white shadow-xs overflow-hidden dark:border-neutral-800 dark:bg-[#0a0a0a]">
-        
-        {/* Info Header Bar (Replacing Tips to show Class, Teacher, and Subject metadata) */}
-        <div className="p-4 bg-muted/30 border-b  border-neutral-200 dark:border-neutral-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-muted-foreground ">
-            <span className="flex items-center gap-1.5">
-              <GraduationCap className="h-4 w-4 text-primary" />
-              <span><strong>Class:</strong> <span className="text-foreground">{resolvedClassName}</span></span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4 text-primary" />
-              <span><strong>Subject:</strong> <span className="text-foreground">{resolvedSubjectName}</span></span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-primary" />
-              <span><strong>Teacher:</strong> <span className="text-foreground">{resolvedTeacherName}</span></span>
-            </span>
+      {/* ── MAIN ATTENDANCE DISPLAY (MATRIX vs ROSTER) ── */}
+      {viewLayout === "roster" ? (
+        /* ── SESSION ROSTER VIEW (Mobile 1-Tap Toggle List) ── */
+        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-xs space-y-6">
+          {/* Session Switcher Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                <Users className="size-5 text-primary" />
+                Session Roster View
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Select a specific session to record attendance with 1-tap buttons
+              </p>
+            </div>
+
+            {/* Session Selector & Bulk Action */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="w-64 sm:w-72">
+                <Select
+                  value={rosterSessionId?.toString() ?? ""}
+                  onValueChange={(val) => setRosterSessionId(val ? Number(val) : null)}
+                  items={rosterSessionItems}
+                >
+                  <SelectTrigger className="h-10 bg-background">
+                    <SelectValue placeholder="Select Session Date…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredSessions.map((session, idx) => {
+                      const d = getSessionStartTime(session)
+                      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })
+                      const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+                      return (
+                        <SelectItem key={session.id} value={session.id.toString()}>
+                          #{idx + 1} • {dateStr} ({timeStr})
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedRosterSession && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleMarkAllPresent(selectedRosterSession.id)}
+                  disabled={rowStudents.length === 0}
+                  className="gap-1.5 shadow-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-emerald-500/30"
+                >
+                  <CheckCircle2 className="size-4" />
+                  <span>Mark All Present</span>
+                </Button>
+              )}
+            </div>
           </div>
-          
-        </div>
-        
-        {loading ? (
-          <div className="flex h-60 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : filteredSessions.length === 0 ? (
-          <div className="flex h-60 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            <Calendar className="h-10 w-10 opacity-30 mb-2" />
-            <p className="font-semibold text-sm">No Sessions Found</p>
-            <p className="text-xs max-w-sm mt-1">
-              No tutoring or class sessions were scheduled for this Class, Subject, and Teacher combination in the selected month.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-none">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-60 min-w-60 sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r rounded-none">
-                    Student Name
-                  </TableHead>
-                  {filteredSessions.map((session, index) => {
-                    const d = getSessionStartTime(session)
-                    const dateStr = d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" })
-                    const dayStr = d.toLocaleDateString("en-US", { weekday: "short" })
-                    const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
-                    
+
+          {/* Roster Controls & Search */}
+          {selectedRosterSession ? (
+            <>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search student roster..."
+                    value={rosterSearch}
+                    onChange={(e) => setRosterSearch(e.target.value)}
+                    className="pl-9 bg-background"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                  <Badge variant="secondary" className="px-3 py-1">
+                    {rosterStudentsFiltered.length} student{rosterStudentsFiltered.length !== 1 ? "s" : ""}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Roster Cards List */}
+              {rosterStudentsFiltered.length === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+                  <Users className="size-8 opacity-30 mb-2" />
+                  <p className="text-sm font-semibold">No students found in this roster.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {rosterStudentsFiltered.map((student) => {
+                    const cellKey = `${student.id}-${selectedRosterSession.id}`
+                    const isPending = pendingCells[cellKey]
+                    const record = attendanceMode === "class"
+                      ? attendances.find((a) => a.student_id === student.id && a.session_id === selectedRosterSession.id)
+                      : adhocAttendances.find((a) => a.student?.id === student.id && a.ad_hoc_session?.id === selectedRosterSession.id)
+                    const status = record?.status ?? "absent"
+
                     return (
-                      <TableHead key={session.id} className="text-center min-w-40 py-4 border-r">
-                        <div className="flex flex-col items-center relative">
-                          {/* Column index / Session Number */}
-                          <span className="absolute -top-2 left-1 text-[9px] font-bold text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-full h-4 w-5 flex items-center justify-center">
-                            #{index + 1}
-                          </span>
-                          
-                          <span className="font-bold text-sm text-foreground mt-2">{dateStr}</span>
-                          <span className="text-xs font-semibold text-muted-foreground">{dayStr} ({timeStr})</span>
-                          
-                          <div className="flex flex-col gap-1 mt-1.5 items-center">
-                            {"timetable_slot" in session && session.timetable_slot ? (
-                              <span className="text-[10px] uppercase font-extrabold text-primary px-1.5 py-0.5 bg-primary/10 rounded">
-                                {session.timetable_slot.subject.name}
-                              </span>
-                            ) : "subject" in session && session.subject ? (
-                              <span className="text-[10px] uppercase font-extrabold text-amber-500 px-1.5 py-0.5 bg-amber-500/10 rounded">
-                                {session.subject.name}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] uppercase font-extrabold text-amber-500 px-1.5 py-0.5 bg-amber-500/10 rounded">
-                                Ad-Hoc
-                              </span>
-                            )}
-                            <span className="text-[9px] font-semibold text-muted-foreground truncate max-w-28" title={session.teacher.name}>
-                              T: {session.teacher.name}
-                            </span>
+                      <motion.div
+                        key={student.id}
+                        whileHover={{ scale: 1.005 }}
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all ${
+                          status === "present"
+                            ? "bg-emerald-500/5 border-emerald-500/30"
+                            : status === "late"
+                            ? "bg-amber-500/5 border-amber-500/30"
+                            : "bg-card border-border"
+                        }`}
+                      >
+                        {/* Student Name */}
+                        <div className="flex items-center gap-3 mb-3 sm:mb-0">
+                          <div className={`flex size-10 items-center justify-center rounded-lg font-bold text-sm ${
+                            status === "present"
+                              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                              : status === "late"
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {student.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-foreground">{student.name}</p>
+                            <p className="text-xs text-muted-foreground">ID: #{student.id}</p>
                           </div>
                         </div>
-                      </TableHead>
+
+                        {/* 1-Tap Status Toggle Buttons */}
+                        {isPending ? (
+                          <div className="flex h-9 items-center justify-center px-4">
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border/60">
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "present")}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                                status === "present"
+                                  ? "bg-emerald-600 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              }`}
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                              <span>Present</span>
+                            </motion.button>
+
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "late")}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                                status === "late"
+                                  ? "bg-amber-500 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              }`}
+                            >
+                              <AlertTriangle className="size-3.5" />
+                              <span>Late</span>
+                            </motion.button>
+
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "absent")}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                                status === "absent"
+                                  ? "bg-rose-600 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              }`}
+                            >
+                              <XCircle className="size-3.5" />
+                              <span>Absent</span>
+                            </motion.button>
+                          </div>
+                        )}
+                      </motion.div>
                     )
                   })}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rowStudents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={filteredSessions.length + 1} className="h-32 text-center text-muted-foreground text-sm">
-                      No students found. Try adjusting your filters or use the search bar above to manually add students.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rowStudents.map((student) => (
-                    <TableRow key={student.id} className="hover:bg-muted/10">
-                      {/* Student details column sticky */}
-                      <TableCell className="font-semibold sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] rounded-none">
-                        <div className="flex flex-col">
-                          <span>{student.name}</span>
-                          <span className="text-[10px] text-muted-foreground">ID: #{student.id}</span>
-                        </div>
-                      </TableCell>
-                      {/* Attendance Cells */}
-                      {filteredSessions.map((session) => {
-                        const cellKey = `${student.id}-${session.id}`
-                        const isPending = pendingCells[cellKey]
-                        const record = attendanceMode === "class"
-                          ? attendances.find((a) => a.student_id === student.id && a.session_id === session.id)
-                          : adhocAttendances.find((a) => a.student?.id === student.id && a.ad_hoc_session?.id === session.id)
-
-                        return (
-                          <TableCell key={session.id} className="text-center border-r">
-                            {isPending ? (
-                              <div className="mx-auto flex h-10 w-28 items-center justify-center">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                              </div>
-                            ) : (
-                              <Select
-                                value={record ? record.status : "absent"}
-                                onValueChange={(val) => handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)}
-                                items={statusItems}
-                              >
-                                <SelectTrigger 
-                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${getSelectStyles(record?.status)}`}
-                                  size="sm"
-                                >
-                                  <SelectValue placeholder="Absent" />
-                                </SelectTrigger>
-                                <SelectContent alignItemWithTrigger={false} align="center" className="min-w-28 bg-popover text-popover-foreground rounded-lg border shadow-md p-1 z-50">
-                                  <SelectItem value="present" className="text-emerald-600 dark:text-emerald-400 font-semibold">Present</SelectItem>
-                                  <SelectItem value="late" className="text-amber-600 dark:text-amber-400 font-semibold">Late</SelectItem>
-                                  <SelectItem value="absent" className="text-rose-600 dark:text-rose-400 font-semibold">Absent</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </TableCell>
-                        )
-                      })}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+              <Calendar className="size-8 opacity-30 mb-2" />
+              <p className="text-sm font-semibold">No session selected.</p>
+              <p className="text-xs mt-1">Please pick a class and date to load the attendance roster.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── MATRIX GRID SPREADSHEET VIEW ── */
+        <div className="rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
+          {/* Info Header Bar */}
+          <div className="p-4 bg-muted/30 border-b border-border flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <GraduationCap className="h-4 w-4 text-primary" />
+                <span><strong>Class:</strong> <span className="text-foreground">{resolvedClassName}</span></span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="h-4 w-4 text-primary" />
+                <span><strong>Subject:</strong> <span className="text-foreground">{resolvedSubjectName}</span></span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-primary" />
+                <span><strong>Teacher:</strong> <span className="text-foreground">{resolvedTeacherName}</span></span>
+              </span>
+            </div>
           </div>
-        )}
-      </div>
+          
+          {loading ? (
+            <div className="flex h-60 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredSessions.length === 0 ? (
+            <div className="flex h-60 flex-col items-center justify-center p-8 text-center text-muted-foreground">
+              <Calendar className="h-10 w-10 opacity-30 mb-2" />
+              <p className="font-semibold text-sm">No Sessions Found</p>
+              <p className="text-xs max-w-sm mt-1">
+                No tutoring or class sessions were scheduled for this Class, Subject, and Teacher combination in the selected month.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-none hinthar-scrollbar">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-60 min-w-60 sticky left-0 z-10 bg-card border-r rounded-none">
+                      Student Name
+                    </TableHead>
+                    {filteredSessions.map((session, index) => {
+                      const d = getSessionStartTime(session)
+                      const dateStr = d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" })
+                      const dayStr = d.toLocaleDateString("en-US", { weekday: "short" })
+                      const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+                      
+                      return (
+                        <TableHead key={session.id} className="text-center min-w-40 py-4 border-r">
+                          <div className="flex flex-col items-center relative">
+                            {/* Column index / Session Number */}
+                            <span className="absolute -top-2 left-1 text-[9px] font-bold text-muted-foreground bg-muted border border-border rounded-full h-4 w-5 flex items-center justify-center">
+                              #{index + 1}
+                            </span>
+                            
+                            <span className="font-bold text-sm text-foreground mt-2">{dateStr}</span>
+                            <span className="text-xs font-semibold text-muted-foreground">{dayStr} ({timeStr})</span>
+                            
+                            <div className="flex flex-col gap-1 mt-1.5 items-center">
+                              {"timetable_slot" in session && session.timetable_slot ? (
+                                <span className="text-[10px] uppercase font-extrabold text-primary px-1.5 py-0.5 bg-primary/10 rounded">
+                                  {session.timetable_slot.subject.name}
+                                </span>
+                              ) : "subject" in session && session.subject ? (
+                                <span className="text-[10px] uppercase font-extrabold text-amber-500 px-1.5 py-0.5 bg-amber-500/10 rounded">
+                                  {session.subject.name}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] uppercase font-extrabold text-amber-500 px-1.5 py-0.5 bg-amber-500/10 rounded">
+                                  Ad-Hoc
+                                </span>
+                              )}
+                              <span className="text-[9px] font-semibold text-muted-foreground truncate max-w-28" title={session.teacher.name}>
+                                T: {session.teacher.name}
+                              </span>
+                            </div>
+                          </div>
+                        </TableHead>
+                      )
+                    })}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rowStudents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={filteredSessions.length + 1} className="h-32 text-center text-muted-foreground text-sm">
+                        No students found. Try adjusting your filters or use the search bar above to manually add students.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rowStudents.map((student) => (
+                      <TableRow key={student.id} className="hover:bg-muted/30">
+                        {/* Student details column sticky */}
+                        <TableCell className="font-semibold sticky left-0 z-10 bg-card border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] rounded-none">
+                          <div className="flex flex-col">
+                            <span className="text-foreground">{student.name}</span>
+                            <span className="text-[10px] text-muted-foreground">ID: #{student.id}</span>
+                          </div>
+                        </TableCell>
+                        {/* Attendance Cells */}
+                        {filteredSessions.map((session) => {
+                          const cellKey = `${student.id}-${session.id}`
+                          const isPending = pendingCells[cellKey]
+                          const record = attendanceMode === "class"
+                            ? attendances.find((a) => a.student_id === student.id && a.session_id === session.id)
+                            : adhocAttendances.find((a) => a.student?.id === student.id && a.ad_hoc_session?.id === session.id)
+
+                          return (
+                            <TableCell key={session.id} className="text-center border-r">
+                              {isPending ? (
+                                <div className="mx-auto flex h-10 w-28 items-center justify-center">
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                              ) : (
+                                <Select
+                                  value={record ? record.status : "absent"}
+                                  onValueChange={(val) => handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)}
+                                >
+                                  <SelectTrigger 
+                                    className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${getSelectStyles(record?.status)}`}
+                                    size="sm"
+                                  >
+                                    <SelectValue placeholder="Absent" />
+                                  </SelectTrigger>
+                                  <SelectContent align="center" className="min-w-28">
+                                    <SelectItem value="present" className="text-emerald-600 dark:text-emerald-400 font-semibold">Present</SelectItem>
+                                    <SelectItem value="late" className="text-amber-600 dark:text-amber-400 font-semibold">Late</SelectItem>
+                                    <SelectItem value="absent" className="text-rose-600 dark:text-rose-400 font-semibold">Absent</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }

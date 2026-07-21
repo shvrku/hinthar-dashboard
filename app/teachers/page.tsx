@@ -30,6 +30,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -171,19 +178,28 @@ function TeacherFormModal({
             <label className="mb-1.5 block text-sm font-medium">
               Employment Type
             </label>
-            <select
-              name="employment_type"
-              value={form.employment_type}
-              onChange={handleChange}
-              className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            <Select
+              value={form.employment_type || "none"}
+              onValueChange={(val) =>
+                setForm((prev) => ({
+                  ...prev,
+                  employment_type: !val || val === "none" ? "" : val,
+                }))
+              }
+              items={[{ value: "none", label: "None" }, ...EMPLOYMENT_TYPES]}
             >
-              <option value="">None</option>
-              {EMPLOYMENT_TYPES.map((et) => (
-                <option key={et.value} value={et.value}>
-                  {et.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Employment Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {EMPLOYMENT_TYPES.map((et) => (
+                  <SelectItem key={et.value} value={et.value}>
+                    {et.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -238,8 +254,8 @@ function TeacherFormModal({
 
 function employmentLabel(type: string | null) {
   if (!type) return <span className="text-muted-foreground">—</span>
-  const found = EMPLOYMENT_TYPES.find((et) => et.value === type)
-  const label = found ? found.label : type
+  const found = EMPLOYMENT_TYPES.find((et) => et.value === type || et.label.toLowerCase() === type.toLowerCase())
+  const label = found ? found.label : type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   return (
     <Badge variant="secondary" className="font-normal">
       {label}
@@ -384,7 +400,7 @@ export default function TeachersPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
         <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="rounded-xl border p-6 space-y-4">
@@ -405,7 +421,7 @@ export default function TeachersPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

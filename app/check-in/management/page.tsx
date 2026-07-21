@@ -132,7 +132,7 @@ export default function CheckInManagementPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
         <div className="mb-6 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <Table>
           <TableHeader>
@@ -159,7 +159,7 @@ export default function CheckInManagementPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
