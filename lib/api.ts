@@ -1,6 +1,4 @@
-const API_ORIGIN =
-  process.env.NEXT_PUBLIC_API_ORIGIN ||
-  "https://school-management-system-api-xs24.onrender.com"
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || ""
 
 const API_BASE = API_ORIGIN.endsWith("/api/v1")
   ? API_ORIGIN
