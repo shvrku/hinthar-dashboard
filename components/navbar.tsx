@@ -40,6 +40,11 @@ const managementItems: { title: string; href: string; description: string }[] = 
     href: "/sessions",
     description: "Schedule and manage class sessions and timetables.",
   },
+  {
+    title: "Timetable",
+    href: "/timetable",
+    description: "View and manage class timetables.",
+  },
 ]
 
 const checkInItems: { title: string; href: string; description: string }[] = [
