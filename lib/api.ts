@@ -1,8 +1,4 @@
-const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || ""
-
-const API_BASE = API_ORIGIN.endsWith("/api/v1")
-  ? API_ORIGIN
-  : `${API_ORIGIN.replace(/\/$/, "")}/api/v1`
+const API_BASE = "/api/v1"
 
 export class ApiError extends Error {
   status: number
@@ -58,13 +54,9 @@ async function request<T>(
       },
     })
   } catch (err) {
-    // Network-level failures: CORS, DNS, unreachable server, etc.
-    const message =
-      err instanceof TypeError
-        ? "Failed to reach the server. Please check your internet connection and try again."
-        : err instanceof Error
-          ? err.message
-          : "An unexpected network error occurred."
+    // Network-level failures: CORS blocking, DNS failure, unreachable server, etc.
+    const rawMsg = err instanceof Error ? err.message : String(err)
+    const message = `Unable to fetch ${API_BASE}${path} (${rawMsg}). (Check CORS headers on backend for your Vercel domain).`
     throw new ApiError(0, message)
   }
 

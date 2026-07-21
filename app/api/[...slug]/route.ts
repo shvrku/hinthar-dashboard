@@ -1,4 +1,4 @@
-const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || process.env.API_ORIGIN || ""
+const API_ORIGIN = process.env.API_ORIGIN || process.env.NEXT_PUBLIC_API_ORIGIN || "https://school-management-system-api-xs24.onrender.com"
 
 /** CORS headers added to every response so browsers on other devices/origins can fetch. */
 const CORS_HEADERS: Record<string, string> = {
