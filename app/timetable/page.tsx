@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { createApi, ApiError } from "@/lib/api";
+import type { Class, Teacher, Subject, TimetableSlot } from "@/lib/types";
 import {
   Search,
   Users,
@@ -20,6 +23,7 @@ import {
   Trash2,
   Menu,
   PanelLeft,
+  RotateCcw,
 } from "lucide-react";
 import {
   Dialog,
@@ -32,144 +36,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type ClassObj = { id: number; name: string };
-type TeacherObj = { id: number; name: string };
-type SubjectObj = { id: number; name: string };
-
-type TimetableSlot = {
-  id: number;
-  teacherId: number;
-  teacherName: string;
-  subjectId: number;
-  subjectName: string;
-  startTime: string;
-  endTime: string;
-  dayOfWeek: number; // 0 = Monday, 1 = Tuesday, 2 = Wednesday, 3 = Thursday, 4 = Friday
-  classId: number;
-};
-
-// ─── Initial Mock Data ─────────────────────────────────────────────────────────
-
-const INIT_CLASSES: ClassObj[] = [
-  { id: 1, name: "Grade 1 - A" },
-  { id: 2, name: "Grade 1 - B" },
-  { id: 3, name: "Grade 2 - A" },
-  { id: 12, name: "Grade 12 - A (IGCSE)" },
-  { id: 13, name: "Grade 13 - A (A-Level)" },
-];
-
-const INIT_TEACHERS: TeacherObj[] = [
-  { id: 1, name: "Mr. John" },
-  { id: 2, name: "Ms. Mary" },
-  { id: 3, name: "Mr. David" },
-  { id: 4, name: "Ms. Sarah" },
-  { id: 5, name: "Mr. Adam" },
-];
-
-const INIT_SUBJECTS: SubjectObj[] = [
-  { id: 1, name: "Mathematics" },
-  { id: 2, name: "Physics" },
-  { id: 3, name: "Chemistry" },
-  { id: 4, name: "Biology" },
-  { id: 5, name: "English" },
-];
-
-let _nextId = 10;
-const genId = () => _nextId++;
-
-const INIT_LESSONS: TimetableSlot[] = [
-  {
-    id: 1,
-    teacherId: 1,
-    teacherName: "Mr. John",
-    subjectId: 1,
-    subjectName: "Mathematics",
-    startTime: "08:00",
-    endTime: "08:40",
-    dayOfWeek: 0,
-    classId: 1,
-  },
-  {
-    id: 2,
-    teacherId: 2,
-    teacherName: "Ms. Mary",
-    subjectId: 5,
-    subjectName: "English",
-    startTime: "08:45",
-    endTime: "09:25",
-    dayOfWeek: 0,
-    classId: 1,
-  },
-  {
-    id: 3,
-    teacherId: 1,
-    teacherName: "Mr. John",
-    subjectId: 1,
-    subjectName: "Mathematics",
-    startTime: "09:00",
-    endTime: "10:30",
-    dayOfWeek: 0,
-    classId: 12,
-  },
-  {
-    id: 4,
-    teacherId: 2,
-    teacherName: "Ms. Mary",
-    subjectId: 5,
-    subjectName: "English",
-    startTime: "09:00",
-    endTime: "10:30",
-    dayOfWeek: 0,
-    classId: 12,
-  },
-  {
-    id: 5,
-    teacherId: 5,
-    teacherName: "Mr. Adam",
-    subjectId: 2,
-    subjectName: "Physics",
-    startTime: "13:00",
-    endTime: "14:30",
-    dayOfWeek: 0,
-    classId: 13,
-  },
-  {
-    id: 6,
-    teacherId: 4,
-    teacherName: "Ms. Sarah",
-    subjectId: 3,
-    subjectName: "Chemistry",
-    startTime: "13:00",
-    endTime: "14:30",
-    dayOfWeek: 0,
-    classId: 13,
-  },
-  {
-    id: 7,
-    teacherId: 3,
-    teacherName: "Mr. David",
-    subjectId: 4,
-    subjectName: "Biology",
-    startTime: "08:00",
-    endTime: "09:00",
-    dayOfWeek: 1,
-    classId: 3,
-  },
-  {
-    id: 8,
-    teacherId: 1,
-    teacherName: "Mr. John",
-    subjectId: 1,
-    subjectName: "Mathematics",
-    startTime: "10:00",
-    endTime: "11:30",
-    dayOfWeek: 2,
-    classId: 1,
-  },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const timeToMins = (t: string) => {
@@ -177,7 +43,11 @@ const timeToMins = (t: string) => {
   return h * 60 + m;
 };
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const getClassName = (cls: Class) => {
+  return `${cls.education_level} - ${cls.cohort_identifier} ${cls.cohort_sub_category ? `(${cls.cohort_sub_category})` : ""}`.trim();
+};
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const HOURS = Array.from({ length: 10 }, (_, i) => i + 7); // 07:00–16:00
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -188,7 +58,7 @@ function TeacherSelect({
   value,
   onChange,
 }: {
-  teachers: TeacherObj[];
+  teachers: Teacher[];
   value: number;
   onChange: (id: number, name: string) => void;
 }) {
@@ -267,7 +137,7 @@ function SubjectSelect({
   value,
   onChange,
 }: {
-  subjects: SubjectObj[];
+  subjects: Subject[];
   value: number;
   onChange: (id: number, name: string) => void;
 }) {
@@ -357,21 +227,13 @@ type FormState = {
   subjectId: number;
 };
 
-const emptyForm = (dayOfWeek = 0): FormState => ({
-  dayOfWeek,
-  startTime: "09:00",
-  endTime: "10:30",
-  teacherId: 1,
-  subjectId: 1,
-});
-
 function lessonToForm(l: TimetableSlot): FormState {
   return {
-    dayOfWeek: l.dayOfWeek,
-    startTime: l.startTime,
-    endTime: l.endTime,
-    teacherId: l.teacherId,
-    subjectId: l.subjectId,
+    dayOfWeek: l.day_of_week,
+    startTime: l.start_time.substring(0, 5),
+    endTime: l.end_time.substring(0, 5),
+    teacherId: l.teacher.id,
+    subjectId: l.subject.id,
   };
 }
 
@@ -384,16 +246,22 @@ function SlotModal({
   onClose,
 }: {
   modal: ModalState;
-  teachers: TeacherObj[];
-  subjects: SubjectObj[];
-  onSave: (form: FormState, id?: number) => void;
+  teachers: Teacher[];
+  subjects: Subject[];
+  onSave: (form: FormState, id?: number) => Promise<void>;
   onDelete?: (id: number) => void;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<FormState>(() =>
     modal.mode === "edit" && modal.lesson
       ? lessonToForm(modal.lesson)
-      : emptyForm(modal.prefillDayOfWeek),
+      : {
+          dayOfWeek: modal.prefillDayOfWeek ?? 0,
+          startTime: "09:00",
+          endTime: "10:30",
+          teacherId: teachers[0]?.id || 0,
+          subjectId: subjects[0]?.id || 0,
+        }
   );
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -421,9 +289,17 @@ function SlotModal({
     }
     setErrors([]);
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 300));
-    onSave(form, modal.lesson?.id);
-    setSaving(false);
+    try {
+      await onSave(form, modal.lesson?.id);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setErrors([err.userMessage]);
+      } else {
+        setErrors([err.message || "An unexpected error occurred."]);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -548,132 +424,171 @@ function SlotModal({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function TimetableDashboard() {
+  const { getToken, isSignedIn, isLoaded } = useAuth();
   const [mounted, setMounted] = useState(false);
-  const [lessons, setLessons] = useState<TimetableSlot[]>(INIT_LESSONS);
-  const [classes] = useState<ClassObj[]>(INIT_CLASSES);
-  const [teachers] = useState<TeacherObj[]>(INIT_TEACHERS);
-  const [subjects] = useState<SubjectObj[]>(INIT_SUBJECTS);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [lastLoaded, setLastLoaded] = useState<string | null>(null);
 
-  const [selectedClassId, setSelectedClassId] = useState<number>(1);
-  const [selectedLesson, setSelectedLesson] = useState<TimetableSlot | null>(
-    null,
-  );
+  const [lessons, setLessons] = useState<TimetableSlot[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<TimetableSlot | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "week">("list");
   const [modal, setModal] = useState<ModalState | null>(null);
   const [activeDay, setActiveDay] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
+
+  const loadData = useCallback(async () => {
+    if (!isSignedIn) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token available");
+      const api = createApi(token);
+
+      const [classesData, teachersData, subjectsData, slotsData] = await Promise.all([
+        api.listClasses(),
+        api.listTeachers(),
+        api.listSubjects(),
+        api.listTimetableSlots(),
+      ]);
+
+      setClasses(classesData);
+      setTeachers(teachersData);
+      setSubjects(subjectsData);
+      setLessons(slotsData);
+
+      setLastLoaded(new Date().toLocaleTimeString());
+
+      // If no class is selected yet, select the first class from the loaded list
+      if (classesData.length > 0 && selectedClassId === null) {
+        setSelectedClassId(classesData[0].id);
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to load timetable data");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken, isSignedIn, selectedClassId]);
 
   const selectedClass = classes.find((c) => c.id === selectedClassId);
 
   const filteredClasses = useMemo(
     () =>
       classes.filter((c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()),
+        getClassName(c).toLowerCase().includes(searchQuery.toLowerCase()),
       ),
     [searchQuery, classes],
   );
 
   const filteredLessons = useMemo(
-    () => lessons.filter((l) => l.classId === selectedClassId),
+    () => lessons.filter((l) => l.class_obj?.id === selectedClassId),
     [selectedClassId, lessons],
   );
 
   const listDayLessons = useMemo(
     () =>
       filteredLessons
-        .filter((l) => l.dayOfWeek === activeDay)
-        .sort((a, b) => timeToMins(a.startTime) - timeToMins(b.startTime)),
+        .filter((l) => l.day_of_week === activeDay)
+        .sort((a, b) => timeToMins(a.start_time) - timeToMins(b.start_time)),
     [filteredLessons, activeDay],
   );
 
   // ── TimetableSlot CRUD ──────────────────────────────────────────────────────────
 
   const handleSave = useCallback(
-    (form: FormState, id?: number) => {
-      const teacher = teachers.find((t) => t.id === form.teacherId);
-      const subject = subjects.find((s) => s.id === form.subjectId);
-      if (!teacher || !subject) return;
+    async (form: FormState, id?: number) => {
+      if (!isSignedIn) return;
+      if (selectedClassId === null) return;
+      setError(null);
+
+      const token = await getToken();
+      if (!token) throw new Error("No auth token available");
+      const api = createApi(token);
+
+      const payload = {
+        class_obj_id: selectedClassId,
+        subject_id: form.subjectId,
+        teacher_id: form.teacherId,
+        day_of_week: form.dayOfWeek,
+        start_time: form.startTime.length === 5 ? `${form.startTime}:00` : form.startTime,
+        end_time: form.endTime.length === 5 ? `${form.endTime}:00` : form.endTime,
+      };
 
       if (id) {
         // Edit
-        setLessons((prev) =>
-          prev.map((l) =>
-            l.id === id
-              ? {
-                  ...l,
-                  dayOfWeek: form.dayOfWeek,
-                  startTime: form.startTime,
-                  endTime: form.endTime,
-                  teacherId: form.teacherId,
-                  teacherName: teacher.name,
-                  subjectId: form.subjectId,
-                  subjectName: subject.name,
-                  classId: selectedClassId,
-                }
-              : l,
-          ),
-        );
-        setSelectedLesson((prev) =>
-          prev?.id === id
-            ? {
-                ...prev,
-                dayOfWeek: form.dayOfWeek,
-                startTime: form.startTime,
-                endTime: form.endTime,
-                teacherId: form.teacherId,
-                teacherName: teacher.name,
-                subjectId: form.subjectId,
-                subjectName: subject.name,
-                classId: selectedClassId,
-              }
-            : prev,
-        );
+        await api.updateTimetableSlot(id, payload);
+        setSuccess("Timetable slot updated successfully.");
       } else {
         // Add
-        const newLesson: TimetableSlot = {
-          id: genId(),
-          teacherId: form.teacherId,
-          teacherName: teacher.name,
-          subjectId: form.subjectId,
-          subjectName: subject.name,
-          startTime: form.startTime,
-          endTime: form.endTime,
-          dayOfWeek: form.dayOfWeek,
-          classId: selectedClassId,
-        };
-        setLessons((prev) => [...prev, newLesson]);
+        await api.createTimetableSlot(payload);
+        setSuccess("Timetable slot added successfully.");
       }
+
       setModal(null);
+      await loadData();
     },
-    [selectedClassId, teachers, subjects],
+    [getToken, isSignedIn, selectedClassId, loadData]
   );
 
   const handleDelete = useCallback(
-    (id: number) => {
-      setLessons((prev) => prev.filter((l) => l.id !== id));
-      if (selectedLesson?.id === id) setSelectedLesson(null);
+    async (id: number) => {
+      if (!isSignedIn) return;
+      setError(null);
+      setDeleteSubmitting(true);
+
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("No auth token available");
+        const api = createApi(token);
+
+        await api.deleteTimetableSlot(id);
+        setSuccess("Timetable slot deleted successfully.");
+        if (selectedLesson?.id === id) setSelectedLesson(null);
+        setDeleteConfirmId(null);
+        await loadData();
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setError(err.userMessage);
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to delete timetable slot");
+        }
+      } finally {
+        setDeleteSubmitting(false);
+      }
     },
-    [selectedLesson],
+    [getToken, isSignedIn, selectedLesson, loadData]
   );
 
   // ── Week View ─────────────────────────────────────────────────────────────
 
   const renderWeekEvents = (dayIndex: number) => {
     const dayLessons = lessons
-      .filter((l) => l.dayOfWeek === dayIndex && l.classId === selectedClassId)
+      .filter((l) => l.day_of_week === dayIndex && l.class_obj?.id === selectedClassId)
       .sort((a, b) => {
-        const diff = timeToMins(a.startTime) - timeToMins(b.startTime);
+        const diff = timeToMins(a.start_time) - timeToMins(b.start_time);
         if (diff !== 0) return diff;
         return (
-          timeToMins(a.endTime) -
-          timeToMins(a.startTime) -
-          (timeToMins(b.endTime) - timeToMins(b.startTime))
+          timeToMins(a.end_time) -
+          timeToMins(a.start_time) -
+          (timeToMins(b.end_time) - timeToMins(b.start_time))
         );
       });
 
@@ -683,8 +598,8 @@ export default function TimetableDashboard() {
     let clusterEnd = 0;
 
     for (const lesson of dayLessons) {
-      const start = timeToMins(lesson.startTime);
-      const end = timeToMins(lesson.endTime);
+      const start = timeToMins(lesson.start_time);
+      const end = timeToMins(lesson.end_time);
 
       if (currentCluster.length === 0) {
         currentCluster.push(lesson);
@@ -711,11 +626,11 @@ export default function TimetableDashboard() {
       const columns: TimetableSlot[][] = [];
       for (const lesson of cluster) {
         let placed = false;
-        const start = timeToMins(lesson.startTime);
+        const start = timeToMins(lesson.start_time);
 
         for (let c = 0; c < columns.length; c++) {
           const lastInCol = columns[c][columns[c].length - 1];
-          if (start >= timeToMins(lastInCol.endTime)) {
+          if (start >= timeToMins(lastInCol.end_time)) {
             columns[c].push(lesson);
             placed = true;
             break;
@@ -729,8 +644,8 @@ export default function TimetableDashboard() {
       const totalCols = columns.length;
       for (let c = 0; c < totalCols; c++) {
         for (const lesson of columns[c]) {
-          const s = timeToMins(lesson.startTime);
-          const e = timeToMins(lesson.endTime);
+          const s = timeToMins(lesson.start_time);
+          const e = timeToMins(lesson.end_time);
           const top = (s - dayStart) * pxPerMin;
           const height = Math.max((e - s) * pxPerMin, 28);
 
@@ -757,13 +672,13 @@ export default function TimetableDashboard() {
                 border`}
             >
               <div className="text-xs font-semibold text-foreground truncate">
-                {lesson.subjectName}
+                {lesson.subject.name}
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                {lesson.teacherName}
+                {lesson.teacher.name}
               </div>
               <div className="text-[9px] text-muted-foreground/80 mt-0.5">
-                {lesson.startTime}–{lesson.endTime}
+                {lesson.start_time.substring(0, 5)}–{lesson.end_time.substring(0, 5)}
               </div>
               <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Edit3 className="h-3 w-3 text-muted-foreground" />
@@ -777,7 +692,56 @@ export default function TimetableDashboard() {
     return renderedEvents;
   };
 
-  if (!mounted) return null;
+  if (!mounted || !isLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground font-medium">Loading auth state...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-background">
+        <p className="text-muted-foreground font-medium">Please sign in to view the timetable.</p>
+      </div>
+    );
+  }
+
+  if (!lastLoaded) {
+    return (
+      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center bg-background p-6 text-center">
+        <div className="h-16 w-16 rounded-2xl bg-card border border-border flex items-center justify-center mb-4 shadow-xs">
+          <Calendar className="h-7 w-7 text-muted-foreground" />
+        </div>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Timetable Dashboard</h2>
+        <p className="text-muted-foreground text-sm max-w-sm mb-6">
+          Connect to the school management system API to load classes, teachers, and timetable schedules.
+        </p>
+        {error && (
+          <div className="mb-4 max-w-md mx-auto text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2">
+            {error}
+          </div>
+        )}
+        <Button onClick={loadData} disabled={loading} size="lg">
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 size-5 animate-spin" />
+              Loading Timetable...
+            </>
+          ) : (
+            <>
+              <RotateCcw className="mr-2 size-5" />
+              Load Timetable Data
+            </>
+          )}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -800,7 +764,7 @@ export default function TimetableDashboard() {
           <span className="text-xs font-semibold">Classes</span>
         </button>
         <span className="text-sm font-semibold text-muted-foreground truncate">
-          {selectedClass?.name} Timetable
+          {selectedClass ? getClassName(selectedClass) : ""} Timetable
         </span>
       </header>
 
@@ -845,7 +809,7 @@ export default function TimetableDashboard() {
               {filteredClasses.map((cls) => {
                 const isActive = cls.id === selectedClassId;
                 const lessonCount = lessons.filter(
-                  (l) => l.classId === cls.id,
+                  (l) => l.class_obj?.id === cls.id,
                 ).length;
                 return (
                   <button
@@ -873,13 +837,13 @@ export default function TimetableDashboard() {
                           }`}
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h3
-                          className={`font-medium text-sm ${
+                          className={`font-medium text-sm truncate ${
                             isActive ? "text-foreground" : "text-muted-foreground"
                           }`}
                         >
-                          {cls.name}
+                          {getClassName(cls)}
                         </h3>
                         <div className="text-xs text-muted-foreground mt-0.5">
                           {lessonCount} lesson{lessonCount !== 1 ? "s" : ""}
@@ -887,7 +851,7 @@ export default function TimetableDashboard() {
                       </div>
                     </div>
                     {isActive && (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}
                   </button>
                 );
@@ -907,7 +871,7 @@ export default function TimetableDashboard() {
               </div>
               <div className="min-w-0">
                 <h2 className="text-lg md:text-xl font-bold text-foreground truncate">
-                  {selectedClass?.name}
+                  {selectedClass ? getClassName(selectedClass) : "Select a Class"}
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {filteredLessons.length} total lessons
@@ -917,6 +881,18 @@ export default function TimetableDashboard() {
 
             {/* Actions */}
             <div className="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
+              {/* Refresh button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={loadData}
+                disabled={loading}
+                title="Refresh Timetable Data"
+                className="shrink-0"
+              >
+                <RotateCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+
               {/* View toggle */}
               <div className="flex rounded-lg border border-border bg-muted/50 p-1 w-full sm:w-auto">
                 <button
@@ -947,11 +923,11 @@ export default function TimetableDashboard() {
 
               {/* Button row */}
               <div className="flex gap-2 w-full sm:w-auto">
-                {/* Add TimetableSlot ─ primary style */}
                 <Button
                   onClick={() =>
                     setModal({ mode: "add", prefillDayOfWeek: activeDay })
                   }
+                  disabled={selectedClassId === null}
                 >
                   <Plus className="mr-2 size-4" />
                   <span>Add Timetable Slot</span>
@@ -959,6 +935,25 @@ export default function TimetableDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Banners */}
+          {error && (
+            <div className="mx-4 md:mx-6 mt-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <span>{error}</span>
+              <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+                Dismiss
+              </Button>
+            </div>
+          )}
+
+          {success && (
+            <div className="mx-4 md:mx-6 mt-4 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+              <span>{success}</span>
+              <Button size="xs" variant="ghost" onClick={() => setSuccess(null)}>
+                Dismiss
+              </Button>
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-1 overflow-hidden flex min-h-0">
@@ -996,13 +991,14 @@ export default function TimetableDashboard() {
                         <Calendar className="h-7 w-7 text-muted-foreground" />
                       </div>
                       <p className="text-muted-foreground text-sm">
-                        No lessons for {selectedClass?.name} on {DAYS[activeDay]}
+                        No lessons for {selectedClass ? getClassName(selectedClass) : "selected class"} on {DAYS[activeDay]}
                       </p>
                       <Button
                         variant="outline"
                         onClick={() =>
                           setModal({ mode: "add", prefillDayOfWeek: activeDay })
                         }
+                        disabled={selectedClassId === null}
                         className="mt-4"
                       >
                         <Plus className="mr-2 size-4" /> Add First Timetable Slot
@@ -1029,10 +1025,10 @@ export default function TimetableDashboard() {
                               {/* Time column */}
                               <div className="w-20 flex-shrink-0 text-right border-r border-border pr-4">
                                 <div className="text-sm font-semibold text-foreground">
-                                  {lesson.startTime}
+                                  {lesson.start_time.substring(0, 5)}
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-0.5">
-                                  {lesson.endTime}
+                                  {lesson.end_time.substring(0, 5)}
                                 </div>
                               </div>
 
@@ -1044,27 +1040,41 @@ export default function TimetableDashboard() {
                                   </div>
                                   <div>
                                     <div className="text-sm font-semibold text-foreground">
-                                      {lesson.subjectName}
+                                      {lesson.subject.name}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                      {lesson.teacherName}
+                                      {lesson.teacher.name}
                                     </div>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Edit button */}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setModal({ mode: "edit", lesson });
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <Edit3 className="h-4 w-4" />
-                              </Button>
+                              {/* Edit & Delete buttons */}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setModal({ mode: "edit", lesson });
+                                  }}
+                                  title="Edit Slot"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmId(lesson.id);
+                                  }}
+                                  title="Delete Slot"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
 
                             {/* Mobile: vertical layout */}
@@ -1073,18 +1083,33 @@ export default function TimetableDashboard() {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                  {lesson.startTime} – {lesson.endTime}
+                                  {lesson.start_time.substring(0, 5)} – {lesson.end_time.substring(0, 5)}
                                 </div>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setModal({ mode: "edit", lesson });
-                                  }}
-                                >
-                                  <Edit3 className="h-3.5 w-3.5" />
-                                </Button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setModal({ mode: "edit", lesson });
+                                    }}
+                                    title="Edit Slot"
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirmId(lesson.id);
+                                    }}
+                                    title="Delete Slot"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </div>
 
                               {/* Subject & Teacher info */}
@@ -1094,10 +1119,10 @@ export default function TimetableDashboard() {
                                 </div>
                                 <div>
                                   <div className="text-sm font-semibold text-foreground">
-                                    {lesson.subjectName}
+                                    {lesson.subject.name}
                                   </div>
                                   <div className="text-xs text-muted-foreground">
-                                    {lesson.teacherName}
+                                    {lesson.teacher.name}
                                   </div>
                                 </div>
                               </div>
@@ -1113,7 +1138,8 @@ export default function TimetableDashboard() {
                     onClick={() =>
                       setModal({ mode: "add", prefillDayOfWeek: activeDay })
                     }
-                    className="w-full min-h-[48px] py-4 border-2 border-dashed border-border rounded-xl text-muted-foreground text-sm font-medium hover:text-foreground hover:border-accent hover:bg-muted/50 transition-colors flex items-center justify-center gap-2"
+                    disabled={selectedClassId === null}
+                    className="w-full min-h-[48px] py-4 border-2 border-dashed border-border rounded-xl text-muted-foreground text-sm font-medium hover:text-foreground hover:border-accent hover:bg-muted/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="h-4 w-4" /> Add Timetable Slot
                   </button>
@@ -1152,7 +1178,7 @@ export default function TimetableDashboard() {
                               key={d}
                               className="flex-1 border-r border-border last:border-r-0 relative hover:bg-muted/20 transition-colors cursor-pointer"
                               onClick={() =>
-                                setModal({
+                                selectedClassId !== null && setModal({
                                   mode: "add",
                                   prefillDayOfWeek: index,
                                 })
@@ -1207,7 +1233,7 @@ export default function TimetableDashboard() {
                           Subject
                         </div>
                         <div className="text-sm text-foreground font-medium">
-                          {selectedLesson.subjectName}
+                          {selectedLesson.subject.name}
                         </div>
                       </div>
                     </div>
@@ -1219,7 +1245,7 @@ export default function TimetableDashboard() {
                           Teacher
                         </div>
                         <div className="text-sm text-foreground font-medium">
-                          {selectedLesson.teacherName}
+                          {selectedLesson.teacher.name}
                         </div>
                       </div>
                     </div>
@@ -1231,7 +1257,7 @@ export default function TimetableDashboard() {
                           Time
                         </div>
                         <div className="text-sm text-foreground font-medium">
-                          {selectedLesson.startTime} – {selectedLesson.endTime}
+                          {selectedLesson.start_time.substring(0, 5)} – {selectedLesson.end_time.substring(0, 5)}
                         </div>
                       </div>
                     </div>
@@ -1241,21 +1267,31 @@ export default function TimetableDashboard() {
                       <div>
                         <div className="text-xs text-muted-foreground mb-1">Day</div>
                         <div className="text-sm text-foreground font-medium">
-                          {DAYS[selectedLesson.dayOfWeek]}
+                          {DAYS[selectedLesson.day_of_week]}
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="p-5 border-t border-border">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() =>
-                        setModal({ mode: "edit", lesson: selectedLesson })
-                      }
-                    >
-                      <Edit3 className="mr-2 size-4" /> Edit Timetable Slot
-                    </Button>
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-4 border-t border-border">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() =>
+                          setModal({ mode: "edit", lesson: selectedLesson })
+                        }
+                      >
+                        <Edit3 className="mr-2 size-4" /> Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          setDeleteConfirmId(selectedLesson.id);
+                        }}
+                      >
+                        <Trash2 className="mr-2 size-4" /> Delete
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </aside>
@@ -1271,10 +1307,35 @@ export default function TimetableDashboard() {
           teachers={teachers}
           subjects={subjects}
           onSave={handleSave}
-          onDelete={handleDelete}
+          onDelete={(id) => setDeleteConfirmId(id)}
           onClose={() => setModal(null)}
         />
       )}
+
+      {/* ── DELETE CONFIRMATION DIALOG ── */}
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(val) => !val && setDeleteConfirmId(null)}>
+        <DialogContent onClose={() => setDeleteConfirmId(null)}>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this timetable slot? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={deleteSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+              disabled={deleteSubmitting}
+            >
+              {deleteSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

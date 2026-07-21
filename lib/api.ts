@@ -323,6 +323,22 @@ export function createApi(token: string) {
     listTimetableSlots: () =>
       requestAllPages<import("./types").TimetableSlot>(`/timetable-slots/`, token),
 
+    createTimetableSlot: (data: import("./types").TimetableSlotPayload) =>
+      request<import("./types").TimetableSlot>(`/timetable-slots/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateTimetableSlot: (id: number, data: import("./types").TimetableSlotPayload) =>
+      request<import("./types").TimetableSlot>(`/timetable-slots/${id}/`, token, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+
+    deleteTimetableSlot: (id: number) =>
+      request<void>(`/timetable-slots/${id}/`, token, { method: "DELETE" }),
+
+
     // --- Users ---
     listUsers: () =>
       requestAllPages<import("./types").User>(`/users/`, token),

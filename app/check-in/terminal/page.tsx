@@ -2,10 +2,12 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { User, Check, X, Camera, Loader2, Search } from "lucide-react"
+import { User, Check, X, Camera, Loader2, Search, Maximize2, Minimize2, Users } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import type { Student } from "@/lib/types"
+import type { Student, Class, ClassStudent } from "@/lib/types"
 import jsQR from "jsqr"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 function Clock() {
   const [time, setTime] = React.useState(new Date())
@@ -16,7 +18,7 @@ function Clock() {
   }, [])
 
   return (
-    <div className="text-center">
+    <div className="text-center md:text-right">
       <div className="text-3xl font-bold tracking-tight tabular-nums">
         {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
       </div>
@@ -137,7 +139,11 @@ QrScanner.displayName = "QrScanner"
 export default function TerminalPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const [students, setStudents] = React.useState<Student[]>([])
-  const [studentsLoaded, setStudentsLoaded] = React.useState(false)
+  const [classes, setClasses] = React.useState<Class[]>([])
+  const [classStudents, setClassStudents] = React.useState<ClassStudent[]>([])
+  const [dataLoaded, setDataLoaded] = React.useState(false)
+  const [isFocused, setIsFocused] = React.useState(false)
+
   const scannerRef = React.useRef<{ resetScanLock: () => void }>(null)
   const [scannedToken, setScannedToken] = React.useState<string | null>(null)
   const [matchedStudent, setMatchedStudent] = React.useState<Student | null>(null)
@@ -146,20 +152,58 @@ export default function TerminalPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
 
-  // Load students for matching
+  // Toggle class on body
   React.useEffect(() => {
-    if (!isSignedIn || studentsLoaded) return
+    if (isFocused) {
+      document.body.classList.add("terminal-focus-mode")
+    } else {
+      document.body.classList.remove("terminal-focus-mode")
+    }
+    return () => {
+      document.body.classList.remove("terminal-focus-mode")
+    }
+  }, [isFocused])
+
+  // Load students, classes, and mappings for matching
+  React.useEffect(() => {
+    if (!isSignedIn || dataLoaded) return
     ;(async () => {
       try {
         const token = await getToken()
         if (!token) return
         const api = createApi(token)
-        const data = await api.listStudents()
-        setStudents(data)
-        setStudentsLoaded(true)
-      } catch { /* silent - errors shown on scan */ }
+        const [studentsData, classesData, classStudentsData] = await Promise.all([
+          api.listStudents(),
+          api.listClasses(),
+          api.listClassStudents(),
+        ])
+        setStudents(studentsData)
+        setClasses(classesData)
+        setClassStudents(classStudentsData)
+        setDataLoaded(true)
+      } catch (err) {
+        console.error("Failed to load terminal initialization data", err)
+      }
     })()
-  }, [isSignedIn, getToken, studentsLoaded])
+  }, [isSignedIn, getToken, dataLoaded])
+
+  const getStudentClassName = React.useCallback((studentId: number) => {
+    const mapping = classStudents.find((cs) => {
+      const sId = typeof cs.student === "object" ? cs.student.id : cs.student
+      return sId === studentId
+    })
+    if (!mapping) return "No Class Assigned"
+
+    let classObj: Class | undefined
+    if (typeof mapping.class_obj === "object") {
+      classObj = mapping.class_obj
+    } else {
+      classObj = classes.find((c) => c.id === mapping.class_obj)
+    }
+
+    if (!classObj) return "No Class Assigned"
+    return `${classObj.education_level} - ${classObj.cohort_identifier} ${classObj.cohort_sub_category ? `(${classObj.cohort_sub_category})` : ""}`.trim()
+  }, [classes, classStudents])
 
   const handleScan = React.useCallback((token: string) => {
     setScannedToken(token)
@@ -221,6 +265,7 @@ export default function TerminalPage() {
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
       else setError(err instanceof Error ? err.message : "Failed to check in")
+      scannerRef.current?.resetScanLock()
     } finally {
       setCheckingIn(false)
     }
@@ -243,10 +288,37 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Date & Time */}
-      <div className="mb-8">
+    <div className={`container mx-auto px-4 py-8 max-w-7xl transition-all duration-300 ${isFocused ? "min-h-[90vh] flex flex-col justify-center" : ""}`}>
+      {/* Header with Title, Clock and Focus button */}
+      <div className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4 border-b pb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+            <Users className="h-5 w-5 text-primary" />
+          </div>
+        </div>
+
         <Clock />
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFocused((f) => !f)}
+            className="shadow-xs gap-2"
+          >
+            {isFocused ? (
+              <>
+                <Minimize2 className="size-4" />
+                Exit Focus Mode
+              </>
+            ) : (
+              <>
+                <Maximize2 className="size-4" />
+                Focus Mode
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -282,12 +354,15 @@ export default function TerminalPage() {
             <div className="rounded-lg border p-6">
               {/* Student icon + info */}
               <div className="mb-6 flex items-center gap-4">
-                <div className="flex size-16 items-center justify-center rounded-full border bg-muted">
-                  <User className="size-8 text-muted-foreground" />
+                <div className="flex size-16 items-center justify-center rounded-full border bg-primary/5 border-primary/10">
+                  <User className="size-8 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">ID: {matchedStudent.id}</p>
-                  <p className="text-xl font-semibold">{matchedStudent.name}</p>
+                  <p className="text-xs text-muted-foreground font-medium">ID: {matchedStudent.id}</p>
+                  <p className="text-xl font-bold tracking-tight text-foreground">{matchedStudent.name}</p>
+                  <p className="text-xs font-semibold text-primary mt-0.5">
+                    {getStudentClassName(matchedStudent.id)}
+                  </p>
                 </div>
               </div>
 
@@ -333,26 +408,30 @@ export default function TerminalPage() {
           )}
 
           {/* Manual entry */}
-          <div className="mt-4 rounded-lg border p-4">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">
-              Not Recognized? Type in student ID manually
+          <div className="mt-6 rounded-xl border border-neutral-800 bg-[#0a0a0a] p-5 shadow-xs text-white">
+            <h3 className="mb-1 text-sm font-semibold text-neutral-200">
+              Manual Lookup
+            </h3>
+            <p className="mb-4 text-xs text-neutral-400">
+              Not Recognized? Search by typing in the student ID manually
             </p>
             <div className="flex gap-2">
-              <input
+              <Input
                 type="number"
                 value={manualId}
                 onChange={(e) => setManualId(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleManualLookup() }}
-                placeholder="Student ID"
-                className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                placeholder="Student ID (e.g. 101)"
+                className="min-w-0 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-neutral-850 bg-neutral-950 text-white placeholder:text-neutral-500 focus-visible:ring-neutral-800"
               />
-              <button
+              <Button
                 onClick={handleManualLookup}
-                className="inline-flex items-center justify-center gap-1 rounded-lg bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                variant="outline"
+                className="shadow-xs gap-1.5 border-neutral-800 text-white hover:bg-neutral-900 hover:text-white"
               >
                 <Search className="size-4" />
                 Look Up
-              </button>
+              </Button>
             </div>
           </div>
         </div>

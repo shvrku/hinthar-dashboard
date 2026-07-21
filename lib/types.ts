@@ -125,6 +125,15 @@ export interface SessionPayload {
   timetable_slot_id?: number | null
 }
 
+export interface TimetableSlotPayload {
+  class_obj_id: number
+  subject_id: number
+  teacher_id: number
+  day_of_week: number
+  start_time: string
+  end_time: string
+}
+
 // --- CheckIn ---
 
 export interface CheckIn {
