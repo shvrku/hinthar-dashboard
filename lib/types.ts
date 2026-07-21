@@ -187,3 +187,65 @@ export interface Stats {
   session_attendances: number
   check_ins: number
 }
+
+// --- Session Attendance ---
+export type SessionAttendanceStatus = "present" | "absent" | "late"
+
+export interface SessionAttendance {
+  id: number
+  status: SessionAttendanceStatus
+  session_id: number
+  session_start_time: string
+  session_end_time: string
+  session_status: string
+  teacher_name: string | null
+  class_name: string | null
+  student_id: number
+  student_name: string
+}
+
+export interface SessionAttendancePayload {
+  session_id: number
+  student_id: number
+  status: SessionAttendanceStatus
+}
+
+// --- Ad-Hoc Sessions ---
+
+export interface AdHocSession {
+  id: number
+  teacher: Teacher
+  subject: Subject
+  date: string // format: YYYY-MM-DD
+  start_time: string // format: HH:MM:SS
+  end_time: string // format: HH:MM:SS
+  status: SessionStatus | null
+  paid: boolean | null
+}
+
+export interface AdHocSessionPayload {
+  teacher_id: number
+  subject_id: number
+  date: string
+  start_time: string
+  end_time: string
+  status?: SessionStatus | null
+  paid?: boolean | null
+}
+
+export interface AdHocSessionAttendance {
+  id: number
+  ad_hoc_session: AdHocSession
+  student: Student
+  status: SessionAttendanceStatus
+  ad_hoc_session_id: number
+  student_id: number
+}
+
+export interface AdHocSessionAttendancePayload {
+  ad_hoc_session_id: number
+  student_id: number
+  status: SessionAttendanceStatus
+}
+
+

@@ -5,6 +5,330 @@ info:
   description: Core API for managing classes, timetabling, sessions, attendance, and
     payroll.
 paths:
+  /api/v1/adhoc-session-attendances/:
+    get:
+      operationId: adhoc_session_attendances_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - adhoc-session-attendances
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdHocSessionAttendanceList'
+          description: ''
+    post:
+      operationId: adhoc_session_attendances_create
+      tags:
+      - adhoc-session-attendances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSessionAttendance'
+          description: ''
+  /api/v1/adhoc-session-attendances/{id}/:
+    get:
+      operationId: adhoc_session_attendances_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session attendance.
+        required: true
+      tags:
+      - adhoc-session-attendances
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSessionAttendance'
+          description: ''
+    put:
+      operationId: adhoc_session_attendances_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session attendance.
+        required: true
+      tags:
+      - adhoc-session-attendances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSessionAttendance'
+          description: ''
+    patch:
+      operationId: adhoc_session_attendances_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session attendance.
+        required: true
+      tags:
+      - adhoc-session-attendances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSessionAttendance'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSessionAttendance'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSessionAttendance'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSessionAttendance'
+          description: ''
+    delete:
+      operationId: adhoc_session_attendances_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session attendance.
+        required: true
+      tags:
+      - adhoc-session-attendances
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/adhoc-sessions/:
+    get:
+      operationId: adhoc_sessions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - adhoc-sessions
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdHocSessionList'
+          description: ''
+    post:
+      operationId: adhoc_sessions_create
+      tags:
+      - adhoc-sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSession'
+          description: ''
+  /api/v1/adhoc-sessions/{id}/:
+    get:
+      operationId: adhoc_sessions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session.
+        required: true
+      tags:
+      - adhoc-sessions
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSession'
+          description: ''
+    put:
+      operationId: adhoc_sessions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session.
+        required: true
+      tags:
+      - adhoc-sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSession'
+          description: ''
+    patch:
+      operationId: adhoc_sessions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session.
+        required: true
+      tags:
+      - adhoc-sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSession'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSession'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSession'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSession'
+          description: ''
+    delete:
+      operationId: adhoc_sessions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session.
+        required: true
+      tags:
+      - adhoc-sessions
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/adhoc-sessions/{id}/status/:
+    patch:
+      operationId: adhoc_sessions_status_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ad hoc session.
+        required: true
+      tags:
+      - adhoc-sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSession'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSession'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdHocSession'
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSession'
+          description: ''
   /api/v1/audit-logs/:
     get:
       operationId: audit_logs_list
@@ -558,6 +882,7 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/SessionAttendance'
+        required: true
       security:
       - clerk_jwt: []
       responses:
@@ -610,6 +935,7 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/SessionAttendance'
+        required: true
       security:
       - clerk_jwt: []
       responses:
@@ -1951,6 +2277,76 @@ components:
         * `create` - Create
         * `update` - Update
         * `delete` - Delete
+    AdHocSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        teacher:
+          allOf:
+          - $ref: '#/components/schemas/Teacher'
+          readOnly: true
+        subject:
+          allOf:
+          - $ref: '#/components/schemas/Subject'
+          readOnly: true
+        teacher_id:
+          type: integer
+          writeOnly: true
+        subject_id:
+          type: integer
+          writeOnly: true
+        date:
+          type: string
+          format: date
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        status:
+          $ref: '#/components/schemas/SessionStatusEnum'
+        paid:
+          type: boolean
+      required:
+      - date
+      - end_time
+      - id
+      - start_time
+      - subject
+      - subject_id
+      - teacher
+      - teacher_id
+    AdHocSessionAttendance:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ad_hoc_session:
+          allOf:
+          - $ref: '#/components/schemas/AdHocSession'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+        ad_hoc_session_id:
+          type: integer
+          writeOnly: true
+        student_id:
+          type: integer
+          writeOnly: true
+      required:
+      - ad_hoc_session
+      - ad_hoc_session_id
+      - id
+      - student
+      - student_id
     AuditLog:
       type: object
       properties:
@@ -2139,6 +2535,52 @@ components:
       description: |-
         * `full_time` - Full Time
         * `tutor` - Tutor
+    PaginatedAdHocSessionAttendanceList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdHocSessionAttendance'
+    PaginatedAdHocSessionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdHocSession'
     PaginatedAuditLogList:
       type: object
       required:
@@ -2415,6 +2857,61 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/User'
+    PatchedAdHocSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        teacher:
+          allOf:
+          - $ref: '#/components/schemas/Teacher'
+          readOnly: true
+        subject:
+          allOf:
+          - $ref: '#/components/schemas/Subject'
+          readOnly: true
+        teacher_id:
+          type: integer
+          writeOnly: true
+        subject_id:
+          type: integer
+          writeOnly: true
+        date:
+          type: string
+          format: date
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        status:
+          $ref: '#/components/schemas/SessionStatusEnum'
+        paid:
+          type: boolean
+    PatchedAdHocSessionAttendance:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ad_hoc_session:
+          allOf:
+          - $ref: '#/components/schemas/AdHocSession'
+          readOnly: true
+        student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+        ad_hoc_session_id:
+          type: integer
+          writeOnly: true
+        student_id:
+          type: integer
+          writeOnly: true
     PatchedClass:
       type: object
       properties:
@@ -2474,11 +2971,9 @@ components:
         class_obj_id:
           type: integer
           writeOnly: true
-          nullable: true
         timetable_slot_id:
           type: integer
           writeOnly: true
-          nullable: true
         start_time:
           type: string
           format: date-time
@@ -2505,6 +3000,12 @@ components:
           readOnly: true
         status:
           $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+        session_id:
+          type: integer
+          writeOnly: true
+        student_id:
+          type: integer
+          writeOnly: true
     PatchedStaff:
       type: object
       properties:
@@ -2701,11 +3202,9 @@ components:
         class_obj_id:
           type: integer
           writeOnly: true
-          nullable: true
         timetable_slot_id:
           type: integer
           writeOnly: true
-          nullable: true
         start_time:
           type: string
           format: date-time
@@ -2718,12 +3217,14 @@ components:
           type: boolean
       required:
       - class_obj
+      - class_obj_id
       - end_time
       - id
       - start_time
       - teacher
       - teacher_id
       - timetable_slot
+      - timetable_slot_id
     SessionAttendance:
       type: object
       properties:
@@ -2740,10 +3241,18 @@ components:
           readOnly: true
         status:
           $ref: '#/components/schemas/SessionAttendanceStatusEnum'
+        session_id:
+          type: integer
+          writeOnly: true
+        student_id:
+          type: integer
+          writeOnly: true
       required:
       - id
       - session
+      - session_id
       - student
+      - student_id
     SessionAttendanceList:
       type: object
       description: Lightweight serializer for listing attendance records.

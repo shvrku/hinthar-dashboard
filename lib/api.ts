@@ -1,4 +1,4 @@
-const API_BASE = "/api/v1"
+const API_BASE = "https://school-management-system-api-xs24.onrender.com/api/v1"
 
 export class ApiError extends Error {
   status: number
@@ -12,37 +12,12 @@ export class ApiError extends Error {
   }
 
   get userMessage(): string {
-    const detailText = this.detail ? `: ${this.detail}` : ""
-
-    if (this.status === 401) {
-      return this.detail
-        ? `[401] Unauthorized${detailText}`
-        : "[401] Your session has expired. Please sign in again."
-    }
-    if (this.status === 403) {
-      return this.detail
-        ? `[403] Permission Denied${detailText}`
-        : "[403] You don't have permission to perform this action."
-    }
-    if (this.status === 404) {
-      return this.detail
-        ? `[404] Not Found${detailText}`
-        : "[404] The requested resource was not found."
-    }
-    if (this.status === 409) {
-      return `[409] ${this.detail || "Conflict — the student may already be checked in today."}`
-    }
-    if (this.status === 502) {
-      return `[502] ${this.detail || "Failed to reach the API server. It may be down or restarting."}`
-    }
-    if (this.status === 0) {
-      return this.detail || "[Network] Unable to connect to the server."
-    }
-    if (this.status >= 500) {
-      return this.detail
-        ? `[${this.status}] Server Error${detailText}`
-        : `[${this.status}] The server encountered an error. Please try again later.`
-    }
+    if (this.status === 401) return "[401] Your session has expired. Please sign in again."
+    if (this.status === 403) return "[403] You don't have permission to perform this action."
+    if (this.status === 404) return "[404] The requested resource was not found."
+    if (this.status === 409) return `[409] ${this.detail || "Conflict — the student may already be checked in today."}`
+    if (this.status === 0) return this.detail || "[Network] Unable to connect to the server."
+    if (this.status >= 500) return "[500] The server encountered an error. Please try again later."
     return `[${this.status}] ${this.detail || "An unexpected error occurred."}`
   }
 }
@@ -82,30 +57,13 @@ async function request<T>(
         // Try common response formats
         if (typeof body === "string") {
           detail = body
-        } else if (body && typeof body === "object" && !Array.isArray(body)) {
-          const dict = body as Record<string, unknown>
-          if (typeof dict.detail === "string") {
-            detail = dict.detail
-          } else if (typeof dict.message === "string") {
-            detail = dict.message
-          } else if (typeof dict.error === "string") {
-            detail = dict.error
-          } else {
-            const messages: string[] = []
-            for (const [key, value] of Object.entries(dict)) {
-              const fieldName = key === "__all__" || key === "non_field_errors" ? "" : `${key}: `
-              if (Array.isArray(value)) {
-                messages.push(`${fieldName}${value.join(", ")}`)
-              } else if (typeof value === "string") {
-                messages.push(`${fieldName}${value}`)
-              } else {
-                messages.push(`${fieldName}${JSON.stringify(value)}`)
-              }
-            }
-            if (messages.length > 0) {
-              detail = messages.join("; ")
-            }
-          }
+        } else {
+          detail =
+            (body as { detail?: string }).detail ??
+            (body as { message?: string }).message ??
+            (body as { error?: string }).error ??
+            (body as { non_field_errors?: string[] }).non_field_errors?.join("; ") ??
+            detail
         }
       } catch {
         detail = raw // use raw text if not JSON
@@ -115,66 +73,14 @@ async function request<T>(
   }
 
   if (res.status === 204) return undefined as T
-  const raw = await res.text().catch(() => "")
-  if (!raw) return undefined as T
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return raw as unknown as T
-  }
-}
-
-interface PaginatedResponse<T> {
-  count: number
-  next: string | null
-  previous: string | null
-  results: T[]
-}
-
-async function requestAllPages<T>(
-  path: string,
-  token: string,
-  options: RequestInit = {}
-): Promise<T[]> {
-  const allResults: T[] = []
-  let nextUrl: string | null = path
-
-  while (nextUrl) {
-    const currentUrl: string = nextUrl as string
-    let fetchPath: string = currentUrl
-    if (currentUrl.startsWith("http")) {
-      const urlObj = new URL(currentUrl)
-      fetchPath = `${urlObj.pathname}${urlObj.search}`
-      if (fetchPath.startsWith("/api/v1")) {
-        fetchPath = fetchPath.substring(7)
-      }
-    }
-
-    try {
-      const res = await request<PaginatedResponse<T> | T[]>(fetchPath, token, options)
-      if (Array.isArray(res)) {
-        allResults.push(...res)
-        break
-      } else if (res && Array.isArray(res.results)) {
-        allResults.push(...res.results)
-        nextUrl = res.next
-      } else {
-        break
-      }
-    } catch (err) {
-      console.error(`Error requesting paginated results at ${fetchPath}:`, err)
-      break
-    }
-  }
-
-  return allResults
+  return (await res.json()) as T
 }
 
 export function createApi(token: string) {
   return {
     // --- Classes ---
     listClasses: () =>
-      requestAllPages<import("./types").Class>(`/classes/`, token),
+      request<import("./types").Class[]>(`/classes/`, token),
 
     getClass: (id: number) =>
       request<import("./types").Class>(`/classes/${id}/`, token),
@@ -196,7 +102,7 @@ export function createApi(token: string) {
 
     // --- Students ---
     listStudents: () =>
-      requestAllPages<import("./types").Student>(`/students/`, token),
+      request<import("./types").Student[]>(`/students/`, token),
 
     getStudent: (id: number) =>
       request<import("./types").Student>(`/students/${id}/`, token),
@@ -217,16 +123,16 @@ export function createApi(token: string) {
       request<void>(`/students/${id}/`, token, { method: "DELETE" }),
 
     getCheckInToken: (id: number) =>
-      request<{ check_in_token: string }>(`/students/${id}/check_in_token/`, token),
+      request<import("./types").Student>(`/students/${id}/check_in_token/`, token),
 
     regenerateCheckInToken: (id: number) =>
-      request<{ check_in_token: string }>(`/students/${id}/regenerate_check_in_token/`, token, {
+      request<import("./types").Student>(`/students/${id}/regenerate_check_in_token/`, token, {
         method: "POST",
       }),
 
     // --- Check-Ins ---
     listCheckIns: () =>
-      requestAllPages<import("./types").CheckIn>(`/check-ins/`, token),
+      request<import("./types").CheckIn[]>(`/check-ins/`, token),
 
     createCheckInManual: (studentId: number) =>
       request<import("./types").CheckIn>(`/check-ins/manual/`, token, {
@@ -242,20 +148,11 @@ export function createApi(token: string) {
 
     // --- Class-Students ---
     listClassStudents: () =>
-      requestAllPages<import("./types").ClassStudent>(`/class-students/`, token),
-
-    createClassStudent: (classId: number, studentId: number) =>
-      request<import("./types").ClassStudent>(`/class-students/`, token, {
-        method: "POST",
-        body: JSON.stringify({ class_obj_id: classId, student_id: studentId }),
-      }),
-
-    deleteClassStudent: (id: number) =>
-      request<void>(`/class-students/${id}/`, token, { method: "DELETE" }),
+      request<import("./types").ClassStudent[]>(`/class-students/`, token),
 
     // --- Teachers ---
     listTeachers: () =>
-      requestAllPages<import("./types").Teacher>(`/teachers/`, token),
+      request<import("./types").Teacher[]>(`/teachers/`, token),
 
     getTeacher: (id: number) =>
       request<import("./types").Teacher>(`/teachers/${id}/`, token),
@@ -275,31 +172,9 @@ export function createApi(token: string) {
     deleteTeacher: (id: number) =>
       request<void>(`/teachers/${id}/`, token, { method: "DELETE" }),
 
-    // --- Subjects ---
-    listSubjects: () =>
-      requestAllPages<import("./types").Subject>(`/subjects/`, token),
-
-    getSubject: (id: number) =>
-      request<import("./types").Subject>(`/subjects/${id}/`, token),
-
-    createSubject: (data: import("./types").SubjectPayload) =>
-      request<import("./types").Subject>(`/subjects/`, token, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-
-    updateSubject: (id: number, data: import("./types").SubjectPayload) =>
-      request<import("./types").Subject>(`/subjects/${id}/`, token, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-
-    deleteSubject: (id: number) =>
-      request<void>(`/subjects/${id}/`, token, { method: "DELETE" }),
-
     // --- Sessions ---
     listSessions: () =>
-      requestAllPages<import("./types").Session>(`/sessions/`, token),
+      request<import("./types").Session[]>(`/sessions/`, token),
 
     getSession: (id: number) =>
       request<import("./types").Session>(`/sessions/${id}/`, token),
@@ -318,41 +193,6 @@ export function createApi(token: string) {
 
     deleteSession: (id: number) =>
       request<void>(`/sessions/${id}/`, token, { method: "DELETE" }),
-
-    // --- Timetable Slots ---
-    listTimetableSlots: () =>
-      requestAllPages<import("./types").TimetableSlot>(`/timetable-slots/`, token),
-
-    createTimetableSlot: (data: import("./types").TimetableSlotPayload) =>
-      request<import("./types").TimetableSlot>(`/timetable-slots/`, token, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-
-    updateTimetableSlot: (id: number, data: import("./types").TimetableSlotPayload) =>
-      request<import("./types").TimetableSlot>(`/timetable-slots/${id}/`, token, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-
-    deleteTimetableSlot: (id: number) =>
-      request<void>(`/timetable-slots/${id}/`, token, { method: "DELETE" }),
-
-
-    // --- Users ---
-    listUsers: () =>
-      requestAllPages<import("./types").User>(`/users/`, token),
-
-    getUser: (id: number) =>
-      request<import("./types").User>(`/users/${id}/`, token),
-
-    // --- Stats ---
-    getStats: () =>
-      request<import("./types").Stats>(`/stats/`, token),
-
-    // --- Me ---
-    getMe: () =>
-      request<import("./types").User>(`/me/`, token),
   }
 }
 

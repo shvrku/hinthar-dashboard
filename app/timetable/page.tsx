@@ -21,7 +21,6 @@ import {
   ChevronDown,
   Loader2,
   Trash2,
-  Menu,
   PanelLeft,
   RotateCcw,
 } from "lucide-react";
@@ -228,10 +227,15 @@ type FormState = {
 };
 
 function lessonToForm(l: TimetableSlot): FormState {
+  const formatTimeToSeconds = (time: string): string => {
+    if (!time) return "00:00:00"
+    return time.length === 5 ? `${time}:00` : time
+  }
+
   return {
     dayOfWeek: l.day_of_week,
-    startTime: l.start_time.substring(0, 5),
-    endTime: l.end_time.substring(0, 5),
+    startTime: formatTimeToSeconds(l.start_time),
+    endTime: formatTimeToSeconds(l.end_time),
     teacherId: l.teacher.id,
     subjectId: l.subject.id,
   };
@@ -257,8 +261,8 @@ function SlotModal({
       ? lessonToForm(modal.lesson)
       : {
           dayOfWeek: modal.prefillDayOfWeek ?? 0,
-          startTime: "09:00",
-          endTime: "10:30",
+          startTime: "09:00:00",
+          endTime: "10:30:00",
           teacherId: teachers[0]?.id || 0,
           subjectId: subjects[0]?.id || 0,
         }
@@ -291,11 +295,12 @@ function SlotModal({
     setSaving(true);
     try {
       await onSave(form, modal.lesson?.id);
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof ApiError) {
         setErrors([err.userMessage]);
       } else {
-        setErrors([err.message || "An unexpected error occurred."]);
+        const error = err as Error;
+        setErrors([error.message || "An unexpected error occurred."]);
       }
     } finally {
       setSaving(false);
@@ -353,6 +358,7 @@ function SlotModal({
               <label className="mb-1.5 block text-sm font-medium text-foreground">Start Time</label>
               <Input
                 type="time"
+                step="1"
                 value={form.startTime}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, startTime: e.target.value }))
@@ -363,6 +369,7 @@ function SlotModal({
               <label className="mb-1.5 block text-sm font-medium text-foreground">End Time</label>
               <Input
                 type="time"
+                step="1"
                 value={form.endTime}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, endTime: e.target.value }))
@@ -447,7 +454,10 @@ export default function TimetableDashboard() {
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const loadData = useCallback(async () => {

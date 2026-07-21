@@ -31,7 +31,7 @@ const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
   const hour = Math.floor(7 + i / 2)
   const minute = i % 2 === 0 ? "00" : "30"
   const hourStr = hour.toString().padStart(2, "0")
-  const value = `${hourStr}:${minute}`
+  const value = `${hourStr}:${minute}:00`
   const ampm = hour >= 12 ? "PM" : "AM"
   const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
   const label = `${displayHour}:${minute} ${ampm}`
@@ -235,7 +235,13 @@ export default function SessionsPage() {
       if (slot.teacher?.id) {
         setFormTeacherId(slot.teacher.id.toString())
       }
-      if (slot.start_time) setFormStartTime(slot.start_time.substring(0, 5))
+      if (slot.start_time) {
+        const formatTimeToSeconds = (time: string): string => {
+          if (!time) return "00:00:00"
+          return time.length === 5 ? `${time}:00` : time
+        }
+        setFormStartTime(formatTimeToSeconds(slot.start_time))
+      }
       if (slot.end_time && slot.start_time) {
         const [sh, sm] = slot.start_time.split(":").map(Number)
         const [eh, em] = slot.end_time.split(":").map(Number)
@@ -258,7 +264,7 @@ export default function SessionsPage() {
     setFormDate(new Date().toISOString().substring(0, 10))
     setFormStartTime("09:00")
     setFormDuration("60")
-    setFormCustomEndTime("10:00")
+    setFormCustomEndTime("10:00:00")
     setFormStatus("scheduled")
     setFormPaid(false)
     setFormTeacherId("")
@@ -280,7 +286,8 @@ export default function SessionsPage() {
 
       const sh = String(startDate.getHours()).padStart(2, "0")
       const sm = String(startDate.getMinutes()).padStart(2, "0")
-      setFormStartTime(`${sh}:${sm}`)
+      const ss = String(startDate.getSeconds()).padStart(2, "0")
+      setFormStartTime(`${sh}:${sm}:${ss}`)
 
       if (!isNaN(endDate.getTime())) {
         const diffMins = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
@@ -291,7 +298,8 @@ export default function SessionsPage() {
           setFormDuration("custom")
           const eh = String(endDate.getHours()).padStart(2, "0")
           const em = String(endDate.getMinutes()).padStart(2, "0")
-          setFormCustomEndTime(`${eh}:${em}`)
+          const es = String(endDate.getSeconds()).padStart(2, "0")
+          setFormCustomEndTime(`${eh}:${em}:${es}`)
         }
       }
     } else {
@@ -320,7 +328,11 @@ export default function SessionsPage() {
     setError(null)
 
     try {
-      const startIso = `${formDate}T${formStartTime}:00`
+      const formatTimeToSeconds = (time: string): string => {
+        if (!time) return "00:00:00"
+        return time.length === 5 ? `${time}:00` : time
+      }
+      const startIso = `${formDate}T${formatTimeToSeconds(formStartTime)}`
       let endIso = ""
       if (formDuration === "custom") {
         if (!formCustomEndTime) {
@@ -328,14 +340,15 @@ export default function SessionsPage() {
           setSaving(false)
           return
         }
-        endIso = `${formDate}T${formCustomEndTime}:00`
+        endIso = `${formDate}T${formatTimeToSeconds(formCustomEndTime)}`
       } else {
-        const [h, m] = formStartTime.split(":").map(Number)
+        const [h, m, s] = formStartTime.split(":").map(Number)
         const durationMins = parseInt(formDuration, 10)
         const totalMins = h * 60 + m + durationMins
         const endH = String(Math.floor(totalMins / 60) % 24).padStart(2, "0")
         const endM = String(totalMins % 60).padStart(2, "0")
-        endIso = `${formDate}T${endH}:${endM}:00`
+        const endS = String(s || 0).padStart(2, "0")
+        endIso = `${formDate}T${endH}:${endM}:${endS}`
       }
 
       const payload: SessionPayload = {
@@ -754,6 +767,7 @@ export default function SessionsPage() {
                 <label className="mb-1.5 block text-sm font-medium">Custom End Time</label>
                 <Input
                   type="time"
+                  step="1"
                   value={formCustomEndTime}
                   onChange={(e) => setFormCustomEndTime(e.target.value)}
                   required
@@ -776,19 +790,6 @@ export default function SessionsPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="flex items-center gap-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="paid-check"
-                  checked={formPaid}
-                  onChange={(e) => setFormPaid(e.target.checked)}
-                  className="size-4 rounded border-input text-primary focus:ring-ring"
-                />
-                <label htmlFor="paid-check" className="text-sm font-medium">
-                  Paid
-                </label>
               </div>
             </div>
 
