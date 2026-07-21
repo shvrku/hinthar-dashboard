@@ -179,10 +179,6 @@ export default function SessionsPage() {
     }
   }, [getToken, isSignedIn])
 
-  React.useEffect(() => {
-    loadInitialData()
-  }, [loadInitialData])
-
   const loadSessions = React.useCallback(async () => {
     if (!isSignedIn) return
     setLoading(true)
@@ -204,6 +200,12 @@ export default function SessionsPage() {
       setLoading(false)
     }
   }, [getToken, isSignedIn])
+
+  React.useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      loadInitialData()
+    }
+  }, [isLoaded, isSignedIn, loadInitialData])
 
   const filteredSessions = React.useMemo(() => {
     if (!sessions) return []

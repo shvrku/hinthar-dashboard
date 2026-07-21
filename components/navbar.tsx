@@ -157,10 +157,10 @@ export function Navbar() {
       <AnimatePresence initial={false}>
         {!isFocused && (
           <motion.header
-            initial={{ opacity: 0, height: 0 }}
+            initial={false}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-md overflow-hidden"
           >
             <div className="container mx-auto flex h-14 items-center px-4 sm:px-6 md:px-8 max-w-7xl">

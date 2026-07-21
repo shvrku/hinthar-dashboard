@@ -233,6 +233,8 @@ export default function StudentsPage() {
     }
   }, [getApi])
 
+
+
   const filteredStudents = React.useMemo(() => {
     if (!students) return []
     if (searchQuery.trim() === "") return students

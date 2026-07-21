@@ -207,6 +207,8 @@ export default function SubjectsPage() {
     }
   }, [getApi])
 
+
+
   const filteredSubjects = React.useMemo(() => {
     if (!subjects) return []
     if (searchQuery.trim() === "") return subjects

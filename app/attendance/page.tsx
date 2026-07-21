@@ -242,8 +242,8 @@ export default function AttendancePage() {
       setAdhocAttendances(adhocAttendancesData)
 
       // Set defaults based on mode if not already initialized
-      if (classesData.length > 0 && selectedClassId === "all") {
-        setSelectedClassId(classesData[0].id.toString())
+      if (classesData.length > 0) {
+        setSelectedClassId((prev) => (prev === "all" ? classesData[0].id.toString() : prev))
       }
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
@@ -252,7 +252,9 @@ export default function AttendancePage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, isLoaded, isSignedIn, selectedClassId])
+  }, [getToken, isLoaded, isSignedIn])
+
+
 
   // Reset manually added students when filters change
   React.useEffect(() => {
@@ -611,13 +613,15 @@ export default function AttendancePage() {
     return t ? t.name : "Select a Teacher"
   }, [teachers, selectedTeacherId])
 
-  // Protect against Hydration Mismatch
-  if (!mounted || !isLoaded) {
+  if (!isLoaded) {
     return (
-      <div className="flex-1 min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground font-medium">Loading auth state...</p>
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
+        <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
+        <div className="rounded-xl border border-border p-6 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-6 w-full animate-pulse rounded-md bg-muted" />
+          ))}
         </div>
       </div>
     )
@@ -678,13 +682,7 @@ export default function AttendancePage() {
   )
 
   return (
-    <motion.div
-      key={lastLoaded ? "loaded" : "splash"}
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl flex-1 space-y-6"
-    >
+    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl flex-1 space-y-6">
       {/* Header section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -1416,6 +1414,6 @@ export default function AttendancePage() {
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

@@ -474,8 +474,8 @@ export default function TimetablePage() {
       setSubjects(subjectsData)
       setLessons(lessonsData)
 
-      if (classesData.length > 0 && selectedClassId === null) {
-        setSelectedClassId(classesData[0].id)
+      if (classesData.length > 0) {
+        setSelectedClassId((prev) => prev ?? classesData[0].id)
       }
     } catch (err) {
       if (err instanceof ApiError) {
@@ -486,7 +486,7 @@ export default function TimetablePage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, isSignedIn, selectedClassId])
+  }, [getToken, isSignedIn])
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {

@@ -312,6 +312,8 @@ export default function TeachersPage() {
     }
   }, [getApi])
 
+
+
   const filteredTeachers = React.useMemo(() => {
     if (searchQuery.trim() === "") return teachers
     const q = searchQuery.toLowerCase().trim()

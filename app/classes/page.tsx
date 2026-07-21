@@ -114,6 +114,8 @@ export default function ClassesPage() {
     }
   }, [getToken, isSignedIn])
 
+
+
   const openAddModal = () => {
     setEditingClass(null)
     setFormEducationLevel("IAL")

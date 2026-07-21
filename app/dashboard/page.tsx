@@ -40,7 +40,7 @@ function StatCard({ label, icon: Icon, value, loading, hasData }: StatCardProps)
         </div>
       </CardHeader>
       <CardContent className="px-6 pb-6 pt-0">
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence mode="popLayout" initial={false}>
           {loading ? (
             <motion.div
               key="loading"
