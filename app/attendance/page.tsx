@@ -18,6 +18,7 @@ import {
   Users,
   RotateCcw
 } from "lucide-react"
+import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
 import { 
   type Class, 
@@ -592,10 +593,18 @@ export default function AttendancePage() {
   // Render Splash screen if not loaded yet (manual load behavior consistent with other pages)
   if (!lastLoaded) {
     return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center bg-background p-6 text-center">
-        <div className="h-16 w-16 rounded-2xl bg-card border border-border flex items-center justify-center mb-4 shadow-xs">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center bg-background p-6 text-center"
+      >
+        <motion.div
+          whileHover={{ scale: 1.08, rotate: 3 }}
+          className="h-16 w-16 rounded-2xl bg-card border border-border flex items-center justify-center mb-4 shadow-sm"
+        >
           <Users className="h-7 w-7 text-muted-foreground" />
-        </div>
+        </motion.div>
         <h2 className="text-xl font-semibold text-foreground mb-2">Attendance Dashboard</h2>
         <p className="text-muted-foreground text-sm max-w-sm mb-6">
           Connect to the school management system API to load classes, subjects, teachers, and attendance sheets.
@@ -618,12 +627,18 @@ export default function AttendancePage() {
             </>
           )}
         </Button>
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8">
+    <motion.div
+      key={lastLoaded ? "loaded" : "splash"}
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="flex-1 space-y-6 p-8"
+    >
       {/* Header section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -1144,6 +1159,6 @@ export default function AttendancePage() {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

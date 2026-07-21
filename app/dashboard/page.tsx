@@ -2,12 +2,14 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
+import { motion, AnimatePresence } from "motion/react"
 import { CalendarCheck, GraduationCap, Users, UserPlus, RotateCcw, QrCode, BookOpen, Loader2 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Stats } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const statCards = [
   { key: "sessions" as const, label: "Sessions", icon: CalendarCheck },
@@ -18,12 +20,68 @@ const statCards = [
   { key: "subjects" as const, label: "Subjects", icon: BookOpen },
 ]
 
-function StatSkeleton() {
+interface StatCardProps {
+  label: string
+  icon: React.ElementType
+  value?: number
+  loading: boolean
+  hasData: boolean
+}
+
+function StatCard({ label, icon: Icon, value, loading, hasData }: StatCardProps) {
   return (
-    <Card className="p-6 space-y-3">
-      <div className="size-10 animate-pulse rounded-lg bg-muted" />
-      <div className="h-8 w-20 animate-pulse rounded bg-muted" />
-      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+    <Card className="flex flex-col justify-between border border-border bg-card shadow-xs transition-shadow hover:shadow-md">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {label}
+        </CardTitle>
+        <div className="flex size-9 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground">
+          <Icon className="size-4" />
+        </div>
+      </CardHeader>
+      <CardContent className="px-6 pb-6 pt-0">
+        <AnimatePresence mode="wait" initial={false}>
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="space-y-2 py-0.5"
+            >
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-4 w-32" />
+            </motion.div>
+          ) : hasData && value !== undefined ? (
+            <motion.div
+              key="data"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="text-3xl font-bold tracking-tight text-foreground">
+                {value.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Total active items</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <div className="text-3xl font-bold tracking-tight text-muted-foreground/40">—</div>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Click &quot;Load Data&quot; to fetch
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </CardContent>
     </Card>
   )
 }
@@ -61,12 +119,15 @@ export default function DashboardPage() {
         <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <StatSkeleton />
-          <StatSkeleton />
-          <StatSkeleton />
-          <StatSkeleton />
-          <StatSkeleton />
-          <StatSkeleton />
+          {statCards.map((card) => (
+            <StatCard
+              key={card.key}
+              label={card.label}
+              icon={card.icon}
+              loading={true}
+              hasData={false}
+            />
+          ))}
         </div>
       </div>
     )
@@ -123,48 +184,16 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {loading && !stats
-          ? statCards.map((card) => <StatSkeleton key={card.key} />)
-          : stats
-            ? statCards.map((card) => {
-                const Icon = card.icon
-                return (
-                  <Card key={card.key} className="hover:border-ring/50 transition-all hover:shadow-md">
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        {card.label}
-                      </CardTitle>
-                      <div className="flex size-9 items-center justify-center rounded-lg border border-border/60 bg-muted/30">
-                        <Icon className="size-4 text-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold tracking-tight">{stats[card.key]}</div>
-                    </CardContent>
-                  </Card>
-                )
-              })
-            : statCards.map((card) => {
-                const Icon = card.icon
-                return (
-                  <Card key={card.key} className="border-dashed bg-muted/20">
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        {card.label}
-                      </CardTitle>
-                      <div className="flex size-9 items-center justify-center rounded-lg border border-border/50 bg-background/50">
-                        <Icon className="size-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-semibold tracking-tight text-muted-foreground">—</div>
-                      <p className="mt-1 text-xs text-muted-foreground/70">
-                        Click &quot;Load Data&quot; to fetch metrics
-                      </p>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+        {statCards.map((card) => (
+          <StatCard
+            key={card.key}
+            label={card.label}
+            icon={card.icon}
+            value={stats?.[card.key]}
+            loading={loading}
+            hasData={stats !== null}
+          />
+        ))}
       </div>
     </div>
   )

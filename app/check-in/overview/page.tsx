@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
+import { motion, AnimatePresence } from "motion/react"
 import { Check, X, RotateCcw, Loader2, Search, QrCode } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { EDUCATION_LEVELS, type Student, type CheckIn, type Class, type ClassStudent } from "@/lib/types"
@@ -9,6 +10,7 @@ import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableHeader,
@@ -30,7 +32,7 @@ function RowSkeleton() {
     <TableRow>
       {Array.from({ length: 4 }).map((_, i) => (
         <TableCell key={i}>
-          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
+          <Skeleton className="h-4 w-full" />
         </TableCell>
       ))}
     </TableRow>
@@ -84,7 +86,7 @@ function CohortTable({ rows }: { rows: StudentRow[] }) {
       </TableHeader>
       <TableBody>
         {sortedRows.map(({ studentId, studentName, checkIn }) => (
-          <TableRow key={studentId}>
+          <TableRow key={studentId} className="transition-colors hover:bg-muted/60">
             <TableCell className="font-semibold text-foreground">{studentId}</TableCell>
             <TableCell className="font-medium">{studentName}</TableCell>
             <TableCell className="text-muted-foreground whitespace-nowrap">
@@ -250,12 +252,12 @@ export default function CheckInOverviewPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8 h-8 w-64 animate-pulse rounded-lg bg-muted" />
-        <div className="mb-6 h-4 w-80 animate-pulse rounded-lg bg-muted" />
-        <div className="space-y-4">
+      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-80" />
+        <div className="space-y-4 pt-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-12 w-full animate-pulse rounded-md bg-muted" />
+            <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
       </div>
@@ -271,7 +273,12 @@ export default function CheckInOverviewPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="container mx-auto px-4 py-8 max-w-7xl"
+    >
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -325,21 +332,28 @@ export default function CheckInOverviewPage() {
       </div>
 
       {/* Banners */}
-      {error && (
-        <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <span>{error}</span>
-          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
-            Dismiss
-          </Button>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            <span>{error}</span>
+            <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+              Dismiss
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cohort groups */}
       {loading && !students ? (
         <div className="space-y-8">
           {[1, 2, 3].map((g) => (
             <div key={g} className="space-y-3">
-              <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+              <Skeleton className="h-6 w-32" />
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -357,21 +371,40 @@ export default function CheckInOverviewPage() {
           ))}
         </div>
       ) : students === null ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center"
+        >
           <QrCode className="mb-3 size-10 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">Click &quot;Load Data&quot; to view check-in status.</p>
-        </div>
+        </motion.div>
       ) : sortedGroupedClasses.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center"
+        >
           <p className="text-sm text-muted-foreground">No students found in any cohort classes.</p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-8">
-          {sortedGroupedClasses.map(({ classObj, label, rows }) => {
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-8"
+        >
+          {sortedGroupedClasses.map(({ classObj, label, rows }, idx) => {
             const checkedIn = rows.filter((r) => r.checkIn !== null).length
 
             return (
-              <section key={classObj.id} className="space-y-3">
+              <motion.section
+                key={classObj.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05, duration: 0.25 }}
+                className="space-y-3"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <h2 className="text-xl font-semibold tracking-tight">{label}</h2>
@@ -387,11 +420,11 @@ export default function CheckInOverviewPage() {
                 </div>
 
                 <CohortTable rows={rows} />
-              </section>
+              </motion.section>
             )
           })}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   )
 }

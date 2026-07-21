@@ -1,4 +1,8 @@
+"use client"
+
 import * as React from "react"
+import { createPortal } from "react-dom"
+import { motion, AnimatePresence } from "motion/react"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -9,20 +13,41 @@ interface DialogProps {
 }
 
 function Dialog({ open, onOpenChange, children }: DialogProps) {
-  if (!open) return null
+  const [mounted, setMounted] = React.useState(false)
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in-0"
-        onClick={() => onOpenChange?.(false)}
-      />
-      {/* Content wrapper */}
-      <div className="z-50 w-full max-w-lg p-4 animate-in zoom-in-95 fade-in-0">
-        {children}
-      </div>
-    </div>
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            onClick={() => onOpenChange?.(false)}
+          />
+          {/* Dialog Window Container */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 12 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="z-50 w-full max-w-lg"
+          >
+            {children}
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>,
+    document.body
   )
 }
 
@@ -36,7 +61,7 @@ function DialogContent({
     <div
       data-slot="dialog-content"
       className={cn(
-        "relative w-full rounded-xl border border-border/80 bg-background p-6 shadow-xl transition-all",
+        "relative w-full rounded-xl border border-border bg-background p-6 shadow-2xl",
         className
       )}
       {...props}
