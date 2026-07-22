@@ -1179,7 +1179,7 @@ export default function AttendancePage() {
                     const record = attendanceMode === "class"
                       ? attendances.find((a) => a.student_id === student.id && a.session_id === selectedRosterSession.id)
                       : adhocAttendances.find((a) => a.student?.id === student.id && a.ad_hoc_session?.id === selectedRosterSession.id)
-                    const status = record?.status ?? "absent"
+                    const status = record?.status ?? ""
 
                     return (
                       <motion.div
@@ -1386,7 +1386,7 @@ export default function AttendancePage() {
                                 </div>
                               ) : (
                                 <Select
-                                  value={record ? record.status : "absent"}
+                                  value={record ? record.status : "—"}
                                   onValueChange={(val) => handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)}
                                 >
                                   <SelectTrigger 
