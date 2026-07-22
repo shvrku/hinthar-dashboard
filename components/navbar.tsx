@@ -152,6 +152,11 @@ export function Navbar() {
     setMobileOpen(false)
   }, [pathname])
 
+  // Hide top Navbar on dedicated sidebar test route
+  if (pathname?.startsWith("/sidebar-test")) {
+    return null
+  }
+
   return (
     <>
       <AnimatePresence initial={false}>
