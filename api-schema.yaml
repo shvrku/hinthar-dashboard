@@ -8,6 +8,7 @@ paths:
   /api/v1/adhoc-session-attendances/:
     get:
       operationId: adhoc_session_attendances_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -28,6 +29,7 @@ paths:
           description: ''
     post:
       operationId: adhoc_session_attendances_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - adhoc-session-attendances
       requestBody:
@@ -54,6 +56,7 @@ paths:
   /api/v1/adhoc-session-attendances/{id}/:
     get:
       operationId: adhoc_session_attendances_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -74,6 +77,7 @@ paths:
           description: ''
     put:
       operationId: adhoc_session_attendances_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -106,6 +110,7 @@ paths:
           description: ''
     patch:
       operationId: adhoc_session_attendances_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -137,6 +142,7 @@ paths:
           description: ''
     delete:
       operationId: adhoc_session_attendances_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -151,9 +157,48 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/adhoc-session-attendances/bulk_create/:
+    post:
+      operationId: adhoc_session_attendances_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - adhoc-session-attendances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdHocSessionAttendance'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSessionAttendance'
+          description: ''
+  /api/v1/adhoc-session-attendances/bulk_delete/:
+    delete:
+      operationId: adhoc_session_attendances_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - adhoc-session-attendances
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/adhoc-sessions/:
     get:
       operationId: adhoc_sessions_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -174,6 +219,7 @@ paths:
           description: ''
     post:
       operationId: adhoc_sessions_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - adhoc-sessions
       requestBody:
@@ -200,6 +246,7 @@ paths:
   /api/v1/adhoc-sessions/{id}/:
     get:
       operationId: adhoc_sessions_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -220,6 +267,7 @@ paths:
           description: ''
     put:
       operationId: adhoc_sessions_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -252,6 +300,7 @@ paths:
           description: ''
     patch:
       operationId: adhoc_sessions_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -283,6 +332,7 @@ paths:
           description: ''
     delete:
       operationId: adhoc_sessions_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -300,6 +350,7 @@ paths:
   /api/v1/adhoc-sessions/{id}/status/:
     patch:
       operationId: adhoc_sessions_status_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -329,6 +380,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdHocSession'
           description: ''
+  /api/v1/adhoc-sessions/bulk_create/:
+    post:
+      operationId: adhoc_sessions_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - adhoc-sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdHocSession'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdHocSession'
+          description: ''
+  /api/v1/adhoc-sessions/bulk_delete/:
+    delete:
+      operationId: adhoc_sessions_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - adhoc-sessions
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/audit-logs/:
     get:
       operationId: audit_logs_list
@@ -374,6 +463,7 @@ paths:
   /api/v1/check-ins/:
     get:
       operationId: check_ins_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -395,6 +485,7 @@ paths:
   /api/v1/check-ins/{id}/:
     get:
       operationId: check_ins_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -413,6 +504,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/CheckIn'
           description: ''
+  /api/v1/check-ins/bulk_create/:
+    post:
+      operationId: check_ins_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - check-ins
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckIn'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CheckIn'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CheckIn'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+          description: ''
+  /api/v1/check-ins/bulk_delete/:
+    delete:
+      operationId: check_ins_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - check-ins
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/check-ins/manual/:
     post:
       operationId: check_ins_manual_create
@@ -540,6 +669,7 @@ paths:
   /api/v1/class-students/:
     get:
       operationId: class_students_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -560,6 +690,7 @@ paths:
           description: ''
     post:
       operationId: class_students_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - class-students
       requestBody:
@@ -586,6 +717,7 @@ paths:
   /api/v1/class-students/{id}/:
     get:
       operationId: class_students_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -606,6 +738,7 @@ paths:
           description: ''
     put:
       operationId: class_students_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -638,6 +771,7 @@ paths:
           description: ''
     patch:
       operationId: class_students_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -669,6 +803,7 @@ paths:
           description: ''
     delete:
       operationId: class_students_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -683,9 +818,48 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/class-students/bulk_create/:
+    post:
+      operationId: class_students_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - class-students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassStudent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClassStudent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClassStudent'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassStudent'
+          description: ''
+  /api/v1/class-students/bulk_delete/:
+    delete:
+      operationId: class_students_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - class-students
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/classes/:
     get:
       operationId: classes_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -706,6 +880,7 @@ paths:
           description: ''
     post:
       operationId: classes_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - classes
       requestBody:
@@ -732,6 +907,7 @@ paths:
   /api/v1/classes/{id}/:
     get:
       operationId: classes_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -752,6 +928,7 @@ paths:
           description: ''
     put:
       operationId: classes_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -784,6 +961,7 @@ paths:
           description: ''
     patch:
       operationId: classes_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -815,6 +993,7 @@ paths:
           description: ''
     delete:
       operationId: classes_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -822,6 +1001,44 @@ paths:
           type: integer
         description: A unique integer value identifying this class.
         required: true
+      tags:
+      - classes
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/classes/bulk_create/:
+    post:
+      operationId: classes_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - classes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Class'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Class'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Class'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Class'
+          description: ''
+  /api/v1/classes/bulk_delete/:
+    delete:
+      operationId: classes_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - classes
       security:
@@ -849,6 +1066,7 @@ paths:
   /api/v1/session-attendances/:
     get:
       operationId: session_attendances_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -869,6 +1087,7 @@ paths:
           description: ''
     post:
       operationId: session_attendances_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - session-attendances
       requestBody:
@@ -895,6 +1114,7 @@ paths:
   /api/v1/session-attendances/{id}/:
     get:
       operationId: session_attendances_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -915,6 +1135,7 @@ paths:
           description: ''
     put:
       operationId: session_attendances_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -947,6 +1168,7 @@ paths:
           description: ''
     patch:
       operationId: session_attendances_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -978,6 +1200,7 @@ paths:
           description: ''
     delete:
       operationId: session_attendances_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -992,9 +1215,48 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/session-attendances/bulk_create/:
+    post:
+      operationId: session_attendances_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - session-attendances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionAttendance'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionAttendance'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionAttendance'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionAttendance'
+          description: ''
+  /api/v1/session-attendances/bulk_delete/:
+    delete:
+      operationId: session_attendances_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - session-attendances
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/sessions/:
     get:
       operationId: sessions_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -1015,6 +1277,7 @@ paths:
           description: ''
     post:
       operationId: sessions_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - sessions
       requestBody:
@@ -1041,6 +1304,7 @@ paths:
   /api/v1/sessions/{id}/:
     get:
       operationId: sessions_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1061,6 +1325,7 @@ paths:
           description: ''
     put:
       operationId: sessions_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1093,6 +1358,7 @@ paths:
           description: ''
     patch:
       operationId: sessions_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1124,6 +1390,7 @@ paths:
           description: ''
     delete:
       operationId: sessions_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1141,6 +1408,7 @@ paths:
   /api/v1/sessions/{id}/status/:
     patch:
       operationId: sessions_status_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1170,6 +1438,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/Session'
           description: ''
+  /api/v1/sessions/bulk_create/:
+    post:
+      operationId: sessions_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Session'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Session'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Session'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /api/v1/sessions/bulk_delete/:
+    delete:
+      operationId: sessions_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - sessions
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/sessions/generate/{class_id}/:
     post:
       operationId: sessions_generate_create
@@ -1227,6 +1533,7 @@ paths:
   /api/v1/staff/:
     get:
       operationId: staff_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -1247,6 +1554,7 @@ paths:
           description: ''
     post:
       operationId: staff_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - staff
       requestBody:
@@ -1273,6 +1581,7 @@ paths:
   /api/v1/staff/{id}/:
     get:
       operationId: staff_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1293,6 +1602,7 @@ paths:
           description: ''
     put:
       operationId: staff_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1325,6 +1635,7 @@ paths:
           description: ''
     patch:
       operationId: staff_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1356,6 +1667,7 @@ paths:
           description: ''
     delete:
       operationId: staff_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1363,6 +1675,44 @@ paths:
           type: integer
         description: A unique integer value identifying this staff.
         required: true
+      tags:
+      - staff
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/staff/bulk_create/:
+    post:
+      operationId: staff_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Staff'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Staff'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Staff'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Staff'
+          description: ''
+  /api/v1/staff/bulk_delete/:
+    delete:
+      operationId: staff_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - staff
       security:
@@ -1413,6 +1763,7 @@ paths:
   /api/v1/students/:
     get:
       operationId: students_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -1433,6 +1784,7 @@ paths:
           description: ''
     post:
       operationId: students_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - students
       requestBody:
@@ -1459,6 +1811,7 @@ paths:
   /api/v1/students/{id}/:
     get:
       operationId: students_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1479,6 +1832,7 @@ paths:
           description: ''
     put:
       operationId: students_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1511,6 +1865,7 @@ paths:
           description: ''
     patch:
       operationId: students_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1542,6 +1897,7 @@ paths:
           description: ''
     delete:
       operationId: students_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1613,9 +1969,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/Student'
           description: ''
+  /api/v1/students/bulk_create/:
+    post:
+      operationId: students_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Student'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Student'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Student'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+  /api/v1/students/bulk_delete/:
+    delete:
+      operationId: students_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - students
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/subjects/:
     get:
       operationId: subjects_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -1636,6 +2031,7 @@ paths:
           description: ''
     post:
       operationId: subjects_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - subjects
       requestBody:
@@ -1662,6 +2058,7 @@ paths:
   /api/v1/subjects/{id}/:
     get:
       operationId: subjects_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1682,6 +2079,7 @@ paths:
           description: ''
     put:
       operationId: subjects_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1714,6 +2112,7 @@ paths:
           description: ''
     patch:
       operationId: subjects_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1745,6 +2144,7 @@ paths:
           description: ''
     delete:
       operationId: subjects_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1759,9 +2159,48 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/subjects/bulk_create/:
+    post:
+      operationId: subjects_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - subjects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Subject'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Subject'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Subject'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+          description: ''
+  /api/v1/subjects/bulk_delete/:
+    delete:
+      operationId: subjects_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - subjects
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/teachers/:
     get:
       operationId: teachers_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -1782,6 +2221,7 @@ paths:
           description: ''
     post:
       operationId: teachers_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - teachers
       requestBody:
@@ -1808,6 +2248,7 @@ paths:
   /api/v1/teachers/{id}/:
     get:
       operationId: teachers_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1828,6 +2269,7 @@ paths:
           description: ''
     put:
       operationId: teachers_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1860,6 +2302,7 @@ paths:
           description: ''
     patch:
       operationId: teachers_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1891,6 +2334,7 @@ paths:
           description: ''
     delete:
       operationId: teachers_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -1905,9 +2349,48 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/teachers/bulk_create/:
+    post:
+      operationId: teachers_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - teachers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Teacher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Teacher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Teacher'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Teacher'
+          description: ''
+  /api/v1/teachers/bulk_delete/:
+    delete:
+      operationId: teachers_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - teachers
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/timetable-slots/:
     get:
       operationId: timetable_slots_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -1960,6 +2443,7 @@ paths:
   /api/v1/timetable-slots/{id}/:
     get:
       operationId: timetable_slots_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -2057,6 +2541,7 @@ paths:
           description: Not Found
     delete:
       operationId: timetable_slots_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -2064,6 +2549,44 @@ paths:
           type: integer
         description: A unique integer value identifying this timetable slot.
         required: true
+      tags:
+      - timetable-slots
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/timetable-slots/bulk_create/:
+    post:
+      operationId: timetable_slots_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - timetable-slots
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimetableSlot'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimetableSlot'
+          description: ''
+  /api/v1/timetable-slots/bulk_delete/:
+    delete:
+      operationId: timetable_slots_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - timetable-slots
       security:
@@ -2122,6 +2645,7 @@ paths:
   /api/v1/users/:
     get:
       operationId: users_list
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - name: page
         required: false
@@ -2142,6 +2666,7 @@ paths:
           description: ''
     post:
       operationId: users_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - users
       requestBody:
@@ -2168,6 +2693,7 @@ paths:
   /api/v1/users/{id}/:
     get:
       operationId: users_retrieve
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -2188,6 +2714,7 @@ paths:
           description: ''
     put:
       operationId: users_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -2220,6 +2747,7 @@ paths:
           description: ''
     patch:
       operationId: users_partial_update
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -2251,6 +2779,7 @@ paths:
           description: ''
     delete:
       operationId: users_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       parameters:
       - in: path
         name: id
@@ -2258,6 +2787,44 @@ paths:
           type: integer
         description: A unique integer value identifying this user.
         required: true
+      tags:
+      - users
+      security:
+      - clerk_jwt: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/users/bulk_create/:
+    post:
+      operationId: users_bulk_create_create
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - clerk_jwt: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/users/bulk_delete/:
+    delete:
+      operationId: users_bulk_delete_destroy
+      description: Provides reusable bulk_create and bulk_delete action endpoints.
       tags:
       - users
       security:
@@ -2293,10 +2860,8 @@ components:
           readOnly: true
         teacher_id:
           type: integer
-          writeOnly: true
         subject_id:
           type: integer
-          writeOnly: true
         date:
           type: string
           format: date
@@ -2337,10 +2902,8 @@ components:
           $ref: '#/components/schemas/SessionAttendanceStatusEnum'
         ad_hoc_session_id:
           type: integer
-          writeOnly: true
         student_id:
           type: integer
-          writeOnly: true
       required:
       - ad_hoc_session
       - ad_hoc_session_id
@@ -2405,6 +2968,10 @@ components:
           type: integer
           readOnly: true
         student:
+          allOf:
+          - $ref: '#/components/schemas/Student'
+          readOnly: true
+        student_id:
           type: integer
         student_name:
           type: string
@@ -2428,6 +2995,7 @@ components:
       - date
       - id
       - student
+      - student_id
       - student_name
       - timestamp
     CheckInTypeEnum:
@@ -2473,10 +3041,8 @@ components:
           readOnly: true
         class_obj_id:
           type: integer
-          writeOnly: true
         student_id:
           type: integer
-          writeOnly: true
       required:
       - class_obj
       - class_obj_id
@@ -2873,10 +3439,8 @@ components:
           readOnly: true
         teacher_id:
           type: integer
-          writeOnly: true
         subject_id:
           type: integer
-          writeOnly: true
         date:
           type: string
           format: date
@@ -2908,10 +3472,8 @@ components:
           $ref: '#/components/schemas/SessionAttendanceStatusEnum'
         ad_hoc_session_id:
           type: integer
-          writeOnly: true
         student_id:
           type: integer
-          writeOnly: true
     PatchedClass:
       type: object
       properties:
@@ -2943,10 +3505,8 @@ components:
           readOnly: true
         class_obj_id:
           type: integer
-          writeOnly: true
         student_id:
           type: integer
-          writeOnly: true
     PatchedSession:
       type: object
       properties:
@@ -2967,13 +3527,10 @@ components:
           readOnly: true
         teacher_id:
           type: integer
-          writeOnly: true
         class_obj_id:
           type: integer
-          writeOnly: true
         timetable_slot_id:
           type: integer
-          writeOnly: true
         start_time:
           type: string
           format: date-time
@@ -3002,10 +3559,8 @@ components:
           $ref: '#/components/schemas/SessionAttendanceStatusEnum'
         session_id:
           type: integer
-          writeOnly: true
         student_id:
           type: integer
-          writeOnly: true
     PatchedStaff:
       type: object
       properties:
@@ -3103,13 +3658,10 @@ components:
           readOnly: true
         class_obj_id:
           type: integer
-          writeOnly: true
         subject_id:
           type: integer
-          writeOnly: true
         teacher_id:
           type: integer
-          writeOnly: true
         day_of_week:
           allOf:
           - $ref: '#/components/schemas/DayOfWeekEnum'
@@ -3149,7 +3701,7 @@ components:
           $ref: '#/components/schemas/RoleEnum'
         clerk_id:
           type: string
-          readOnly: true
+          maxLength: 255
         teacher_profile_id:
           type: integer
           readOnly: true
@@ -3198,13 +3750,10 @@ components:
           readOnly: true
         teacher_id:
           type: integer
-          writeOnly: true
         class_obj_id:
           type: integer
-          writeOnly: true
         timetable_slot_id:
           type: integer
-          writeOnly: true
         start_time:
           type: string
           format: date-time
@@ -3243,10 +3792,8 @@ components:
           $ref: '#/components/schemas/SessionAttendanceStatusEnum'
         session_id:
           type: integer
-          writeOnly: true
         student_id:
           type: integer
-          writeOnly: true
       required:
       - id
       - session
@@ -3430,13 +3977,10 @@ components:
           readOnly: true
         class_obj_id:
           type: integer
-          writeOnly: true
         subject_id:
           type: integer
-          writeOnly: true
         teacher_id:
           type: integer
-          writeOnly: true
         day_of_week:
           allOf:
           - $ref: '#/components/schemas/DayOfWeekEnum'
@@ -3487,7 +4031,7 @@ components:
           $ref: '#/components/schemas/RoleEnum'
         clerk_id:
           type: string
-          readOnly: true
+          maxLength: 255
         teacher_profile_id:
           type: integer
           readOnly: true
