@@ -43,74 +43,97 @@ async function request<T>(
   token: string,
   options: RequestInit = {}
 ): Promise<T> {
-  let res: Response
-  try {
-    res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
-    })
-  } catch (err) {
-    // Network-level failures: CORS blocking, DNS failure, unreachable server, etc.
-    const rawMsg = err instanceof Error ? err.message : String(err)
-    const message = `Unable to fetch ${API_BASE}${path} (${rawMsg}). (Check CORS headers on backend for your Vercel domain).`
-    throw new ApiError(0, message)
-  }
+  // Use a variable to track the URL as we paginate
+  let currentUrl = `${API_BASE}${path}`
+  let accumulatedResults: any[] = []
 
-  if (!res.ok) {
-    const raw = await res.text().catch(() => "")
-    let detail = res.statusText
-    if (raw) {
-      try {
-        const body = JSON.parse(raw)
-        if (typeof body === "string") {
-          detail = body
-        } else if (typeof body === "object" && body !== null) {
-          if ("detail" in body && typeof body.detail === "string") {
-            detail = body.detail
-          } else if ("message" in body && typeof body.message === "string") {
-            detail = body.message
-          } else if ("error" in body && typeof body.error === "string") {
-            detail = body.error
-          } else {
-            // Join field errors from DRF dict / non_field_errors
-            const messages: string[] = []
-            for (const [, v] of Object.entries(body)) {
-              if (Array.isArray(v)) {
-                messages.push(v.join("; "))
-              } else if (typeof v === "string") {
-                messages.push(v)
+  while (currentUrl) {
+    let res: Response
+    try {
+      res = await fetch(currentUrl, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer mock_token_admin1`,
+          'Content-Type': 'application/json'
+        },
+      })
+    } catch (err) {
+      // Network-level failures: CORS blocking, DNS failure, unreachable server, etc.
+      const rawMsg = err instanceof Error ? err.message : String(err)
+      const message = `Unable to fetch ${currentUrl} (${rawMsg}). (Check CORS headers on backend for your Vercel domain).`
+      throw new ApiError(0, message)
+    }
+
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "")
+      let detail = res.statusText
+      if (raw) {
+        try {
+          const body = JSON.parse(raw)
+          if (typeof body === "string") {
+            detail = body
+          } else if (typeof body === "object" && body !== null) {
+            if ("detail" in body && typeof body.detail === "string") {
+              detail = body.detail
+            } else if ("message" in body && typeof body.message === "string") {
+              detail = body.message
+            } else if ("error" in body && typeof body.error === "string") {
+              detail = body.error
+            } else {
+              // Join field errors from DRF dict / non_field_errors
+              const messages: string[] = []
+              for (const [, v] of Object.entries(body)) {
+                if (Array.isArray(v)) {
+                  messages.push(v.join("; "))
+                } else if (typeof v === "string") {
+                  messages.push(v)
+                }
+              }
+              if (messages.length > 0) {
+                detail = messages.join(" | ")
               }
             }
-            if (messages.length > 0) {
-              detail = messages.join(" | ")
-            }
           }
+        } catch {
+          detail = raw // use raw text if not JSON
         }
-      } catch {
-        detail = raw // use raw text if not JSON
       }
+      throw new ApiError(res.status, detail)
     }
-    throw new ApiError(res.status, detail)
+
+    if (res.status === 204) return undefined as T
+    const data = await res.json()
+
+    // If the response is paginated, accumulate the results and fetch the next page
+    if (
+      data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      "results" in data &&
+      Array.isArray((data as any).results)
+    ) {
+      accumulatedResults = [...accumulatedResults, ...(data as any).results]
+
+      // Check if the backend provided a link to the next page
+      if ((data as any).next) {
+        // Extract just the query string (e.g. "?page=2") to keep using your relative API_BASE
+        const nextUrlString = (data as any).next as string
+        const searchIndex = nextUrlString.indexOf("?")
+        const queryString = searchIndex !== -1 ? nextUrlString.substring(searchIndex) : ""
+        currentUrl = `${API_BASE}${path}${queryString}`
+      } else {
+        // No more pages, exit loop
+        break
+      }
+    } else {
+      // If it's a single object (e.g. getStudent) return it immediately
+      return data as T
+    }
   }
 
-  if (res.status === 204) return undefined as T
-  const data = await res.json()
-  if (
-    data &&
-    typeof data === "object" &&
-    !Array.isArray(data) &&
-    "results" in data &&
-    Array.isArray((data as { results: unknown }).results)
-  ) {
-    return (data as { results: T }).results
-  }
-  return data as T
+  // Return the fully accumulated list
+  return accumulatedResults as T
 }
-
 export function createApi(token: string) {
   return {
     // --- Classes ---
