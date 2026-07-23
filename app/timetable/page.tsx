@@ -43,6 +43,8 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import { Badge } from "@/components/ui/badge"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -437,6 +439,7 @@ export default function TimetablePage() {
   const [viewMode, setViewMode] = useState<"list" | "week">("list")
 
   const [loading, setLoading] = useState(false)
+  const [lastLoaded, setLastLoaded] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -477,6 +480,7 @@ export default function TimetablePage() {
       if (classesData.length > 0) {
         setSelectedClassId((prev) => prev ?? classesData[0].id)
       }
+      setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -488,11 +492,7 @@ export default function TimetablePage() {
     }
   }, [getToken, isSignedIn])
 
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      loadData()
-    }
-  }, [isLoaded, isSignedIn, loadData])
+
 
   const selectedClassIndex = useMemo(() => {
     return classes.findIndex((c) => c.id === selectedClassId)
@@ -514,6 +514,20 @@ export default function TimetablePage() {
       .filter((l) => l.day_of_week === activeDay)
       .sort((a, b) => timeToMins(a.start_time) - timeToMins(b.start_time))
   }, [filteredLessons, activeDay])
+
+  const [classSearchQuery, setClassSearchQuery] = useState("")
+
+  const filteredPillClasses = useMemo(() => {
+    if (!classSearchQuery.trim()) return classes
+    const q = classSearchQuery.toLowerCase().trim()
+    return classes.filter(
+      (c) =>
+        c.education_level.toLowerCase().includes(q) ||
+        c.cohort_identifier.toLowerCase().includes(q) ||
+        (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(q)) ||
+        getClassName(c).toLowerCase().includes(q)
+    )
+  }, [classes, classSearchQuery])
 
   // Class navigation handlers
   const handlePrevClass = () => {
@@ -731,58 +745,75 @@ export default function TimetablePage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-background text-foreground">
-      {/* ── TOP NAV & CLASS SELECTION BAR ── */}
-      <div className="border-b bg-card/40 shadow-2xs">
-        <div className="container mx-auto px-4 sm:px-6 md:px-8 py-4 max-w-7xl space-y-4">
-        {/* Row 1: Header title, Refresh & Mode Toggle */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold">
-              <Calendar className="size-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-foreground">Class Timetables</h1>
-              <p className="text-xs text-muted-foreground">
-                View, manage, and schedule class sessions
-              </p>
+    <div className="space-y-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Timetables"
+        description="View, manage, and schedule class session timetables."
+        secondaryAction={{
+          label: lastLoaded ? "Refresh" : "Load Data",
+          onClick: loadData,
+          icon: <RotateCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />,
+        }}
+      />
+
+      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Timetable Slots</p>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Calendar className="size-4" />
             </div>
           </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">{lessons.length}</h2>
+            <span className="text-[11px] text-muted-foreground">{classes.length} Classes active</span>
+          </div>
+        </Card>
+      </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={loadData}
-              disabled={loading}
-              title="Refresh Timetable Data"
-              className="shrink-0"
-            >
-              <RotateCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
+      {/* Sleek Timetable Toolbar */}
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-2xs">
+        {/* Tier 1: Primary Controls */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Left: Class Search Input (Replaces dropdown & arrows) */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search class name... (e.g. IAL F, Year 6)"
+              value={classSearchQuery}
+              onChange={(e) => setClassSearchQuery(e.target.value)}
+              className="pl-9 text-xs"
+            />
+          </div>
 
-            {/* List / Week view switcher */}
-            <div className="flex rounded-xl border border-border bg-muted/50 p-1">
+          {/* Right: View Mode Switcher & Add Slot Action */}
+          <div className="flex items-center gap-2.5 shrink-0 justify-end">
+            <div className="flex rounded-lg border border-border bg-muted/50 p-1">
               <button
+                type="button"
                 onClick={() => setViewMode("list")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
                   viewMode === "list"
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <List className="h-3.5 w-3.5" />
+                <List className="size-3.5" />
                 <span>List View</span>
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("week")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
                   viewMode === "week"
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <CalendarDays className="h-3.5 w-3.5" />
+                <CalendarDays className="size-3.5" />
                 <span>Week View</span>
               </button>
             </div>
@@ -793,93 +824,53 @@ export default function TimetablePage() {
               className="gap-1.5 shadow-xs"
             >
               <Plus className="size-4" />
-              <span className="hidden sm:inline">Add Timetable Slot</span>
-              <span className="sm:hidden">Add</span>
+              <span>Add Slot</span>
             </Button>
           </div>
         </div>
 
-        {/* Row 2: Mobile-Friendly Class Navigation & Quick Pills */}
-        <div className="flex items-center gap-3">
-          {/* Cycle prev/next buttons */}
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={handlePrevClass}
-              disabled={classes.length <= 1}
-              title="Previous Class"
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={handleNextClass}
-              disabled={classes.length <= 1}
-              title="Next Class"
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-
-          {/* Quick Select Dropdown */}
-          <div className="w-48 sm:w-56 shrink-0">
-            <Select
-              value={selectedClassId?.toString() ?? ""}
-              onValueChange={(val) => setSelectedClassId(val ? Number(val) : null)}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select Class…" />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()}>
-                    {getClassName(c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Horizontal Scrollable Class Pills */}
-          <div className="flex-1 overflow-x-auto hinthar-scrollbar py-0.5">
-            <div className="flex items-center gap-2 min-w-max">
-              {classes.map((cls) => {
-                const isActive = cls.id === selectedClassId
-                const slotCount = lessons.filter((l) => l.class_obj?.id === cls.id).length
-                return (
-                  <motion.button
-                    key={cls.id}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => setSelectedClassId(cls.id)}
-                    className={`flex items-center gap-2 rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                      isActive
-                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                        : "bg-card border-border hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span>{getClassName(cls)}</span>
-                    <span
-                      className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+        {/* Tier 2: Quick Class Navigation Pills with Smooth Scrollbar */}
+        {classes.length > 0 && (
+          <div className="border-t border-border/50 pt-3 flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 overflow-x-auto hinthar-scrollbar pb-1 scroll-smooth">
+              {filteredPillClasses.length === 0 ? (
+                <span className="text-xs text-muted-foreground py-1">No matching classes found</span>
+              ) : (
+                filteredPillClasses.map((cls) => {
+                  const isActive = cls.id === selectedClassId
+                  const slotCount = lessons.filter((l) => l.class_obj?.id === cls.id).length
+                  return (
+                    <button
+                      key={cls.id}
+                      type="button"
+                      onClick={() => setSelectedClassId(cls.id)}
+                      className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                         isActive
-                          ? "bg-primary-foreground/20 text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
+                          ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                          : "bg-muted/30 border-border hover:bg-muted text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {slotCount}
-                    </span>
-                  </motion.button>
-                )
-              })}
+                      <span>{getClassName(cls)}</span>
+                      <span
+                        className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                          isActive
+                            ? "bg-primary-foreground/20 text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {slotCount}
+                      </span>
+                    </button>
+                  )
+                })
+              )}
             </div>
           </div>
-        </div>
+        )}
       </div>
-    </div>
 
       {/* ── BANNERS ── */}
-      <div className="container mx-auto px-4 sm:px-6 md:px-8 max-w-7xl">
+      <div>
         {error && (
           <div className="mt-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <span>{error}</span>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { SearchableSelect } from "@/components/searchable-select"
 import { useAuth } from "@clerk/nextjs"
 import { 
   Check, 
@@ -42,6 +43,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import {
   Table,
   TableHeader,
@@ -253,6 +256,8 @@ export default function AttendancePage() {
       setLoading(false)
     }
   }, [getToken, isLoaded, isSignedIn])
+
+
 
 
 
@@ -635,46 +640,7 @@ export default function AttendancePage() {
     )
   }
 
-  // Render Splash screen if not loaded yet
-  if (!lastLoaded) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center bg-background p-6 text-center"
-      >
-        <motion.div
-          whileHover={{ scale: 1.08, rotate: 3 }}
-          className="h-16 w-16 rounded-2xl bg-card border border-border flex items-center justify-center mb-4 shadow-sm"
-        >
-          <Users className="h-7 w-7 text-muted-foreground" />
-        </motion.div>
-        <h2 className="text-xl font-semibold text-foreground mb-2">Attendance Dashboard</h2>
-        <p className="text-muted-foreground text-sm max-w-sm mb-6">
-          Connect to the school management system API to load classes, subjects, teachers, and attendance sheets.
-        </p>
-        {error && (
-          <div className="mb-4 max-w-md mx-auto text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2">
-            {error}
-          </div>
-        )}
-        <Button onClick={loadData} disabled={loading} size="lg">
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 size-5 animate-spin" />
-              Loading Attendance...
-            </>
-          ) : (
-            <>
-              <RotateCcw className="mr-2 size-5" />
-              Load Attendance Sheet
-            </>
-          )}
-        </Button>
-      </motion.div>
-    )
-  }
+
 
   // Filtered roster students for Session Roster View
   const rosterStudentsFiltered = rowStudents.filter((s) =>
@@ -682,34 +648,108 @@ export default function AttendancePage() {
   )
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl flex-1 space-y-6">
-      {/* Header section */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Session Attendance</h1>
-          <p className="text-muted-foreground">
-            Track and log student attendance across monthly course sessions.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {attendanceMode === "adhoc" && (
-            <Button size="sm" onClick={() => {
-              setIsAddSessionOpen(true)
-              if (subjects.length > 0) setNewSubjectId(subjects[0].id.toString())
-              if (teachers.length > 0) setNewTeacherId(teachers[0].id.toString())
-              setNewStartTime("09:00:00")
-              setNewEndTime("10:00:00")
-            }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Ad-Hoc Session
-            </Button>
-          )}
+    <div className="space-y-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Session Attendance"
+        description="Track and log student attendance across monthly course sessions."
+        secondaryAction={{
+          label: lastLoaded ? "Refresh" : "Load Data",
+          onClick: loadData,
+          icon: <RotateCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />,
+        }}
+        primaryAction={
+          attendanceMode === "adhoc"
+            ? {
+                label: "Add Ad-Hoc Session",
+                onClick: () => {
+                  setIsAddSessionOpen(true)
+                  if (subjects.length > 0) setNewSubjectId(subjects[0].id.toString())
+                  if (teachers.length > 0) setNewTeacherId(teachers[0].id.toString())
+                  setNewStartTime("09:00:00")
+                  setNewEndTime("10:00:00")
+                },
+                icon: <Plus className="size-4" />,
+              }
+            : undefined
+        }
+      />
+
+      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Enrolled Students</p>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Users className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">{rowStudents.length}</h2>
+            <span className="text-[11px] text-muted-foreground">{filteredSessions.length} Sessions loaded</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Standardized Combined Management Toolbar Card */}
+      <Card className="p-4 shadow-2xs border-border/80 bg-card">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          {/* Mode Switcher */}
+          <div className="flex rounded-lg border border-border bg-muted/50 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setAttendanceMode("class")
+                if (classes.length > 0) {
+                  setSelectedClassId(classes[0].id.toString())
+                } else {
+                  setSelectedClassId("all")
+                }
+                setSelectedSubjectId("all")
+                setSelectedTeacherId("all")
+              }}
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                attendanceMode === "class"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <GraduationCap className="size-3.5" />
+              <span>Class Attendance</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAttendanceMode("adhoc")
+                setSelectedClassId("adhoc")
+                if (subjects.length > 0) {
+                  setSelectedSubjectId(subjects[0].id.toString())
+                } else {
+                  setSelectedSubjectId("all")
+                }
+                if (teachers.length > 0) {
+                  setSelectedTeacherId(teachers[0].id.toString())
+                } else {
+                  setSelectedTeacherId("all")
+                }
+              }}
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                attendanceMode === "adhoc"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BookOpen className="size-3.5" />
+              <span>Ad-Hoc / Tutoring Sessions</span>
+            </button>
+          </div>
 
           {/* DUAL VIEW SWITCHER: Matrix Grid vs Session Roster */}
-          <div className="flex rounded-xl border border-border bg-muted/50 p-1">
+          <div className="flex rounded-lg border border-border bg-muted/50 p-1">
             <button
+              type="button"
               onClick={() => setViewLayout("matrix")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
                 viewLayout === "matrix"
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -719,8 +759,9 @@ export default function AttendancePage() {
               <span>Matrix Grid</span>
             </button>
             <button
+              type="button"
               onClick={() => setViewLayout("roster")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
                 viewLayout === "roster"
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -730,62 +771,8 @@ export default function AttendancePage() {
               <span>Session Roster</span>
             </button>
           </div>
-
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
         </div>
-      </div>
-
-      {error && (
-        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-medium">{error}</span>
-        </div>
-      )}
-
-      {/* Mode Switcher */}
-      <div className="flex gap-2 border-b pb-4 border-neutral-200 dark:border-neutral-800">
-        <Button
-          variant={attendanceMode === "class" ? "default" : "outline"}
-          onClick={() => {
-            setAttendanceMode("class")
-            if (classes.length > 0) {
-              setSelectedClassId(classes[0].id.toString())
-            } else {
-              setSelectedClassId("all")
-            }
-            setSelectedSubjectId("all")
-            setSelectedTeacherId("all")
-          }}
-          className="shadow-xs"
-        >
-          <GraduationCap className="mr-2 h-4 w-4" />
-          Class Attendance
-        </Button>
-        <Button
-          variant={attendanceMode === "adhoc" ? "default" : "outline"}
-          onClick={() => {
-            setAttendanceMode("adhoc")
-            setSelectedClassId("adhoc")
-            if (subjects.length > 0) {
-              setSelectedSubjectId(subjects[0].id.toString())
-            } else {
-              setSelectedSubjectId("all")
-            }
-            if (teachers.length > 0) {
-              setSelectedTeacherId(teachers[0].id.toString())
-            } else {
-              setSelectedTeacherId("all")
-            }
-          }}
-          className="shadow-xs"
-        >
-          <BookOpen className="mr-2 h-4 w-4" />
-          Ad-Hoc / Tutoring Sessions
-        </Button>
-      </div>
+      </Card>
 
       {/* Add Ad-Hoc Session Dialog */}
       <Dialog open={isAddSessionOpen} onOpenChange={setIsAddSessionOpen}>
@@ -900,22 +887,13 @@ export default function AttendancePage() {
                 <GraduationCap className="h-3.5 w-3.5" />
                 Class
               </label>
-              <Select 
-                value={selectedClassId} 
-                onValueChange={(val) => setSelectedClassId(val ?? "")}
-                items={classItems}
-              >
-                <SelectTrigger className="w-full h-10 bg-background">
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.map((c) => (
-                    <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.education_level} - {c.cohort_identifier} {c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={classItems.map((c) => ({ value: c.value, label: c.label }))}
+                value={selectedClassId}
+                onValueChange={(val) => setSelectedClassId(val)}
+                placeholder="Select class..."
+                searchPlaceholder="Search class..."
+              />
             </div>
           )}
 
@@ -925,35 +903,13 @@ export default function AttendancePage() {
               <BookOpen className="h-3.5 w-3.5" />
               Subject
             </label>
-            <Select 
-              value={selectedSubjectId} 
-              onValueChange={(val) => setSelectedSubjectId(val ?? "")}
-              items={subjectItems}
-            >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <SelectValue placeholder="Select subject" />
-              </SelectTrigger>
-              <SelectContent>
-                {attendanceMode === "class" ? (
-                  <>
-                    <SelectItem value="all">All Subjects</SelectItem>
-                    {subjects.map((sub) => (
-                      <SelectItem key={sub.id} value={sub.id.toString()}>
-                        {sub.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    {subjects.map((sub) => (
-                      <SelectItem key={sub.id} value={sub.id.toString()}>
-                        {sub.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={subjectItems}
+              value={selectedSubjectId}
+              onValueChange={(val) => setSelectedSubjectId(val)}
+              placeholder="Select subject..."
+              searchPlaceholder="Search subject..."
+            />
           </div>
 
           {/* Teacher Filter */}
@@ -962,35 +918,13 @@ export default function AttendancePage() {
               <Users className="h-3.5 w-3.5" />
               Teacher
             </label>
-            <Select 
-              value={selectedTeacherId} 
-              onValueChange={(val) => setSelectedTeacherId(val ?? "")}
-              items={teacherItems}
-            >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <SelectValue placeholder="Select teacher" />
-              </SelectTrigger>
-              <SelectContent>
-                {attendanceMode === "class" ? (
-                  <>
-                    <SelectItem value="all">All Teachers</SelectItem>
-                    {teachers.map((t) => (
-                      <SelectItem key={t.id} value={t.id.toString()}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    {teachers.map((t) => (
-                      <SelectItem key={t.id} value={t.id.toString()}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={teacherItems}
+              value={selectedTeacherId}
+              onValueChange={(val) => setSelectedTeacherId(val)}
+              placeholder="Select teacher..."
+              searchPlaceholder="Search teacher..."
+            />
           </div>
 
           {/* Month Filter */}
@@ -999,22 +933,13 @@ export default function AttendancePage() {
               <Calendar className="h-3.5 w-3.5" />
               Month
             </label>
-            <Select 
-              value={selectedMonth.toString()} 
+            <SearchableSelect
+              options={monthItems}
+              value={selectedMonth.toString()}
               onValueChange={(val) => setSelectedMonth(Number(val))}
-              items={monthItems}
-            >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m) => (
-                  <SelectItem key={m.value} value={m.value.toString()}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select month..."
+              searchPlaceholder="Search month..."
+            />
           </div>
 
           {/* Year Filter */}
@@ -1022,22 +947,13 @@ export default function AttendancePage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               Year
             </label>
-            <Select 
-              value={selectedYear.toString()} 
+            <SearchableSelect
+              options={yearItems}
+              value={selectedYear.toString()}
               onValueChange={(val) => setSelectedYear(Number(val))}
-              items={yearItems}
-            >
-              <SelectTrigger className="w-full h-10 bg-background">
-                <SelectValue placeholder="Select year" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((y) => (
-                  <SelectItem key={y} value={y.toString()}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select year..."
+              searchPlaceholder="Search year..."
+            />
           </div>
         </div>
 

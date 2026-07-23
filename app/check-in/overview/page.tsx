@@ -10,7 +10,9 @@ import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import {
   Table,
   TableHeader,
@@ -43,79 +45,81 @@ function CohortTable({ rows }: { rows: StudentRow[] }) {
   const { items: sortedRows, requestSort, sortConfig } = useSortableData(rows, "studentId", "asc")
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHeadSortable
-            className="w-[120px]"
-            sortKey="studentId"
-            currentSortKey={sortConfig.key}
-            currentSortOrder={sortConfig.order}
-            onSort={requestSort}
-          >
-            Student ID
-          </TableHeadSortable>
+    <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHeadSortable
+              className="w-[120px]"
+              sortKey="studentId"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Student ID
+            </TableHeadSortable>
 
-          <TableHeadSortable
-            sortKey="studentName"
-            currentSortKey={sortConfig.key}
-            currentSortOrder={sortConfig.order}
-            onSort={requestSort}
-          >
-            Name
-          </TableHeadSortable>
+            <TableHeadSortable
+              sortKey="studentName"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Name
+            </TableHeadSortable>
 
-          <TableHeadSortable
-            sortKey="checkIn.timestamp"
-            currentSortKey={sortConfig.key}
-            currentSortOrder={sortConfig.order}
-            onSort={requestSort}
-          >
-            Check-In Time
-          </TableHeadSortable>
+            <TableHeadSortable
+              sortKey="checkIn.timestamp"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Check-In Time
+            </TableHeadSortable>
 
-          <TableHeadSortable
-            sortKey="checkIn"
-            currentSortKey={sortConfig.key}
-            currentSortOrder={sortConfig.order}
-            onSort={requestSort}
-          >
-            Status
-          </TableHeadSortable>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sortedRows.map(({ studentId, studentName, checkIn }) => (
-          <TableRow key={studentId} className="transition-colors hover:bg-muted/60">
-            <TableCell className="font-semibold text-foreground">{studentId}</TableCell>
-            <TableCell className="font-medium">{studentName}</TableCell>
-            <TableCell className="text-muted-foreground whitespace-nowrap">
-              {checkIn
-                ? new Date(checkIn.timestamp).toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: false,
-                  })
-                : "—"}
-            </TableCell>
-            <TableCell>
-              {checkIn ? (
-                <Badge variant="success" className="gap-1">
-                  <Check className="size-3.5" />
-                  Checked In
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="gap-1 text-muted-foreground">
-                  <X className="size-3.5" />
-                  Absent
-                </Badge>
-              )}
-            </TableCell>
+            <TableHeadSortable
+              sortKey="checkIn"
+              currentSortKey={sortConfig.key}
+              currentSortOrder={sortConfig.order}
+              onSort={requestSort}
+            >
+              Status
+            </TableHeadSortable>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {sortedRows.map(({ studentId, studentName, checkIn }) => (
+            <TableRow key={studentId} className="transition-colors hover:bg-muted/60">
+              <TableCell className="font-semibold text-foreground">{studentId}</TableCell>
+              <TableCell className="font-medium">{studentName}</TableCell>
+              <TableCell className="text-muted-foreground whitespace-nowrap">
+                {checkIn
+                  ? new Date(checkIn.timestamp).toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: false,
+                    })
+                  : "—"}
+              </TableCell>
+              <TableCell>
+                {checkIn ? (
+                  <Badge variant="success" className="gap-1">
+                    <Check className="size-3.5" />
+                    Checked In
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 text-muted-foreground">
+                    <X className="size-3.5" />
+                    Absent
+                  </Badge>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   )
 }
 
@@ -177,7 +181,13 @@ export default function CheckInOverviewPage() {
         const query = searchQuery.toLowerCase().trim()
         const matchesName = name.toLowerCase().includes(query)
         const matchesId = String(studentId).includes(query)
-        if (!matchesName && !matchesId) continue
+        const matchesClass =
+          cls.education_level.toLowerCase().includes(query) ||
+          cls.cohort_identifier.toLowerCase().includes(query) ||
+          (cls.cohort_sub_category && cls.cohort_sub_category.toLowerCase().includes(query)) ||
+          `${cls.education_level} ${cls.cohort_identifier}`.toLowerCase().includes(query)
+
+        if (!matchesName && !matchesId && !matchesClass) continue
       }
 
       const checkIn = todayCheckInMap.get(studentId) ?? null
@@ -273,58 +283,63 @@ export default function CheckInOverviewPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Check-In Overview</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            View all students and their check-in status, grouped by cohort class.
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Check-In Overview"
+        description="View all students and their check-in status, grouped by cohort class."
+        secondaryAction={{
+          label: loading ? "Loading..." : "Load Data",
+          onClick: loadData,
+          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+        }}
+      />
 
-        <div className="flex items-center gap-3">
-          <Button onClick={loadData} disabled={loading} variant="default" className="shadow-xs">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <RotateCcw className="mr-2 size-4" />
-                Load Data
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search students in overview..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        {lastLoaded && (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1 text-xs">
-              <QrCode className="mr-1.5 size-3.5" />
-              {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              Loaded {lastLoaded}
-            </span>
+      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Check-In Logs</p>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <QrCode className="size-4" />
+            </div>
           </div>
-        )}
+          <div className="mt-2 flex items-baseline justify-between">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">{checkIns.length}</h2>
+            {lastLoaded && (
+              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+            )}
+          </div>
+        </Card>
       </div>
+
+      {/* Management Toolbar Card */}
+      <Card className="p-4 shadow-2xs border-border/80 bg-card">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search students, classes, cohorts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {lastLoaded && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="secondary" className="px-3 py-1 text-xs">
+                <QrCode className="mr-1.5 size-3.5" />
+                {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Loaded {lastLoaded}
+              </span>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Banners */}
       <AnimatePresence>

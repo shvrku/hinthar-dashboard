@@ -1,98 +1,87 @@
-import { GraduationCap, Users, CalendarCheck, CreditCard, QrCode, ClipboardList } from "lucide-react"
-import { AuthButtons } from "@/components/auth-buttons"
+"use client"
 
-const features = [
-  {
-    title: "Class Management",
-    description: "Organize classes, sections, and academic groups with ease.",
-    icon: GraduationCap,
-  },
-  {
-    title: "Student Records",
-    description: "Maintain comprehensive student profiles and enrollment history.",
-    icon: Users,
-  },
-  {
-    title: "Session Scheduling",
-    description: "Plan and manage class sessions with an intuitive timetable.",
-    icon: CalendarCheck,
-  },
-  {
-    title: "QR Check-In",
-    description: "Fast attendance tracking via QR code scanning and manual entry.",
-    icon: QrCode,
-  },
-  {
-    title: "Payroll Management",
-    description: "Handle staff pay periods, adjustments, and payroll items.",
-    icon: CreditCard,
-  },
-  {
-    title: "Audit Logging",
-    description: "Keep a detailed record of all system activities and changes.",
-    icon: ClipboardList,
-  },
+import React from "react"
+import Link from "next/link"
+import {
+  GraduationCap,
+  Users,
+  UserCheck,
+  BookOpen,
+  Clock,
+  Calendar,
+  ClipboardCheck,
+  QrCode,
+  ArrowRight,
+} from "lucide-react"
+import { StandardPageHeader } from "@/components/standard-page-header"
+import { MetricCard } from "@/components/metric-card"
+import { MetricContainer } from "@/components/metric-container"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+
+const quickNavModules = [
+  { title: "Classes", href: "/classes", description: "Manage academic cohorts & groups.", icon: GraduationCap },
+  { title: "Students", href: "/students", description: "View student profiles & QR passes.", icon: Users },
+  { title: "Teachers", href: "/teachers", description: "Manage faculty & teaching assignments.", icon: UserCheck },
+  { title: "Subjects", href: "/subjects", description: "Curriculum courses & subject catalog.", icon: BookOpen },
+  { title: "Sessions", href: "/sessions", description: "Class session schedules & timetable.", icon: Clock },
+  { title: "Attendance", href: "/attendance", description: "Track attendance logs & cohorts.", icon: ClipboardCheck },
 ]
 
-export default function LandingPage() {
+export default function OverviewPage() {
   return (
-    <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="container mx-auto flex flex-col items-center px-4 pb-24 pt-16 text-center md:pb-32 md:pt-24">
-          <div className="mb-4 inline-flex items-center rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium">
-            Built with Next.js &middot; Powered by Clerk
-          </div>
-          <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-            School Management,{" "}
-            <span className="text-muted-foreground">Simplified</span>
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            A modern platform for managing classes, tracking attendance, scheduling
-            sessions, and handling payroll — all in one place.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <AuthButtons />
-          </div>
-        </div>
-      </section>
+    <div className="space-y-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Hinthar Overview"
+        description="Central operational management workspace for classes, faculty, students, and attendance."
+        primaryAction={{
+          label: "Open Check-In Terminal",
+          onClick: () => (window.location.href = "/check-in/terminal"),
+          icon: <QrCode className="size-4" />,
+        }}
+      />
 
-      {/* Features */}
-      <section className="border-t">
-        <div className="container mx-auto px-4 py-20 md:py-28">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold tracking-tight">
-              Everything you need
-            </h2>
-            <p className="mt-3 text-muted-foreground">
-              Tools to streamline your school&apos;s daily operations.
-            </p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="group rounded-lg border p-6 transition-colors hover:bg-muted/50"
-              >
-                <div className="mb-3 flex size-10 items-center justify-center rounded-lg border bg-background">
-                  <feature.icon className="size-5 text-foreground" />
+      {/* Metric Highlight Container (Auto-layout grid, Total Count primary stat) */}
+      <MetricContainer>
+        <MetricCard
+          title="Total Overview Count"
+          value="6 Modules"
+          icon={<GraduationCap className="size-4" />}
+          description="Active core management sections"
+        />
+      </MetricContainer>
+
+      {/* Operational Modules Grid */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">Management Modules</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {quickNavModules.map((item) => (
+            <Card key={item.title} className="group relative overflow-hidden transition-all hover:border-foreground/30 hover:shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50 text-foreground">
+                    <item.icon className="size-4" />
+                  </div>
+                  <Button variant="ghost" size="icon-sm" render={<Link href={item.href} />}>
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </Button>
                 </div>
-                <h3 className="mb-1 font-semibold">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
+                <CardTitle className="mt-3 text-base">{item.title}</CardTitle>
+                <CardDescription className="text-xs">{item.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Link
+                  href={item.href}
+                  className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Access Module <ArrowRight className="size-3" />
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t">
-        <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          Hinthar Dashboard &copy; {new Date().getFullYear()}
-        </div>
-      </footer>
+      </div>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import jsQR from "jsqr"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useFocusMode } from "@/components/focus-context"
+import { StandardPageHeader } from "@/components/standard-page-header"
 
 function Clock() {
   const [time, setTime] = React.useState(new Date())
@@ -289,31 +290,15 @@ export default function TerminalPage() {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: isFocused ? 1.02 : 1 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl"
+      className="space-y-6"
     >
-      {/* Header with Clock and Focus button only */}
-      <div className="mb-8 flex flex-row items-center justify-between gap-4 border-b pb-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Check-In Terminal"
+        description="Scan student QR codes or look up ID manually for real-time attendance verification."
+      >
         <Clock />
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsFocused((f) => !f)}
-          className="shadow-xs gap-2"
-        >
-          {isFocused ? (
-            <>
-              <Minimize2 className="size-4" />
-              Exit Focus Mode
-            </>
-          ) : (
-            <>
-              <Maximize2 className="size-4" />
-              Focus Mode
-            </>
-          )}
-        </Button>
-      </div>
+      </StandardPageHeader>
 
       {/* Notifications */}
       <AnimatePresence>

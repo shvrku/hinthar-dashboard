@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Public_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
 import { FocusProvider } from "@/components/focus-context";
-import { Navbar } from "@/components/navbar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SiteHeader } from "@/components/site-header";
 import { PageTransition } from "@/components/page-transition";
+import { cn } from "@/lib/utils";
+
+import Script from "next/script";
+
+const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,8 +26,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hinthar Dashboard",
-  description: "School management system for managing classes, students, teachers, and more.",
+  title: "Hinthar",
+  description: "Management platform for classes, students, teachers, sessions, and attendance.",
 };
 
 export default function RootLayout({
@@ -30,11 +38,20 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={cn(
+        "h-full overflow-hidden",
+        "antialiased",
+        geistSans.variable,
+        geistMono.variable,
+        "font-sans",
+        publicSans.variable
+      )}
       suppressHydrationWarning
     >
       <head>
-        <script
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               try {
@@ -50,14 +67,21 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="h-full flex flex-col bg-background text-foreground overflow-hidden">
         <FocusProvider>
           <ThemeProvider>
             <ClerkThemeProvider>
-              <Navbar />
-              <main className="flex-1 flex flex-col">
-                <PageTransition>{children}</PageTransition>
-              </main>
+              <TooltipProvider>
+                <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
+                  <AppSidebar />
+                  <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <SiteHeader />
+                    <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
+                      <PageTransition>{children}</PageTransition>
+                    </main>
+                  </SidebarInset>
+                </SidebarProvider>
+              </TooltipProvider>
             </ClerkThemeProvider>
           </ThemeProvider>
         </FocusProvider>

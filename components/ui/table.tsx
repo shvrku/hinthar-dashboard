@@ -1,14 +1,18 @@
 import * as React from "react"
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import type { SortOrder } from "@/lib/use-sortable-data"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto rounded-xl border border-border/70 bg-card shadow-xs">
+    <div
+      data-slot="table-container"
+      className="relative w-full overflow-x-auto"
+    >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm border-collapse", className)}
+        className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
     </div>
@@ -19,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("bg-muted/40 font-medium text-muted-foreground [&_tr]:border-b", className)}
+      className={cn("bg-muted/50 border-b border-border/80 [&_tr]:border-b-0", className)}
       {...props}
     />
   )
@@ -39,7 +43,10 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       data-slot="table-footer"
-      className={cn("border-t bg-muted/50 font-medium [&>tr]:last-child:border-0", className)}
+      className={cn(
+        "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
+        className
+      )}
       {...props}
     />
   )
@@ -50,7 +57,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-border/50 transition-colors hover:bg-muted/40 data-[state=selected]:bg-muted",
+        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
         className
       )}
       {...props}
@@ -63,7 +70,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-11 px-4 py-3.5 text-left align-middle font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "h-10 px-5 text-left align-middle text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -76,6 +83,7 @@ interface TableHeadSortableProps extends React.ComponentProps<"th"> {
   currentSortKey: string | null
   currentSortOrder: SortOrder
   onSort: (key: string) => void
+  align?: "left" | "center" | "right"
   children: React.ReactNode
 }
 
@@ -84,6 +92,7 @@ function TableHeadSortable({
   currentSortKey,
   currentSortOrder,
   onSort,
+  align = "left",
   children,
   className,
   ...props
@@ -93,12 +102,20 @@ function TableHeadSortable({
     <TableHead
       className={cn(
         "cursor-pointer select-none hover:text-foreground transition-colors group/sort",
+        align === "right" && "text-right",
+        align === "center" && "text-center",
         className
       )}
       onClick={() => onSort(sortKey)}
       {...props}
     >
-      <div className="inline-flex items-center gap-1.5">
+      <div
+        className={cn(
+          "inline-flex items-center gap-1.5",
+          align === "right" && "ml-auto justify-end",
+          align === "center" && "mx-auto justify-center"
+        )}
+      >
         <span>{children}</span>
         {isSorted ? (
           currentSortOrder === "asc" ? (
@@ -119,7 +136,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "px-4 py-3.5 align-middle text-sm text-foreground [&:has([role=checkbox])]:pr-0",
+        "py-3 px-5 align-middle text-xs whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -127,7 +144,10 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   )
 }
 
-function TableCaption({ className, ...props }: React.ComponentProps<"caption">) {
+function TableCaption({
+  className,
+  ...props
+}: React.ComponentProps<"caption">) {
   return (
     <caption
       data-slot="table-caption"
@@ -148,3 +168,4 @@ export {
   TableCell,
   TableCaption,
 }
+

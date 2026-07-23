@@ -9,6 +9,10 @@ import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { StandardPageHeader } from "@/components/standard-page-header"
+import { usePagination } from "@/components/use-pagination"
+import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
   TableHeader,
@@ -223,6 +227,9 @@ export default function SubjectsPage() {
   // Sorting
   const { items: sortedSubjects, requestSort, sortConfig } = useSortableData(filteredSubjects, "id", "asc")
 
+  // Pagination
+  const pagination = usePagination(sortedSubjects, 10)
+
   const handleSave = React.useCallback(
     async (payload: SubjectPayload) => {
       setSaving(true)
@@ -313,63 +320,68 @@ export default function SubjectsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Subjects</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage academic subjects, curriculum offerings, and course definitions.
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Subjects"
+        description="Manage academic subjects, curriculum offerings, and course definitions."
+        primaryAction={{
+          label: "Add Subject",
+          onClick: openCreateModal,
+          icon: <Plus className="size-4" />,
+        }}
+        secondaryAction={{
+          label: loading ? "Loading..." : "Load Data",
+          onClick: loadData,
+          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+        }}
+      />
 
-        <div className="flex items-center gap-3">
-          <Button onClick={loadData} disabled={loading} variant="default" className="shadow-xs">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <RotateCcw className="mr-2 size-4" />
-                Load Data
-              </>
-            )}
-          </Button>
-
-          <Button onClick={openCreateModal} variant="outline" className="shadow-xs">
-            <Plus className="mr-2 size-4" />
-            Add Subject
-          </Button>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search subjects by name or ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        {lastLoaded && subjects && (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1 text-xs">
-              <BookOpen className="mr-1.5 size-3.5" />
-              {filteredSubjects.length} of {subjects.length} subject{subjects.length !== 1 ? "s" : ""}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              Loaded {lastLoaded}
-            </span>
+      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Subjects</p>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <BookOpen className="size-4" />
+            </div>
           </div>
-        )}
+          <div className="mt-2 flex items-baseline justify-between">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">{subjects ? subjects.length : 0}</h2>
+            {lastLoaded && (
+              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+            )}
+          </div>
+        </Card>
       </div>
+
+      {/* Standardized Management Toolbar Card */}
+      <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search subjects by name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {lastLoaded && subjects && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="secondary" className="px-3 py-1 text-xs">
+                <BookOpen className="mr-1.5 size-3.5" />
+                {filteredSubjects.length} of {subjects.length} subject{subjects.length !== 1 ? "s" : ""}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Loaded {lastLoaded}
+              </span>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Banners */}
       {error && (
@@ -390,72 +402,88 @@ export default function SubjectsPage() {
         </div>
       )}
 
-      {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHeadSortable
-              className="w-[100px]"
-              sortKey="id"
-              currentSortKey={sortConfig.key}
-              currentSortOrder={sortConfig.order}
-              onSort={requestSort}
-            >
-              ID
-            </TableHeadSortable>
-
-            <TableHeadSortable
-              sortKey="name"
-              currentSortKey={sortConfig.key}
-              currentSortOrder={sortConfig.order}
-              onSort={requestSort}
-            >
-              Subject Name
-            </TableHeadSortable>
-
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading && !subjects ? (
-            Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-          ) : sortedSubjects && sortedSubjects.length === 0 ? (
+      {/* Floating Table Card */}
+      <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
-                {subjects === null ? 'Click "Load Data" to fetch subjects.' : 'No subjects found.'}
-              </TableCell>
+              <TableHeadSortable
+                className="w-[100px]"
+                sortKey="id"
+                currentSortKey={sortConfig.key}
+                currentSortOrder={sortConfig.order}
+                onSort={requestSort}
+              >
+                ID
+              </TableHeadSortable>
+
+              <TableHeadSortable
+                sortKey="name"
+                currentSortKey={sortConfig.key}
+                currentSortOrder={sortConfig.order}
+                onSort={requestSort}
+              >
+                Subject Name
+              </TableHeadSortable>
+
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ) : (
-            sortedSubjects?.map((subject) => (
-              <TableRow key={subject.id}>
-                <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
-                <TableCell className="font-medium">{subject.name}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => openEditModal(subject)}
-                      aria-label={`Edit ${subject.name}`}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeletingId(subject.id)}
-                      aria-label={`Delete ${subject.name}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
+          </TableHeader>
+          <TableBody>
+            {loading && !subjects ? (
+              Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+            ) : sortedSubjects && sortedSubjects.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                  {subjects === null ? 'Click "Load Data" to fetch subjects.' : 'No subjects found.'}
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              pagination.paginatedItems.map((subject) => (
+                <TableRow key={subject.id}>
+                  <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
+                  <TableCell className="font-medium">{subject.name}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openEditModal(subject)}
+                        aria-label={`Edit ${subject.name}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeletingId(subject.id)}
+                        aria-label={`Delete ${subject.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+
+      {/* Standardized Table Pagination Footer */}
+      {sortedSubjects && sortedSubjects.length > 0 && (
+        <StandardTablePagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.setCurrentPage}
+          onPageSizeChange={pagination.setPageSize}
+        />
+      )}
 
       {/* Form modal */}
       <SubjectFormModal

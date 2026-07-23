@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { StandardPageHeader } from "@/components/standard-page-header"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { usePagination } from "@/components/use-pagination"
+import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
   TableHeader,
@@ -27,13 +31,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
+
 
 function TableSkeletonRow() {
   return (
@@ -227,19 +225,27 @@ export default function ClassesPage() {
     }
   }
 
+  const [levelFilter, setLevelFilter] = React.useState<string>("all")
+
   const filteredClasses = React.useMemo(() => {
-    if (!searchQuery.trim()) return classes
-    const q = searchQuery.toLowerCase().trim()
-    return classes.filter(
-      (c) =>
+    return classes.filter((c) => {
+      const matchesLevel = levelFilter === "all" || c.education_level === levelFilter
+      if (!matchesLevel) return false
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase().trim()
+      return (
         c.education_level.toLowerCase().includes(q) ||
         c.cohort_identifier.toLowerCase().includes(q) ||
         (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(q))
-    )
-  }, [classes, searchQuery])
+      )
+    })
+  }, [classes, levelFilter, searchQuery])
 
   // Sorting
   const { items: sortedClasses, requestSort, sortConfig } = useSortableData(filteredClasses, "id", "asc")
+
+  // Pagination
+  const pagination = usePagination(sortedClasses, 10)
 
   // Roster helpers
   const assignedStudentIds = React.useMemo(() => {
@@ -303,39 +309,50 @@ export default function ClassesPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Classes</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage academic classes, cohorts, and student roster enrollments.
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/* Standardized Header */}
+      <StandardPageHeader
+        title="Classes"
+        description="Manage academic classes, cohorts, and student roster enrollments."
+        primaryAction={
+          !activeRosterClass
+            ? {
+                label: "Add Class",
+                onClick: openAddModal,
+                icon: <Plus className="size-4" />,
+              }
+            : undefined
+        }
+        secondaryAction={
+          !activeRosterClass
+            ? {
+                label: loading ? "Loading..." : "Load Data",
+                onClick: loadData,
+                icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+              }
+            : undefined
+        }
+      />
 
-        {!activeRosterClass && (
-          <div className="flex items-center gap-3">
-            <Button onClick={loadData} disabled={loading} variant="default" className="shadow-xs">
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="mr-2 size-4" />
-                  Load Data
-                </>
+      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {!activeRosterClass && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Classes</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <GraduationCap className="size-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{classes.length}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
               )}
-            </Button>
-
-            <Button onClick={openAddModal} variant="outline" className="shadow-xs">
-              <Plus className="mr-2 size-4" />
-              Add Class
-            </Button>
-          </div>
-        )}
-      </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Banners */}
       {successMessage && (
@@ -461,130 +478,162 @@ export default function ClassesPage() {
       ) : (
         /* Class list table */
         <div>
-          {/* Toolbar */}
-          <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search classes by level, cohort, sub-category..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+          {/* Standardized Management Toolbar Card */}
+          <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="flex flex-1 items-center gap-3 max-w-lg">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search classes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
 
-            {lastLoaded && (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="px-3 py-1 text-xs">
-                  <GraduationCap className="mr-1.5 size-3.5" />
-                  {classes.length} class{classes.length !== 1 ? "es" : ""}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  Loaded {lastLoaded}
-                </span>
+                {/* Education Level Filter */}
+                <Select value={levelFilter} onValueChange={(val) => setLevelFilter(val ?? "all")}>
+                  <SelectTrigger className="w-40 text-xs">
+                    <SelectValue>
+                      {levelFilter === "all" ? "All Levels" : EDUCATION_LEVELS.find((l) => l.value === levelFilter)?.label ?? levelFilter}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    {EDUCATION_LEVELS.map((lvl) => (
+                      <SelectItem key={lvl.value} value={lvl.value}>
+                        {lvl.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
 
-          {/* Table */}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHeadSortable
-                  className="w-[100px]"
-                  sortKey="id"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  ID
-                </TableHeadSortable>
+              {lastLoaded && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="secondary" className="px-3 py-1 text-xs">
+                    <GraduationCap className="mr-1.5 size-3.5" />
+                    {classes.length} class{classes.length !== 1 ? "es" : ""}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Loaded {lastLoaded}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
 
-                <TableHeadSortable
-                  sortKey="education_level"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Education Level
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  sortKey="cohort_identifier"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Cohort Identifier
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  sortKey="cohort_sub_category"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Sub Category
-                </TableHeadSortable>
-
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && classes.length === 0 ? (
-                Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-              ) : sortedClasses.length === 0 ? (
+          {/* Floating Table Card */}
+          <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    {classes.length === 0 ? 'Click "Load Data" to fetch classes.' : 'No classes found.'}
-                  </TableCell>
+                  <TableHeadSortable
+                    className="w-[100px]"
+                    sortKey="id"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    ID
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    sortKey="education_level"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Education Level
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    sortKey="cohort_identifier"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Cohort Identifier
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    sortKey="cohort_sub_category"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Sub Category
+                  </TableHeadSortable>
+
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                sortedClasses.map((cls) => (
-                  <TableRow key={cls.id}>
-                    <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{cls.education_level}</Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{cls.cohort_identifier}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {cls.cohort_sub_category ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setActiveRosterClass(cls)}
-                          title="Manage Roster"
-                        >
-                          <Users className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditModal(cls)}
-                          title="Edit"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirmId(cls.id)}
-                          title="Delete"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+
+              <TableBody>
+                {loading && classes.length === 0 ? (
+                  Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+                ) : sortedClasses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                      {classes.length === 0 ? 'Click "Load Data" to fetch classes.' : 'No classes found.'}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  pagination.paginatedItems.map((cls) => (
+                    <TableRow key={cls.id}>
+                      <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {EDUCATION_LEVELS.find((l) => l.value === cls.education_level)?.label ?? cls.education_level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{cls.cohort_identifier}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {cls.cohort_sub_category || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditModal(cls)}
+                            title="Edit"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmId(cls.id)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Separate Pagination Container */}
+          {filteredClasses.length > 0 && (
+            <StandardTablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
+          )}
         </div>
       )}
 
