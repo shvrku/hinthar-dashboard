@@ -945,6 +945,7 @@ export default function AttendancePage() {
           {/* Year Filter */}
           <div className="w-32 space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
               Year
             </label>
             <SearchableSelect
@@ -957,49 +958,6 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* Dynamic Student Adder Section */}
-        {(attendanceMode === "adhoc" || selectedClassId !== "all") && (
-          <div className="mt-4 pt-4 border-t border-border flex items-center gap-4">
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search & Add Student to view..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  setShowSearchDropdown(true)
-                }}
-                onFocus={() => setShowSearchDropdown(true)}
-                className="pl-9 h-10"
-              />
-              {showSearchDropdown && searchResults.length > 0 && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowSearchDropdown(false)} 
-                  />
-                  <div className="absolute left-0 right-0 mt-1 z-20 rounded-md border bg-popover text-popover-foreground shadow-md outline-hidden">
-                    <div className="p-1">
-                      {searchResults.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => handleAddManualStudent(s)}
-                          className="relative flex w-full cursor-pointer select-none items-center rounded-xs px-2 py-1.5 text-sm outline-hidden hover:bg-accent hover:text-accent-foreground"
-                        >
-                          <UserPlus className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          {s.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Use this to manually add students not enrolled in the selected class (essential for ad-hoc / tutoring sessions).
-            </p>
-          </div>
-        )}
       </div>
 
       {/* ── MAIN ATTENDANCE DISPLAY (MATRIX vs ROSTER) ── */}

@@ -52,7 +52,7 @@ export function SearchableSelect({
   // When open changes, focus input
   React.useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 10)
+      setTimeout(() => inputRef.current?.focus(), 20)
     } else {
       setSearchQuery("")
     }
@@ -61,61 +61,58 @@ export function SearchableSelect({
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
+        nativeButton={true}
         render={
-          <div
+          <button
+            type="button"
             className={cn(
-              "relative flex h-9 w-full items-center justify-between gap-2 rounded-4xl border border-input bg-input/30 px-3.5 text-xs font-medium text-foreground transition-all hover:bg-input/50 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50 cursor-pointer select-none",
+              "relative flex h-9 w-full items-center justify-between gap-2 rounded-4xl border border-input bg-input/30 px-3.5 text-xs font-medium text-foreground transition-all hover:bg-input/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 cursor-pointer select-none outline-none",
               open && "border-ring ring-2 ring-ring/50 bg-background",
               triggerClassName
             )}
           >
-            {open ? (
-              <div className="flex w-full items-center gap-1.5 min-w-0">
-                <Search className="size-3.5 shrink-0 text-muted-foreground" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  placeholder={selectedOption ? selectedOption.label : searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-medium"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSearchQuery("")
-                    }}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3" />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <>
-                <span className="truncate font-semibold">
-                  {selectedOption ? selectedOption.label : placeholder}
-                </span>
-                <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
-              </>
-            )}
-          </div>
+            <span className="truncate font-semibold">
+              {selectedOption ? selectedOption.label : placeholder}
+            </span>
+            <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+          </button>
         }
       />
 
-      <Popover.Portal>
+      <Popover.Portal container={typeof document !== "undefined" ? document.body : null}>
         <Popover.Positioner side="bottom" align="start" sideOffset={4} className="z-50 min-w-[var(--anchor-width)]">
           <Popover.Popup
             className={cn(
-              "w-[var(--anchor-width)] min-w-[180px] max-w-xs rounded-xl border border-border bg-popover/95 p-1.5 text-popover-foreground shadow-xl backdrop-blur-md outline-none duration-150 animate-in fade-in-0 slide-in-from-top-1",
+              "w-[var(--anchor-width)] min-w-[200px] max-w-xs rounded-xl border border-border bg-popover/95 p-1.5 text-popover-foreground shadow-xl backdrop-blur-md outline-none duration-150 animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-1.5",
               className
             )}
           >
-            <div className="max-h-60 overflow-y-auto hinthar-scrollbar space-y-0.5">
+            {/* Floating Search Header */}
+            <div className="flex items-center gap-2 rounded-lg border border-input bg-muted/40 px-2.5 py-1.5 text-xs">
+              <Search className="size-3.5 shrink-0 text-muted-foreground" />
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-medium"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Floating Options List */}
+            <div className="max-h-56 overflow-y-auto hinthar-scrollbar space-y-0.5">
               {filteredOptions.length === 0 ? (
-                <p className="p-2 text-center text-xs text-muted-foreground">
+                <p className="p-2.5 text-center text-xs text-muted-foreground">
                   No results found.
                 </p>
               ) : (
