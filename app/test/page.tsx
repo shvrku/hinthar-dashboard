@@ -3,19 +3,39 @@
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Calendar } from "@/components/ui/calendar"
+import Link from "next/link"
 
 export default function TestPage() {
   const { isLoaded, isSignedIn } = useAuth()
   const [date, setDate] = React.useState<Date | undefined>(new Date())
 
-  if (!isLoaded) return <div className="flex min-h-screen items-center justify-center">Loading...</div>
-  if (!isSignedIn) return <div className="flex min-h-screen items-center justify-center">Please sign in to view this page.</div>
+  if (!isLoaded)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading...
+      </div>
+    )
+  if (!isSignedIn)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Please sign in to view this page.
+      </div>
+    )
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-6 text-3xl font-bold tracking-tight">
+      <h1 className="mb-2 text-3xl font-bold tracking-tight">
         Component Test Page
       </h1>
+      <p className="mb-6 text-muted-foreground">
+        Use this area to test components.{" "}
+        <Link
+          href="/test/design-system"
+          className="font-medium text-primary underline underline-offset-4"
+        >
+          View Design System Demo (sidebar-08)
+        </Link>
+      </p>
 
       <section className="mb-12">
         <h2 className="mb-4 text-xl font-semibold">Calendar</h2>
@@ -48,5 +68,3 @@ export default function TestPage() {
     </div>
   )
 }
-
-
