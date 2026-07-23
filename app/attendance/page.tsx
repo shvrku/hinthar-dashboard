@@ -5,28 +5,22 @@ import { SearchableSelect } from "@/components/searchable-select"
 import { useAuth } from "@clerk/nextjs"
 import { 
   Check, 
-  X, 
   Clock, 
   Loader2, 
   Search, 
   Plus, 
   AlertCircle, 
-  RefreshCw, 
-  UserPlus, 
+  RotateCcw, 
   Calendar,
   BookOpen,
   GraduationCap,
   Users,
-  RotateCcw,
   LayoutGrid,
-  ListFilter,
-  UserCheck,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   Sparkles,
 } from "lucide-react"
-import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
 import { 
   type Class, 
@@ -201,7 +195,71 @@ export default function AttendancePage() {
   const [newEndTime, setNewEndTime] = React.useState<string>("10:00:00")
   const [isCreatingSession, setIsCreatingSession] = React.useState(false)
 
-  // Fetch all starting data
+  // Batch Session Generator State
+  const [isGeneratingSessions, setIsGeneratingSessions] = React.useState(false)
+  const [successMsg, setSuccessMsg] = React.useState<string | null>(null)
+
+  const handleGenerateSessions = async () => {
+    if (selectedClassId === "all" || selectedClassId === "adhoc") return
+    setIsGeneratingSessions(true)
+    setError(null)
+    setSuccessMsg(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      const classId = Number(selectedClassId)
+      const res = await api.generateSessionsForClass(classId)
+      setSuccessMsg(`Successfully generated ${res.created_count} session(s) from timetable slots.`)
+      const [sessionsData, attendancesData] = await Promise.all([
+        api.listSessions({ class_id: classId }),
+        api.listSessionAttendances(),
+      ])
+      setSessions(sessionsData)
+      setAttendances(attendancesData)
+      setLastLoaded(new Date().toLocaleTimeString())
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to generate sessions")
+      }
+    } finally {
+      setIsGeneratingSessions(false)
+    }
+  }
+
+  // Prefetch filter options (Classes, Subjects, Teachers) automatically on mount so combobox options are available before load data is clicked
+  const prefetchOptions = React.useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return
+    try {
+      const token = await getToken()
+      if (!token) return
+      const api = createApi(token)
+      const [classesData, subjectsData, teachersData] = await Promise.all([
+        api.listClasses(),
+        api.listSubjects(),
+        api.listTeachers(),
+      ])
+      setClasses(classesData)
+      setSubjects(subjectsData)
+      setTeachers(teachersData)
+
+      if (classesData.length > 0) {
+        setSelectedClassId((prev) => (prev === "all" ? classesData[0].id.toString() : prev))
+      }
+    } catch {
+      // silent
+    }
+  }, [getToken, isLoaded, isSignedIn])
+
+  React.useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      prefetchOptions()
+    }
+  }, [isLoaded, isSignedIn, prefetchOptions])
+
+  // Fetch full attendance data query
   const loadData = React.useCallback(async () => {
     if (!isLoaded || !isSignedIn) return
     setLoading(true)
@@ -211,6 +269,12 @@ export default function AttendancePage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
+
+      const sessionParams = {
+        class_id: selectedClassId !== "all" && selectedClassId !== "adhoc" ? selectedClassId : undefined,
+        subject_id: selectedSubjectId !== "all" ? selectedSubjectId : undefined,
+        teacher_id: selectedTeacherId !== "all" ? selectedTeacherId : undefined,
+      }
 
       const [
         classesData,
@@ -227,10 +291,10 @@ export default function AttendancePage() {
         api.listSubjects(),
         api.listTeachers(),
         api.listStudents(),
-        api.listClassStudents(),
-        api.listSessions(),
+        api.listClassStudents(sessionParams.class_id ? { class_id: sessionParams.class_id } : undefined),
+        api.listSessions(sessionParams),
         api.listSessionAttendances(),
-        api.listAdHocSessions(),
+        api.listAdHocSessions({ subject_id: sessionParams.subject_id, teacher_id: sessionParams.teacher_id }),
         api.listAdHocSessionAttendances(),
       ])
 
@@ -244,255 +308,179 @@ export default function AttendancePage() {
       setAdhocSessions(adhocSessionsData)
       setAdhocAttendances(adhocAttendancesData)
 
-      // Set defaults based on mode if not already initialized
-      if (classesData.length > 0) {
-        setSelectedClassId((prev) => (prev === "all" ? classesData[0].id.toString() : prev))
+      if (classesData.length > 0 && selectedClassId === "all") {
+        setSelectedClassId(classesData[0].id.toString())
       }
+
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
-      console.error(err)
-      setError(err instanceof ApiError ? err.userMessage : "Failed to load attendance data")
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to fetch attendance data")
+      }
     } finally {
       setLoading(false)
     }
-  }, [getToken, isLoaded, isSignedIn])
+  }, [getToken, isLoaded, isSignedIn, selectedClassId])
 
-
-
-
-
-  // Reset manually added students when filters change
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setManuallyAddedStudents([])
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [selectedClassId, selectedSubjectId, selectedTeacherId, attendanceMode])
-
-  // Filter sessions based on Selected Month, Class, Subject, and Teacher
-  const filteredSessions = React.useMemo(() => {
-    if (attendanceMode === "class") {
-      return sessions
-        .filter((s) => {
-          const date = parseBackendDateTime(s.start_time)
-          if (isNaN(date.getTime())) return false
-
-          // Month & Year Filter
-          const matchesMonth = date.getMonth() + 1 === selectedMonth
-          const matchesYear = date.getFullYear() === selectedYear
-          if (!matchesMonth || !matchesYear) return false
-
-          // Class Filter (required)
-          if (selectedClassId === "all") return false
-          if (s.class_obj?.id !== Number(selectedClassId)) return false
-
-          // Subject Filter (optional)
-          if (selectedSubjectId !== "all") {
-            if (s.timetable_slot?.subject?.id !== Number(selectedSubjectId)) return false
-          }
-
-          // Teacher Filter (optional)
-          if (selectedTeacherId !== "all") {
-            if (s.teacher?.id !== Number(selectedTeacherId)) return false
-          }
-
-          return true
-        })
-        .sort((a, b) => {
-          const da = parseBackendDateTime(a.start_time).getTime()
-          const db = parseBackendDateTime(b.start_time).getTime()
-          return da - db
-        })
-    } else {
-      // adhoc mode
-      return adhocSessions
-        .filter((s) => {
-          const date = new Date(`${s.date}T${s.start_time}`)
-          if (isNaN(date.getTime())) return false
-
-          // Month & Year Filter
-          const matchesMonth = date.getMonth() + 1 === selectedMonth
-          const matchesYear = date.getFullYear() === selectedYear
-          if (!matchesMonth || !matchesYear) return false
-
-          // Subject Filter (required)
-          if (selectedSubjectId === "all" || selectedSubjectId === "adhoc") return false
-          if (s.subject?.id !== Number(selectedSubjectId)) return false
-
-          // Teacher Filter (required)
-          if (selectedTeacherId === "all") return false
-          if (s.teacher?.id !== Number(selectedTeacherId)) return false
-
-          return true
-        })
-        .sort((a, b) => {
-          const da = new Date(`${a.date}T${a.start_time}`).getTime()
-          const db = new Date(`${b.date}T${b.start_time}`).getTime()
-          return da - db
-        })
+  // Computed: Row Students based on mode & class selection
+  const rowStudents = React.useMemo(() => {
+    if (attendanceMode === "adhoc") {
+      const map = new Map<number, Student>()
+      students.forEach((s) => map.set(s.id, s))
+      manuallyAddedStudents.forEach((s) => map.set(s.id, s))
+      return Array.from(map.values())
     }
-  }, [sessions, adhocSessions, attendanceMode, selectedClassId, selectedSubjectId, selectedTeacherId, selectedMonth, selectedYear])
 
-  // Automatically select first session for roster view when sessions update
+    if (selectedClassId === "all") return students
+
+    const targetClassId = Number(selectedClassId)
+    const activeClassStudentRelations = classStudents.filter((cs) => {
+      const cId = typeof cs.class_obj === "object" && cs.class_obj ? cs.class_obj.id : cs.class_obj_id ?? (typeof cs.class_obj === "number" ? cs.class_obj : null)
+      return cId === targetClassId
+    })
+
+    const studentIds = new Set(
+      activeClassStudentRelations.map((cs) => {
+        return typeof cs.student === "object" && cs.student ? cs.student.id : cs.student_id ?? (typeof cs.student === "number" ? cs.student : null)
+      })
+    )
+
+    return students.filter((s) => studentIds.has(s.id))
+  }, [attendanceMode, selectedClassId, students, classStudents, manuallyAddedStudents])
+
+  // Filtered Sessions for Column Headers
+  const filteredSessions = React.useMemo(() => {
+    if (attendanceMode === "adhoc") {
+      return adhocSessions.filter((s) => {
+        const d = parseBackendDateTime(`${s.date}T${s.start_time}`)
+        if (isNaN(d.getTime())) return true
+
+        const matchYear = d.getFullYear() === Number(selectedYear)
+        const matchMonth = d.getMonth() + 1 === Number(selectedMonth)
+        const matchSubject = selectedSubjectId === "all" || (s.subject && s.subject.id.toString() === selectedSubjectId)
+        const matchTeacher = selectedTeacherId === "all" || (s.teacher && s.teacher.id.toString() === selectedTeacherId)
+
+        return matchYear && matchMonth && matchSubject && matchTeacher
+      })
+    }
+
+    return sessions.filter((s) => {
+      const d = parseBackendDateTime(s.start_time)
+      if (isNaN(d.getTime())) return true
+
+      const matchYear = d.getFullYear() === Number(selectedYear)
+      const matchMonth = d.getMonth() + 1 === Number(selectedMonth)
+      const matchClass = selectedClassId === "all" || (s.class_obj && s.class_obj.id.toString() === selectedClassId)
+      const matchSubject = selectedSubjectId === "all" || (s.timetable_slot && s.timetable_slot.subject && s.timetable_slot.subject.id.toString() === selectedSubjectId)
+      const matchTeacher = selectedTeacherId === "all" || (s.teacher && s.teacher.id.toString() === selectedTeacherId)
+
+      return matchYear && matchMonth && matchClass && matchSubject && matchTeacher
+    })
+  }, [attendanceMode, adhocSessions, sessions, selectedYear, selectedMonth, selectedClassId, selectedSubjectId, selectedTeacherId])
+
+  // Auto-select first session for Roster view if none selected
   React.useEffect(() => {
-    if (filteredSessions.length > 0) {
+    if (viewLayout === "roster" && filteredSessions.length > 0) {
       if (rosterSessionId === null || !filteredSessions.some((s) => s.id === rosterSessionId)) {
         setRosterSessionId(filteredSessions[0].id)
       }
-    } else {
-      setRosterSessionId(null)
     }
-  }, [filteredSessions, rosterSessionId])
+  }, [viewLayout, filteredSessions, rosterSessionId])
 
-  // Selected session object for Roster View
+  // Selected session object for Roster view
   const selectedRosterSession = React.useMemo(() => {
     if (!rosterSessionId) return null
     return filteredSessions.find((s) => s.id === rosterSessionId) ?? null
   }, [filteredSessions, rosterSessionId])
 
-  // Identify which students should show up as Rows
-  const rowStudents = React.useMemo(() => {
-    let baseStudents: Student[] = []
-
+  // Status mapping helper
+  const getAttendanceRecord = (studentId: number, sessionId: number) => {
     if (attendanceMode === "adhoc") {
-      // Ad-hoc tutoring: find students who have any attendance record in the filtered sessions
-      const filteredSessionIds = filteredSessions.map((fs) => fs.id)
-      const studentsWithAttendanceIds = adhocAttendances
-        .filter((a) => a.ad_hoc_session && filteredSessionIds.includes(a.ad_hoc_session.id))
-        .map((a) => a.student?.id)
-      
-      baseStudents = students.filter((s) => studentsWithAttendanceIds.includes(s.id))
+      return adhocAttendances.find((a) => {
+        const sId = typeof a.student === "object" && a.student ? a.student.id : a.student_id ?? (typeof a.student === "number" ? a.student : null)
+        const sessId = typeof a.adhoc_session === "object" && a.adhoc_session ? a.adhoc_session.id : (a.ad_hoc_session && typeof a.ad_hoc_session === "object" ? a.ad_hoc_session.id : (a.adhoc_session_id ?? a.ad_hoc_session_id ?? (typeof a.adhoc_session === "number" ? a.adhoc_session : null)))
+        return sId === studentId && sessId === sessionId
+      })
     } else {
-      if (selectedClassId === "all") {
-        baseStudents = students
-      } else {
-        // Find students enrolled in the selected class
-        const targetClassId = Number(selectedClassId)
-        const studentIdsInClass = classStudents
-          .filter((cs) => {
-            const cId = typeof cs.class_obj === "object" ? cs.class_obj.id : cs.class_obj
-            return cId === targetClassId
-          })
-          .map((cs) => {
-            return typeof cs.student === "object" ? cs.student.id : cs.student
-          })
-
-        baseStudents = students.filter((s) => studentIdsInClass.includes(s.id))
-      }
+      return attendances.find((a) => {
+        const sId = typeof a.student === "object" && a.student ? a.student.id : a.student_id ?? (typeof a.student === "number" ? a.student : null)
+        const sessId = typeof a.session === "object" && a.session ? a.session.id : a.session_id ?? (typeof a.session === "number" ? a.session : null)
+        return sId === studentId && sessId === sessionId
+      })
     }
+  }
 
-    // Combine with manually added students (from the search) and remove duplicates
-    const combined = [...baseStudents, ...manuallyAddedStudents]
-    const seen = new Set<number>()
-    const unique: Student[] = []
-    
-    for (const student of combined) {
-      if (!seen.has(student.id)) {
-        seen.add(student.id)
-        unique.push(student)
-      }
-    }
-
-    // Sort alphabetically by name
-    return unique.sort((a, b) => a.name.localeCompare(b.name))
-  }, [students, classStudents, selectedClassId, manuallyAddedStudents, filteredSessions, adhocAttendances, attendanceMode])
-
-  // Update attendance status using the select dropdown or roster toggle
+  // Attendance Status Change Handler
   const handleStatusChange = async (studentId: number, sessionId: number, newStatus: SessionAttendanceStatus) => {
-    if (!isLoaded || !isSignedIn) {
-      setError("Authentication state is loading or user is not signed in.")
-      return
-    }
-
-    const cellKey = `${studentId}-${sessionId}`
-    if (pendingCells[cellKey]) return
-
-    setPendingCells((prev) => ({ ...prev, [cellKey]: true }))
-    setError(null)
+    const key = `${studentId}-${sessionId}`
+    setPendingCells((prev) => ({ ...prev, [key]: true }))
 
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
 
-      if (attendanceMode === "class") {
-        const existing = attendances.find((a) => a.student_id === studentId && a.session_id === sessionId)
+      const existingRecord = getAttendanceRecord(studentId, sessionId)
+      const isAttended = newStatus === "present" || newStatus === "late"
 
-        if (existing) {
-          const updated = await api.updateSessionAttendance(existing.id, { status: newStatus })
-          const updatedWithIds = {
-            ...updated,
-            session_id: sessionId,
-            student_id: studentId,
-          }
-          setAttendances((prev) => prev.map((a) => (a.id === existing.id ? updatedWithIds : a)))
-        } else {
-          const newRecord = await api.createSessionAttendance({
-            session_id: sessionId,
-            student_id: studentId,
+      if (attendanceMode === "adhoc") {
+        if (existingRecord) {
+          const updated = await api.updateAdHocSessionAttendance(existingRecord.id, {
             status: newStatus,
+            attended: isAttended,
           })
-          const recordWithIds = {
-            ...newRecord,
-            session_id: sessionId,
-            student_id: studentId,
-          }
-          setAttendances((prev) => [...prev, recordWithIds])
+          setAdhocAttendances((prev) =>
+            prev.map((item) => (item.id === existingRecord.id ? { ...item, ...updated, status: newStatus } : item))
+          )
+        } else {
+          const created = await api.createAdHocSessionAttendance({
+            adhoc_session: sessionId,
+            student: studentId,
+            status: newStatus,
+            attended: isAttended,
+          })
+          setAdhocAttendances((prev) => [...prev, { ...created, status: newStatus }])
         }
       } else {
-        // adhoc mode
-        const existing = adhocAttendances.find((a) => a.student?.id === studentId && a.ad_hoc_session?.id === sessionId)
-
-        if (existing) {
-          const updated = await api.updateAdHocSessionAttendance(existing.id, { status: newStatus })
-          const updatedWithIds = {
-            ...updated,
-            ad_hoc_session_id: sessionId,
-            student_id: studentId,
-            ad_hoc_session: updated.ad_hoc_session || existing.ad_hoc_session || { id: sessionId },
-            student: updated.student || existing.student || { id: studentId },
-          }
-          setAdhocAttendances((prev) => prev.map((a) => (a.id === existing.id ? updatedWithIds : a)))
-        } else {
-          const newRecord = await api.createAdHocSessionAttendance({
-            ad_hoc_session_id: sessionId,
-            student_id: studentId,
+        if (existingRecord) {
+          const updated = await api.updateSessionAttendance(existingRecord.id, {
             status: newStatus,
+            attended: isAttended,
           })
-          const recordWithIds = {
-            ...newRecord,
-            ad_hoc_session_id: sessionId,
-            student_id: studentId,
-            ad_hoc_session: newRecord.ad_hoc_session || { id: sessionId },
-            student: newRecord.student || { id: studentId },
-          }
-          setAdhocAttendances((prev) => [...prev, recordWithIds])
+          setAttendances((prev) =>
+            prev.map((item) => (item.id === existingRecord.id ? { ...item, ...updated, status: newStatus } : item))
+          )
+        } else {
+          const created = await api.createSessionAttendance({
+            session: sessionId,
+            student: studentId,
+            status: newStatus,
+            attended: isAttended,
+          })
+          setAttendances((prev) => [...prev, { ...created, status: newStatus }])
         }
       }
     } catch (err) {
       console.error(err)
-      setError(err instanceof ApiError ? err.userMessage : "Failed to update attendance")
+      setError("Failed to save attendance record")
     } finally {
-      setPendingCells((prev) => ({ ...prev, [cellKey]: false }))
+      setPendingCells((prev) => ({ ...prev, [key]: false }))
     }
   }
 
-  // Batch action: Mark All Present for a session
+  // 1-Tap Roster Quick Actions
   const handleMarkAllPresent = async (sessionId: number) => {
-    if (rowStudents.length === 0) return
     for (const student of rowStudents) {
       await handleStatusChange(student.id, sessionId, "present")
     }
   }
 
-  // Handle manual creation of ad-hoc session
+  // Handle Create Ad-Hoc Session Form Submit
   const handleCreateAdHocSession = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isLoaded || !isSignedIn) return
-    if (!newSubjectId || !newTeacherId || !newDate || !newStartTime || !newEndTime) {
-      setError("Please fill in all required fields.")
-      return
-    }
+    if (!newSubjectId || !newTeacherId || !newDate || !newStartTime || !newEndTime) return
 
     setIsCreatingSession(true)
     setError(null)
@@ -502,7 +490,6 @@ export default function AttendancePage() {
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
 
-      // Format times to HH:MM:SS format
       const formattedStartTime = newStartTime.length === 5 ? `${newStartTime}:00` : newStartTime
       const formattedEndTime = newEndTime.length === 5 ? `${newEndTime}:00` : newEndTime
 
@@ -515,10 +502,8 @@ export default function AttendancePage() {
         status: "scheduled",
       })
 
-      // Append the newly created session to the list of ad-hoc sessions
       setAdhocSessions((prev) => [...prev, created])
 
-      // Reset form states
       setNewSubjectId("")
       setNewTeacherId("")
       setNewDate(new Date().toISOString().split("T")[0])
@@ -533,48 +518,23 @@ export default function AttendancePage() {
     }
   }
 
-  // Student Search filter results
-  const searchResults = React.useMemo(() => {
-    if (!searchQuery) return []
-    const normalizedQuery = searchQuery.toLowerCase()
-    
-    // Don't show students already in the row list
-    const currentStudentIds = rowStudents.map((s) => s.id)
-    
-    return students
-      .filter((s) => s.name.toLowerCase().includes(normalizedQuery) && !currentStudentIds.includes(s.id))
-      .slice(0, 5) // Limit to top 5 results
-  }, [searchQuery, students, rowStudents])
-
-  // Handle adding student from search to the row list
-  const handleAddManualStudent = (student: Student) => {
-    setManuallyAddedStudents((prev) => [...prev, student])
-    setSearchQuery("")
-    setShowSearchDropdown(false)
-  }
-
   const classItems = React.useMemo(() => {
-    return classes.map((c) => ({
+    const list = classes.map((c) => ({
       value: c.id.toString(),
       label: `${c.education_level} - ${c.cohort_identifier} ${c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}`.trim(),
     }))
+    return [{ value: "all", label: "All Classes" }, ...list]
   }, [classes])
 
   const subjectItems = React.useMemo(() => {
     const list = subjects.map((sub) => ({ value: sub.id.toString(), label: sub.name }))
-    if (attendanceMode === "class") {
-      return [{ value: "all", label: "All Subjects" }, ...list]
-    }
-    return list
-  }, [subjects, attendanceMode])
+    return [{ value: "all", label: "All Subjects" }, ...list]
+  }, [subjects])
 
   const teacherItems = React.useMemo(() => {
     const list = teachers.map((t) => ({ value: t.id.toString(), label: t.name }))
-    if (attendanceMode === "class") {
-      return [{ value: "all", label: "All Teachers" }, ...list]
-    }
-    return list
-  }, [teachers, attendanceMode])
+    return [{ value: "all", label: "All Teachers" }, ...list]
+  }, [teachers])
 
   const monthItems = React.useMemo(() => {
     return MONTHS.map((m) => ({ value: m.value.toString(), label: m.label }))
@@ -599,25 +559,6 @@ export default function AttendancePage() {
     })
   }, [filteredSessions])
 
-  const resolvedClassName = React.useMemo(() => {
-    if (attendanceMode === "adhoc") return "Ad-Hoc / Tutoring Sessions (No Class)"
-    const c = classes.find((cls) => cls.id === Number(selectedClassId))
-    return c ? `${c.education_level} - ${c.cohort_identifier} ${c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}` : "Select a Class"
-  }, [classes, selectedClassId, attendanceMode])
-
-  const resolvedSubjectName = React.useMemo(() => {
-    if (selectedSubjectId === "all") return "All Subjects"
-    if (selectedSubjectId === "adhoc") return "Ad-Hoc"
-    const s = subjects.find((sub) => sub.id === Number(selectedSubjectId))
-    return s ? s.name : "Select a Subject"
-  }, [subjects, selectedSubjectId])
-
-  const resolvedTeacherName = React.useMemo(() => {
-    if (selectedTeacherId === "all") return "All Teachers"
-    const t = teachers.find((t) => t.id === Number(selectedTeacherId))
-    return t ? t.name : "Select a Teacher"
-  }, [teachers, selectedTeacherId])
-
   if (!isLoaded) {
     return (
       <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
@@ -639,8 +580,6 @@ export default function AttendancePage() {
       </div>
     )
   }
-
-
 
   // Filtered roster students for Session Roster View
   const rosterStudentsFiltered = rowStudents.filter((s) =>
@@ -675,7 +614,7 @@ export default function AttendancePage() {
         }
       />
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -744,7 +683,7 @@ export default function AttendancePage() {
             </button>
           </div>
 
-          {/* DUAL VIEW SWITCHER: Matrix Grid vs Session Roster */}
+          {/* DUAL VIEW SWITCHER */}
           <div className="flex rounded-lg border border-border bg-muted/50 p-1">
             <button
               type="button"
@@ -786,10 +725,11 @@ export default function AttendancePage() {
               <Select 
                 value={newSubjectId} 
                 onValueChange={(val) => setNewSubjectId(val ?? "")}
-                items={subjects.map((s) => ({ value: s.id.toString(), label: s.name }))}
               >
                 <SelectTrigger className="w-full bg-background">
-                  <SelectValue placeholder="Select Subject" />
+                  <SelectValue placeholder="Select Subject">
+                    {subjects.find((s) => s.id.toString() === newSubjectId)?.name ?? "Select Subject"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {subjects.map((sub) => (
@@ -806,10 +746,11 @@ export default function AttendancePage() {
               <Select 
                 value={newTeacherId} 
                 onValueChange={(val) => setNewTeacherId(val ?? "")}
-                items={teachers.map((t) => ({ value: t.id.toString(), label: t.name }))}
               >
                 <SelectTrigger className="w-full bg-background">
-                  <SelectValue placeholder="Select Teacher" />
+                  <SelectValue placeholder="Select Teacher">
+                    {teachers.find((t) => t.id.toString() === newTeacherId)?.name ?? "Select Teacher"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {teachers.map((t) => (
@@ -880,7 +821,7 @@ export default function AttendancePage() {
       {/* Filters Card */}
       <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-          {/* Class Filter */}
+          {/* Class Filter Combobox */}
           {attendanceMode === "class" && (
             <div className="flex-1 space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -888,7 +829,7 @@ export default function AttendancePage() {
                 Class
               </label>
               <SearchableSelect
-                options={classItems.map((c) => ({ value: c.value, label: c.label }))}
+                options={classItems}
                 value={selectedClassId}
                 onValueChange={(val) => setSelectedClassId(val)}
                 placeholder="Select class..."
@@ -897,7 +838,7 @@ export default function AttendancePage() {
             </div>
           )}
 
-          {/* Subject Filter */}
+          {/* Subject Filter Combobox */}
           <div className="flex-1 space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <BookOpen className="h-3.5 w-3.5" />
@@ -912,7 +853,7 @@ export default function AttendancePage() {
             />
           </div>
 
-          {/* Teacher Filter */}
+          {/* Teacher Filter Combobox */}
           <div className="flex-1 space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5" />
@@ -927,7 +868,7 @@ export default function AttendancePage() {
             />
           </div>
 
-          {/* Month Filter */}
+          {/* Month Filter Combobox */}
           <div className="flex-1 space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
@@ -942,7 +883,7 @@ export default function AttendancePage() {
             />
           </div>
 
-          {/* Year Filter */}
+          {/* Year Filter Combobox */}
           <div className="w-32 space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
@@ -956,15 +897,60 @@ export default function AttendancePage() {
               searchPlaceholder="Search year..."
             />
           </div>
-        </div>
 
+          {/* Generate Sessions Button */}
+          {attendanceMode === "class" && (
+            <div className="pt-2 sm:pt-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateSessions}
+                disabled={isGeneratingSessions || selectedClassId === "all" || selectedClassId === "adhoc"}
+                className="w-full sm:w-auto h-9 text-xs font-semibold gap-1.5"
+              >
+                {isGeneratingSessions ? (
+                  <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                ) : (
+                  <Sparkles className="size-3.5 text-primary" />
+                )}
+                <span>{isGeneratingSessions ? "Generating..." : "Generate Month Sessions"}</span>
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Success Banner */}
+      {successMsg && (
+        <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="size-4 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <Button size="xs" variant="ghost" onClick={() => setSuccessMsg(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button size="xs" variant="ghost" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       {/* ── MAIN ATTENDANCE DISPLAY (MATRIX vs ROSTER) ── */}
       {viewLayout === "roster" ? (
-        /* ── SESSION ROSTER VIEW (Mobile 1-Tap Toggle List) ── */
+        /* ── SESSION ROSTER VIEW ── */
         <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-xs space-y-6">
-          {/* Session Switcher Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
             <div className="space-y-1">
               <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -976,30 +962,15 @@ export default function AttendancePage() {
               </p>
             </div>
 
-            {/* Session Selector & Bulk Action */}
             <div className="flex items-center gap-3 flex-wrap">
               <div className="w-64 sm:w-72">
-                <Select
+                <SearchableSelect
+                  options={rosterSessionItems}
                   value={rosterSessionId?.toString() ?? ""}
                   onValueChange={(val) => setRosterSessionId(val ? Number(val) : null)}
-                  items={rosterSessionItems}
-                >
-                  <SelectTrigger className="h-10 bg-background">
-                    <SelectValue placeholder="Select Session Date…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredSessions.map((session, idx) => {
-                      const d = getSessionStartTime(session)
-                      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })
-                      const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
-                      return (
-                        <SelectItem key={session.id} value={session.id.toString()}>
-                          #{idx + 1} • {dateStr} ({timeStr})
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select Session Date…"
+                  searchPlaceholder="Search session date..."
+                />
               </div>
 
               {selectedRosterSession && (
@@ -1008,285 +979,203 @@ export default function AttendancePage() {
                   size="sm"
                   onClick={() => handleMarkAllPresent(selectedRosterSession.id)}
                   disabled={rowStudents.length === 0}
-                  className="gap-1.5 shadow-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-emerald-500/30"
+                  className="h-10 text-xs font-semibold gap-1.5"
                 >
-                  <CheckCircle2 className="size-4" />
+                  <Sparkles className="size-4 text-emerald-500" />
                   <span>Mark All Present</span>
                 </Button>
               )}
             </div>
           </div>
 
-          {/* Roster Controls & Search */}
           {selectedRosterSession ? (
-            <>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search student roster..."
-                    value={rosterSearch}
-                    onChange={(e) => setRosterSearch(e.target.value)}
-                    className="pl-9 bg-background"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                  <Badge variant="secondary" className="px-3 py-1">
-                    {rosterStudentsFiltered.length} student{rosterStudentsFiltered.length !== 1 ? "s" : ""}
-                  </Badge>
-                </div>
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Filter student roster..."
+                  value={rosterSearch}
+                  onChange={(e) => setRosterSearch(e.target.value)}
+                  className="pl-10 h-10 text-xs"
+                />
               </div>
 
-              {/* Roster Cards List */}
-              {rosterStudentsFiltered.length === 0 ? (
-                <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center text-muted-foreground">
-                  <Users className="size-8 opacity-30 mb-2" />
-                  <p className="text-sm font-semibold">No students found in this roster.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {rosterStudentsFiltered.map((student) => {
-                    const cellKey = `${student.id}-${selectedRosterSession.id}`
-                    const isPending = pendingCells[cellKey]
-                    const record = attendanceMode === "class"
-                      ? attendances.find((a) => a.student_id === student.id && a.session_id === selectedRosterSession.id)
-                      : adhocAttendances.find((a) => a.student?.id === student.id && a.ad_hoc_session?.id === selectedRosterSession.id)
-                    const status = record?.status ?? ""
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {rosterStudentsFiltered.map((student) => {
+                  const record = getAttendanceRecord(student.id, selectedRosterSession.id)
+                  const currentStatus = record?.status ?? "unmarked"
+                  const isPending = pendingCells[`${student.id}-${selectedRosterSession.id}`]
 
-                    return (
-                      <motion.div
-                        key={student.id}
-                        whileHover={{ scale: 1.005 }}
-                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all ${
-                          status === "present"
-                            ? "bg-emerald-500/5 border-emerald-500/30"
-                            : status === "late"
-                            ? "bg-amber-500/5 border-amber-500/30"
-                            : "bg-card border-border"
-                        }`}
-                      >
-                        {/* Student Name */}
-                        <div className="flex items-center gap-3 mb-3 sm:mb-0">
-                          <div className={`flex size-10 items-center justify-center rounded-lg font-bold text-sm ${
-                            status === "present"
-                              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                              : status === "late"
-                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                              : "bg-muted text-muted-foreground"
-                          }`}>
-                            {student.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-foreground">{student.name}</p>
-                            <p className="text-xs text-muted-foreground">ID: #{student.id}</p>
-                          </div>
-                        </div>
+                  return (
+                    <div
+                      key={student.id}
+                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                        currentStatus === "present"
+                          ? "bg-emerald-500/5 border-emerald-500/30"
+                          : currentStatus === "late"
+                          ? "bg-amber-500/5 border-amber-500/30"
+                          : currentStatus === "absent"
+                          ? "bg-rose-500/5 border-rose-500/30"
+                          : "bg-muted/30 border-border"
+                      }`}
+                    >
+                      <div className="grid gap-0.5">
+                        <span className="font-semibold text-sm text-foreground">{student.name}</span>
+                        <span className="text-[11px] text-muted-foreground">ID: #{student.id}</span>
+                      </div>
 
-                        {/* 1-Tap Status Toggle Buttons */}
+                      <div className="flex items-center gap-1">
                         {isPending ? (
-                          <div className="flex h-9 items-center justify-center px-4">
-                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                          </div>
+                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
                         ) : (
-                          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border/60">
-                            <motion.button
-                              whileTap={{ scale: 0.93 }}
+                          <>
+                            <button
+                              type="button"
                               onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "present")}
-                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                                status === "present"
-                                  ? "bg-emerald-600 text-white shadow-xs"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
+                                currentStatus === "present"
+                                  ? "bg-emerald-500 text-white border-emerald-600 shadow-xs"
+                                  : "border-border bg-background text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10"
                               }`}
+                              title="Present"
                             >
-                              <CheckCircle2 className="size-3.5" />
-                              <span>Present</span>
-                            </motion.button>
+                              <CheckCircle2 className="size-4" />
+                            </button>
 
-                            <motion.button
-                              whileTap={{ scale: 0.93 }}
+                            <button
+                              type="button"
                               onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "late")}
-                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                                status === "late"
-                                  ? "bg-amber-500 text-white shadow-xs"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
+                                currentStatus === "late"
+                                  ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                                  : "border-border bg-background text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10"
                               }`}
+                              title="Late"
                             >
-                              <AlertTriangle className="size-3.5" />
-                              <span>Late</span>
-                            </motion.button>
+                              <AlertTriangle className="size-4" />
+                            </button>
 
-                            <motion.button
-                              whileTap={{ scale: 0.93 }}
+                            <button
+                              type="button"
                               onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "absent")}
-                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                                status === "absent"
-                                  ? "bg-rose-600 text-white shadow-xs"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
+                                currentStatus === "absent"
+                                  ? "bg-rose-500 text-white border-rose-600 shadow-xs"
+                                  : "border-border bg-background text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
                               }`}
+                              title="Absent"
                             >
-                              <XCircle className="size-3.5" />
-                              <span>Absent</span>
-                            </motion.button>
-                          </div>
+                              <XCircle className="size-4" />
+                            </button>
+                          </>
                         )}
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              )}
-            </>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           ) : (
-            <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center text-muted-foreground">
-              <Calendar className="size-8 opacity-30 mb-2" />
-              <p className="text-sm font-semibold">No session selected.</p>
-              <p className="text-xs mt-1">Please pick a class and date to load the attendance roster.</p>
+            <div className="py-12 text-center text-muted-foreground">
+              <p>No session selected. Please select a session from the dropdown above.</p>
             </div>
           )}
         </div>
       ) : (
-        /* ── MATRIX GRID SPREADSHEET VIEW ── */
-        <div className="rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
-          {/* Info Header Bar */}
-          <div className="p-4 bg-muted/30 border-b border-border flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <GraduationCap className="h-4 w-4 text-primary" />
-                <span><strong>Class:</strong> <span className="text-foreground">{resolvedClassName}</span></span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4 text-primary" />
-                <span><strong>Subject:</strong> <span className="text-foreground">{resolvedSubjectName}</span></span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-primary" />
-                <span><strong>Teacher:</strong> <span className="text-foreground">{resolvedTeacherName}</span></span>
-              </span>
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex h-60 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredSessions.length === 0 ? (
-            <div className="flex h-60 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-              <Calendar className="h-10 w-10 opacity-30 mb-2" />
-              <p className="font-semibold text-sm">No Sessions Found</p>
-              <p className="text-xs max-w-sm mt-1">
-                No tutoring or class sessions were scheduled for this Class, Subject, and Teacher combination in the selected month.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-none hinthar-scrollbar">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-60 min-w-60 sticky left-0 z-10 bg-card border-r rounded-none">
-                      Student Name
-                    </TableHead>
-                    {filteredSessions.map((session, index) => {
-                      const d = getSessionStartTime(session)
-                      const dateStr = d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" })
-                      const dayStr = d.toLocaleDateString("en-US", { weekday: "short" })
-                      const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
-                      
-                      return (
-                        <TableHead key={session.id} className="text-center min-w-40 py-4 border-r">
-                          <div className="flex flex-col items-center relative">
-                            {/* Column index / Session Number */}
-                            <span className="absolute -top-2 left-1 text-[9px] font-bold text-muted-foreground bg-muted border border-border rounded-full h-4 w-5 flex items-center justify-center">
-                              #{index + 1}
-                            </span>
-                            
-                            <span className="font-bold text-sm text-foreground mt-2">{dateStr}</span>
-                            <span className="text-xs font-semibold text-muted-foreground">{dayStr} ({timeStr})</span>
-                            
-                            <div className="flex flex-col gap-1 mt-1.5 items-center">
-                              {"timetable_slot" in session && session.timetable_slot ? (
-                                <span className="text-[10px] uppercase font-extrabold text-primary px-1.5 py-0.5 bg-primary/10 rounded">
-                                  {session.timetable_slot.subject.name}
-                                </span>
-                              ) : "subject" in session && session.subject ? (
-                                <span className="text-[10px] uppercase font-extrabold text-amber-500 px-1.5 py-0.5 bg-amber-500/10 rounded">
-                                  {session.subject.name}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] uppercase font-extrabold text-amber-500 px-1.5 py-0.5 bg-amber-500/10 rounded">
-                                  Ad-Hoc
-                                </span>
-                              )}
-                              <span className="text-[9px] font-semibold text-muted-foreground truncate max-w-28" title={session.teacher.name}>
-                                T: {session.teacher.name}
-                              </span>
-                            </div>
-                          </div>
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rowStudents.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={filteredSessions.length + 1} className="h-32 text-center text-muted-foreground text-sm">
-                        No students found. Try adjusting your filters or use the search bar above to manually add students.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    rowStudents.map((student) => (
-                      <TableRow key={student.id} className="hover:bg-muted/30">
-                        {/* Student details column sticky */}
-                        <TableCell className="font-semibold sticky left-0 z-10 bg-card border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] rounded-none">
-                          <div className="flex flex-col">
-                            <span className="text-foreground">{student.name}</span>
-                            <span className="text-[10px] text-muted-foreground">ID: #{student.id}</span>
-                          </div>
-                        </TableCell>
-                        {/* Attendance Cells */}
-                        {filteredSessions.map((session) => {
-                          const cellKey = `${student.id}-${session.id}`
-                          const isPending = pendingCells[cellKey]
-                          const record = attendanceMode === "class"
-                            ? attendances.find((a) => a.student_id === student.id && a.session_id === session.id)
-                            : adhocAttendances.find((a) => a.student?.id === student.id && a.ad_hoc_session?.id === session.id)
+        /* ── MATRIX GRID VIEW ── */
+        <Card className="rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
+          <div className="overflow-x-auto hinthar-scrollbar">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="sticky left-0 z-20 w-56 font-bold text-foreground text-xs uppercase tracking-wider bg-card shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                    Student Name
+                  </TableHead>
+                  {filteredSessions.map((session, idx) => {
+                    const d = getSessionStartTime(session)
+                    const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })
+                    const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
 
-                          return (
-                            <TableCell key={session.id} className="text-center border-r">
-                              {isPending ? (
-                                <div className="mx-auto flex h-10 w-28 items-center justify-center">
-                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                </div>
-                              ) : (
-                                <Select
-                                  value={record ? record.status : "—"}
-                                  onValueChange={(val) => handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)}
+                    return (
+                      <TableHead key={session.id} className="min-w-32 text-center text-xs">
+                        <div className="flex flex-col items-center py-1">
+                          <span className="font-bold text-foreground">#{idx + 1}</span>
+                          <span className="text-[11px] font-medium text-muted-foreground">{dateStr}</span>
+                          <span className="text-[10px] text-muted-foreground/80">{timeStr}</span>
+                        </div>
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading && !lastLoaded ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="sticky left-0 z-10 w-56 bg-card shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"><div className="h-4 w-36 animate-pulse rounded bg-muted" /></TableCell>
+                      {Array.from({ length: 4 }).map((_, j) => (
+                        <TableCell key={j}><div className="mx-auto h-8 w-24 animate-pulse rounded-lg bg-muted" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : rowStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={filteredSessions.length + 1} className="h-36 text-center text-muted-foreground">
+                      No enrolled students found for this class.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rowStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="sticky left-0 z-10 w-56 font-semibold text-foreground text-xs bg-card shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        <div className="flex flex-col">
+                          <span>{student.name}</span>
+                          <span className="text-[10px] font-normal text-muted-foreground">ID: #{student.id}</span>
+                        </div>
+                      </TableCell>
+
+                      {filteredSessions.map((session) => {
+                        const record = getAttendanceRecord(student.id, session.id)
+                        const key = `${student.id}-${session.id}`
+                        const isPending = pendingCells[key]
+
+                        return (
+                          <TableCell key={session.id} className="text-center p-2">
+                            {isPending ? (
+                              <div className="flex h-9 items-center justify-center">
+                                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (
+                              <Select
+                                value={record ? (record.status ?? "absent") : "absent"}
+                                onValueChange={(val) => handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)}
+                              >
+                                <SelectTrigger 
+                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${getSelectStyles(record?.status ?? undefined)}`}
+                                  size="sm"
                                 >
-                                  <SelectTrigger 
-                                    className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${getSelectStyles(record?.status)}`}
-                                    size="sm"
-                                  >
-                                    <SelectValue placeholder="Absent" />
-                                  </SelectTrigger>
-                                  <SelectContent align="center" className="min-w-28">
-                                    <SelectItem value="present" className="text-emerald-600 dark:text-emerald-400 font-semibold">Present</SelectItem>
-                                    <SelectItem value="late" className="text-amber-600 dark:text-amber-400 font-semibold">Late</SelectItem>
-                                    <SelectItem value="absent" className="text-rose-600 dark:text-rose-400 font-semibold">Absent</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              )}
-                            </TableCell>
-                          )
-                        })}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
+                                  <SelectValue placeholder="Absent">
+                                    {statusItems.find((st) => st.value === record?.status)?.label ?? (record?.status ? record.status : "Absent")}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent align="center" className="min-w-28">
+                                  <SelectItem value="present" className="text-emerald-600 dark:text-emerald-400 font-semibold">Present</SelectItem>
+                                  <SelectItem value="late" className="text-amber-600 dark:text-amber-400 font-semibold">Late</SelectItem>
+                                  <SelectItem value="absent" className="text-rose-600 dark:text-rose-400 font-semibold">Absent</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       )}
     </div>
   )

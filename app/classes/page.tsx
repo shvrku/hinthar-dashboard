@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, Users, ArrowLeft, GraduationCap } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, ArrowLeft, GraduationCap, Users } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { Class, ClassPayload, EDUCATION_LEVELS, Student, ClassStudent } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
@@ -32,11 +33,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 
-
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: 6 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -56,6 +56,11 @@ export default function ClassesPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false)
 
   // Search
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -88,6 +93,7 @@ export default function ClassesPage() {
     if (!isSignedIn) return
     setLoading(true)
     setError(null)
+    setSelectedIds([])
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
@@ -111,8 +117,6 @@ export default function ClassesPage() {
       setLoading(false)
     }
   }, [getToken, isSignedIn])
-
-
 
   const openAddModal = () => {
     setEditingClass(null)
@@ -184,6 +188,7 @@ export default function ClassesPage() {
       const api = createApi(token)
       await api.deleteClass(id)
       setSuccessMessage("Class deleted successfully.")
+      setSelectedIds((prev) => prev.filter((item) => item !== id))
       setDeleteConfirmId(null)
       await loadData()
     } catch (err) {
@@ -194,6 +199,30 @@ export default function ClassesPage() {
       }
     } finally {
       setDeleteSubmitting(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0 || bulkDeleting) return
+    setBulkDeleting(true)
+    setError(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      const res = await api.bulkDeleteClasses(selectedIds)
+      setSuccessMessage(`Successfully deleted ${res.deleted_count} class(es).`)
+      setSelectedIds([])
+      setBulkConfirmOpen(false)
+      await loadData()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to delete selected classes")
+      }
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -247,44 +276,57 @@ export default function ClassesPage() {
   // Pagination
   const pagination = usePagination(sortedClasses, 10)
 
-  // Roster helpers
-  const assignedStudentIds = React.useMemo(() => {
-    return new Set(
-      classStudents.map((cs) =>
-        typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
-      )
-    )
-  }, [classStudents])
+  // Selection helpers
+  const currentPageIds = React.useMemo(
+    () => pagination.paginatedItems.map((c) => c.id),
+    [pagination.paginatedItems]
+  )
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
 
+  const toggleSelectAll = () => {
+    if (allCurrentPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])))
+    }
+  }
+
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  // Roster helpers
   const enrolledList = React.useMemo(() => {
     if (!activeRosterClass) return []
-    const classStudentMap = new Map<number, number>()
-    for (const cs of classStudents) {
-      const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj.id : cs.class_obj
-      const studentId = typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
-      if (classId === activeRosterClass.id) {
-        classStudentMap.set(studentId, cs.id)
-      }
-    }
-    return students
-      .filter((s) => classStudentMap.has(s.id))
-      .map((s) => ({
-        student: s,
-        classStudentId: classStudentMap.get(s.id)!,
-      }))
-  }, [students, classStudents, activeRosterClass])
+    const relations = classStudents.filter((cs) => {
+      const cId = typeof cs.class_obj === "object" && cs.class_obj ? cs.class_obj.id : cs.class_obj_id ?? (typeof cs.class_obj === "number" ? cs.class_obj : null)
+      return cId === activeRosterClass.id
+    })
+    return relations
+      .map((cs) => {
+        const sId = typeof cs.student === "object" && cs.student ? cs.student.id : cs.student_id ?? (typeof cs.student === "number" ? cs.student : null)
+        const student = students.find((s) => s.id === sId)
+        return student ? { student, classStudentId: cs.id } : null
+      })
+      .filter((x): x is { student: Student; classStudentId: number } => x !== null)
+  }, [activeRosterClass, classStudents, students])
 
-  const unassignedList = React.useMemo(() => {
-    return students.filter((s) => !assignedStudentIds.has(s.id))
-  }, [students, assignedStudentIds])
+  const enrolledStudentIds = React.useMemo(
+    () => new Set(enrolledList.map((x) => x.student.id)),
+    [enrolledList]
+  )
 
   const filteredUnassigned = React.useMemo(() => {
-    if (!rosterSearchQuery.trim()) return unassignedList
+    const unassigned = students.filter((s) => !enrolledStudentIds.has(s.id))
+    if (!rosterSearchQuery.trim()) return unassigned
     const q = rosterSearchQuery.toLowerCase().trim()
-    return unassignedList.filter(
+    return unassigned.filter(
       (s) => s.name.toLowerCase().includes(q) || String(s.id).includes(q)
     )
-  }, [unassignedList, rosterSearchQuery])
+  }, [students, enrolledStudentIds, rosterSearchQuery])
 
   if (!isLoaded) {
     return (
@@ -313,46 +355,36 @@ export default function ClassesPage() {
       {/* Standardized Header */}
       <StandardPageHeader
         title="Classes"
-        description="Manage academic classes, cohorts, and student roster enrollments."
-        primaryAction={
-          !activeRosterClass
-            ? {
-                label: "Add Class",
-                onClick: openAddModal,
-                icon: <Plus className="size-4" />,
-              }
-            : undefined
-        }
-        secondaryAction={
-          !activeRosterClass
-            ? {
-                label: loading ? "Loading..." : "Load Data",
-                onClick: loadData,
-                icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-              }
-            : undefined
-        }
+        description="Manage education levels, cohort identifiers, sub-categories, and student enrollments."
+        primaryAction={{
+          label: "Add Class",
+          onClick: openAddModal,
+          icon: <Plus className="size-4" />,
+        }}
+        secondaryAction={{
+          label: loading ? "Loading..." : "Load Data",
+          onClick: loadData,
+          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+        }}
       />
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
-      {!activeRosterClass && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Classes</p>
-              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <GraduationCap className="size-4" />
-              </div>
+      {/* Metric Highlight Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Classes</p>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <GraduationCap className="size-4" />
             </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">{classes.length}</h2>
-              {lastLoaded && (
-                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-              )}
-            </div>
-          </Card>
-        </div>
-      )}
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">{classes.length}</h2>
+            {lastLoaded && (
+              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+            )}
+          </div>
+        </Card>
+      </div>
 
       {/* Banners */}
       {successMessage && (
@@ -493,11 +525,10 @@ export default function ClassesPage() {
                   />
                 </div>
 
-                {/* Education Level Filter */}
                 <Select value={levelFilter} onValueChange={(val) => setLevelFilter(val ?? "all")}>
                   <SelectTrigger className="w-40 text-xs">
                     <SelectValue>
-                      {levelFilter === "all" ? "All Levels" : EDUCATION_LEVELS.find((l) => l.value === levelFilter)?.label ?? levelFilter}
+                      {levelFilter === "all" ? "All Levels" : (EDUCATION_LEVELS.find((lvl) => lvl.value === levelFilter)?.label ?? levelFilter)}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -511,17 +542,28 @@ export default function ClassesPage() {
                 </Select>
               </div>
 
-              {lastLoaded && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary" className="px-3 py-1 text-xs">
-                    <GraduationCap className="mr-1.5 size-3.5" />
-                    {classes.length} class{classes.length !== 1 ? "es" : ""}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Loaded {lastLoaded}
-                  </span>
-                </div>
-              )}
+              <div className="flex items-center gap-3 shrink-0">
+                {selectedIds.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setBulkConfirmOpen(true)}
+                    className="gap-1.5"
+                  >
+                    <Trash2 className="size-4" />
+                    Delete Selected ({selectedIds.length})
+                  </Button>
+                )}
+
+                {lastLoaded && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="px-3 py-1 text-xs">
+                      <GraduationCap className="mr-1.5 size-3.5" />
+                      {classes.length} class{classes.length !== 1 ? "es" : ""}
+                    </Badge>
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
 
@@ -530,6 +572,14 @@ export default function ClassesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12 text-center">
+                    <Checkbox
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all current page"
+                    />
+                  </TableHead>
+
                   <TableHeadSortable
                     className="w-[100px]"
                     sortKey="id"
@@ -576,46 +626,64 @@ export default function ClassesPage() {
                   Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
                 ) : sortedClasses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                       {classes.length === 0 ? 'Click "Load Data" to fetch classes.' : 'No classes found.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  pagination.paginatedItems.map((cls) => (
-                    <TableRow key={cls.id}>
-                      <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {EDUCATION_LEVELS.find((l) => l.value === cls.education_level)?.label ?? cls.education_level}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-semibold text-foreground">{cls.cohort_identifier}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {cls.cohort_sub_category || "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => openEditModal(cls)}
-                            title="Edit"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setDeleteConfirmId(cls.id)}
-                            title="Delete"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  pagination.paginatedItems.map((cls) => {
+                    const isSelected = selectedIds.includes(cls.id)
+                    return (
+                      <TableRow key={cls.id} data-state={isSelected ? "selected" : undefined}>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelectRow(cls.id)}
+                            aria-label={`Select class ${cls.cohort_identifier}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {EDUCATION_LEVELS.find((l) => l.value === cls.education_level)?.label ?? cls.education_level}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">{cls.cohort_identifier}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {cls.cohort_sub_category || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setActiveRosterClass(cls)}
+                              title="Roster / Students"
+                            >
+                              <Users className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => openEditModal(cls)}
+                              title="Edit"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleteConfirmId(cls.id)}
+                              title="Delete"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
@@ -726,6 +794,27 @@ export default function ClassesPage() {
               disabled={deleteSubmitting}
             >
               {deleteSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk delete confirmation dialog */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent onClose={() => setBulkConfirmOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Delete Multiple Classes</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedIds.length} selected class(es)? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} disabled={bulkDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting && <Loader2 className="mr-2 size-4 animate-spin" />}
               Delete
             </Button>
           </DialogFooter>

@@ -19,8 +19,7 @@ import {
   ChevronsUpDown,
   UserCog,
   LogOut,
-  BadgeCheck,
-  Bell,
+  LogIn,
   School,
   LifeBuoy,
   Send,
@@ -90,7 +89,7 @@ const secondaryItems = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
-  const { user } = useUser()
+  const { user, isSignedIn, isLoaded } = useUser()
   const { openUserProfile, signOut } = useClerk()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
 
@@ -229,49 +228,64 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger
-                render={
-                  <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarImage src={userAvatar} alt={userName} />
-                      <AvatarFallback className="rounded-lg">HT</AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{userName}</span>
-                      <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+            {isLoaded && isSignedIn && user ? (
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger
+                  render={
+                    <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
+                      <Avatar className="h-8 w-8 rounded-lg">
+                        <AvatarImage src={userAvatar} alt={userName} />
+                        <AvatarFallback className="rounded-lg">HT</AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{userName}</span>
+                        <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                      </div>
+                      <ChevronsUpDown className="ml-auto size-4" />
+                    </SidebarMenuButton>
+                  }
+                />
+                <DropdownMenuContent className="w-56" side="right" align="end" sideOffset={4}>
+                  <DropdownMenuLabel className="p-0 font-normal">
+                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                      <Avatar className="h-8 w-8 rounded-lg">
+                        <AvatarImage src={userAvatar} alt={userName} />
+                        <AvatarFallback className="rounded-lg">HT</AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{userName}</span>
+                        <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                      </div>
                     </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                }
-              />
-              <DropdownMenuContent className="w-56" side="right" align="end" sideOffset={4}>
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarImage src={userAvatar} alt={userName} />
-                      <AvatarFallback className="rounded-lg">HT</AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{userName}</span>
-                      <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => openUserProfile()} className="cursor-pointer">
-                    <UserCog className="mr-2 size-4 text-primary" />
-                    <span>Manage Account</span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem onClick={() => openUserProfile()} className="cursor-pointer">
+                      <UserCog className="mr-2 size-4 text-primary" />
+                      <span>Manage Account</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
+                    <LogOut className="mr-2 size-4" />
+                    <span>Log out</span>
                   </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 size-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <SidebarMenuButton
+                size="lg"
+                render={<Link href="/sign-in" />}
+                className="bg-primary/10 hover:bg-primary/20 text-primary font-medium transition-colors"
+                tooltip="Sign In"
+              >
+                <LogIn className="size-4" />
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="font-semibold text-foreground">Sign In</span>
+                  <span className="text-xs text-muted-foreground">Log into account</span>
+                </div>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

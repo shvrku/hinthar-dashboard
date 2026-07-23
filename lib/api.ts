@@ -1,51 +1,37 @@
-const API_BASE = "/api/v1"
-
 export class ApiError extends Error {
-  status: number
-  detail: string
-
-  constructor(status: number, detail: string) {
-    super(detail)
+  constructor(public status: number, public userMessage: string) {
+    super(userMessage)
     this.name = "ApiError"
-    this.status = status
-    this.detail = detail
-  }
-
-  get userMessage(): string {
-    const lowerDetail = (this.detail || "").toLowerCase()
-    const isConflict =
-      this.status === 409 ||
-      (this.status === 400 &&
-        (lowerDetail.includes("conflict") ||
-          lowerDetail.includes("unique set") ||
-          lowerDetail.includes("already") ||
-          lowerDetail.includes("overlap") ||
-          lowerDetail.includes("teacher") ||
-          lowerDetail.includes("timetable") ||
-          lowerDetail.includes("slot")))
-
-    if (isConflict) {
-      return `There's a timetable conflict: ${this.detail}`
-    }
-
-    if (this.status === 400) return `[400] ${this.detail || "Validation error — please check the submitted details."}`
-    if (this.status === 401) return "[401] Your session has expired. Please sign in again."
-    if (this.status === 403) return "[403] You don't have permission to perform this action."
-    if (this.status === 404) return "[404] The requested resource was not found."
-    if (this.status === 0) return this.detail || "[Network] Unable to connect to the server."
-    if (this.status >= 500) return "[500] The server encountered an error. Please try again later."
-    return `[${this.status}] ${this.detail || "An unexpected error occurred."}`
   }
 }
 
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_ORIGIN ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000"
+).replace(/\/+$/, "") + "/api/v1"
+
+function buildQueryString(params?: Record<string, string | number | undefined | null>): string {
+  if (!params) return ""
+  const query = new URLSearchParams()
+  for (const [key, val] of Object.entries(params)) {
+    if (val !== undefined && val !== null && val !== "" && val !== "all") {
+      query.append(key, String(val))
+    }
+  }
+  const str = query.toString()
+  return str ? `?${str}` : ""
+}
+
 async function request<T>(
-  path: string,
+  endpoint: string,
   token: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const url = `${API_BASE}${endpoint}`
   let res: Response
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -54,39 +40,35 @@ async function request<T>(
       },
     })
   } catch (err) {
-    // Network-level failures: CORS blocking, DNS failure, unreachable server, etc.
-    const rawMsg = err instanceof Error ? err.message : String(err)
-    const message = `Unable to fetch ${API_BASE}${path} (${rawMsg}). (Check CORS headers on backend for your Vercel domain).`
-    throw new ApiError(0, message)
+    const detail = err instanceof Error ? err.message : "Network error"
+    throw new ApiError(
+      0,
+      `Unable to connect to API server (${API_BASE}). Details: ${detail}`
+    )
   }
 
   if (!res.ok) {
-    const raw = await res.text().catch(() => "")
-    let detail = res.statusText
+    let detail = "An error occurred"
+    const raw = await res.text()
     if (raw) {
       try {
-        const body = JSON.parse(raw)
-        if (typeof body === "string") {
-          detail = body
-        } else if (typeof body === "object" && body !== null) {
-          if ("detail" in body && typeof body.detail === "string") {
-            detail = body.detail
-          } else if ("message" in body && typeof body.message === "string") {
-            detail = body.message
-          } else if ("error" in body && typeof body.error === "string") {
-            detail = body.error
+        const json = JSON.parse(raw)
+        if (json && typeof json === "object") {
+          if (typeof json.detail === "string") {
+            detail = json.detail
+          } else if (typeof json.error === "string") {
+            detail = json.error
+          } else if (typeof json.message === "string") {
+            detail = json.message
           } else {
-            // Join field errors from DRF dict / non_field_errors
-            const messages: string[] = []
-            for (const [, v] of Object.entries(body)) {
-              if (Array.isArray(v)) {
-                messages.push(v.join("; "))
-              } else if (typeof v === "string") {
-                messages.push(v)
-              }
+            // Concatenate field validation errors
+            const msgs: string[] = []
+            for (const [key, val] of Object.entries(json)) {
+              const strVal = Array.isArray(val) ? val.join(", ") : String(val)
+              msgs.push(`${key}: ${strVal}`)
             }
-            if (messages.length > 0) {
-              detail = messages.join(" | ")
+            if (msgs.length > 0) {
+              detail = msgs.join("; ")
             }
           }
         }
@@ -106,7 +88,41 @@ async function request<T>(
     "results" in data &&
     Array.isArray((data as { results: unknown }).results)
   ) {
-    return (data as { results: T }).results
+    let combinedResults = [...(data as { results: unknown[] }).results]
+    let nextUrl = (data as { next?: string | null }).next
+
+    // Automatically follow pagination `next` links to retrieve all items matching the query
+    while (nextUrl) {
+      try {
+        let nextPath: string
+        if (nextUrl.startsWith("http://") || nextUrl.startsWith("https://")) {
+          const parsedUrl = new URL(nextUrl)
+          nextPath = parsedUrl.pathname.replace(/^\/api\/v1/, "") + parsedUrl.search
+        } else {
+          nextPath = nextUrl.startsWith("/") ? nextUrl.replace(/^\/api\/v1/, "") : `/${nextUrl}`
+        }
+
+        const nextRes = await fetch(`${API_BASE}${nextPath}`, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            ...options.headers,
+          },
+        })
+        if (!nextRes.ok) break
+        const nextData = await nextRes.json()
+        if (nextData && Array.isArray(nextData.results)) {
+          combinedResults = combinedResults.concat(nextData.results)
+          nextUrl = nextData.next
+        } else {
+          break
+        }
+      } catch {
+        break
+      }
+    }
+    return combinedResults as unknown as T
   }
   return data as T
 }
@@ -114,8 +130,8 @@ async function request<T>(
 export function createApi(token: string) {
   return {
     // --- Classes ---
-    listClasses: () =>
-      request<import("./types").Class[]>(`/classes/`, token),
+    listClasses: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").Class[]>(`/classes/${buildQueryString(params)}`, token),
 
     getClass: (id: number) =>
       request<import("./types").Class>(`/classes/${id}/`, token),
@@ -135,9 +151,15 @@ export function createApi(token: string) {
     deleteClass: (id: number) =>
       request<void>(`/classes/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteClasses: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/classes/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Students ---
-    listStudents: () =>
-      request<import("./types").Student[]>(`/students/`, token),
+    listStudents: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").Student[]>(`/students/${buildQueryString(params)}`, token),
 
     getStudent: (id: number) =>
       request<import("./types").Student>(`/students/${id}/`, token),
@@ -157,6 +179,12 @@ export function createApi(token: string) {
     deleteStudent: (id: number) =>
       request<void>(`/students/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteStudents: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/students/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     getCheckInToken: (id: number) =>
       request<import("./types").Student>(`/students/${id}/check_in_token/`, token),
 
@@ -166,8 +194,8 @@ export function createApi(token: string) {
       }),
 
     // --- Check-Ins ---
-    listCheckIns: () =>
-      request<import("./types").CheckIn[]>(`/check-ins/`, token),
+    listCheckIns: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").CheckIn[]>(`/check-ins/${buildQueryString(params)}`, token),
 
     createCheckInManual: (studentId: number) =>
       request<import("./types").CheckIn>(`/check-ins/manual/`, token, {
@@ -182,8 +210,8 @@ export function createApi(token: string) {
       }),
 
     // --- Class-Students ---
-    listClassStudents: () =>
-      request<import("./types").ClassStudent[]>(`/class-students/`, token),
+    listClassStudents: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").ClassStudent[]>(`/class-students/${buildQueryString(params)}`, token),
 
     createClassStudent: (classObjId: number, studentId: number) =>
       request<import("./types").ClassStudent>(`/class-students/`, token, {
@@ -194,9 +222,15 @@ export function createApi(token: string) {
     deleteClassStudent: (id: number) =>
       request<void>(`/class-students/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteClassStudents: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/class-students/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Subjects ---
-    listSubjects: () =>
-      request<import("./types").Subject[]>(`/subjects/`, token),
+    listSubjects: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").Subject[]>(`/subjects/${buildQueryString(params)}`, token),
 
     getSubject: (id: number) =>
       request<import("./types").Subject>(`/subjects/${id}/`, token),
@@ -216,9 +250,15 @@ export function createApi(token: string) {
     deleteSubject: (id: number) =>
       request<void>(`/subjects/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteSubjects: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/subjects/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Timetable Slots ---
-    listTimetableSlots: () =>
-      request<import("./types").TimetableSlot[]>(`/timetable-slots/`, token),
+    listTimetableSlots: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").TimetableSlot[]>(`/timetable-slots/${buildQueryString(params)}`, token),
 
     getTimetableSlot: (id: number) =>
       request<import("./types").TimetableSlot>(`/timetable-slots/${id}/`, token),
@@ -239,8 +279,8 @@ export function createApi(token: string) {
       request<void>(`/timetable-slots/${id}/`, token, { method: "DELETE" }),
 
     // --- Teachers ---
-    listTeachers: () =>
-      request<import("./types").Teacher[]>(`/teachers/`, token),
+    listTeachers: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").Teacher[]>(`/teachers/${buildQueryString(params)}`, token),
 
     getTeacher: (id: number) =>
       request<import("./types").Teacher>(`/teachers/${id}/`, token),
@@ -260,9 +300,15 @@ export function createApi(token: string) {
     deleteTeacher: (id: number) =>
       request<void>(`/teachers/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteTeachers: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/teachers/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Sessions ---
-    listSessions: () =>
-      request<import("./types").Session[]>(`/sessions/`, token),
+    listSessions: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").Session[]>(`/sessions/${buildQueryString(params)}`, token),
 
     getSession: (id: number) =>
       request<import("./types").Session>(`/sessions/${id}/`, token),
@@ -282,9 +328,25 @@ export function createApi(token: string) {
     deleteSession: (id: number) =>
       request<void>(`/sessions/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteSessions: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/sessions/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
+    generateSessionsForClass: (classId: number, data?: { start_date?: string; end_date?: string }) =>
+      request<{ created_count: number; sessions: import("./types").Session[] }>(
+        `/sessions/generate/${classId}/`,
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify(data ?? {}),
+        }
+      ),
+
     // --- Session Attendances ---
-    listSessionAttendances: () =>
-      request<import("./types").SessionAttendance[]>(`/session-attendances/`, token),
+    listSessionAttendances: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").SessionAttendance[]>(`/session-attendances/${buildQueryString(params)}`, token),
 
     createSessionAttendance: (data: import("./types").SessionAttendancePayload) =>
       request<import("./types").SessionAttendance>(`/session-attendances/`, token, {
@@ -301,9 +363,15 @@ export function createApi(token: string) {
     deleteSessionAttendance: (id: number) =>
       request<void>(`/session-attendances/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteSessionAttendances: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/session-attendances/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Ad-Hoc Sessions ---
-    listAdHocSessions: () =>
-      request<import("./types").AdHocSession[]>(`/adhoc-sessions/`, token),
+    listAdHocSessions: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").AdHocSession[]>(`/adhoc-sessions/${buildQueryString(params)}`, token),
 
     getAdHocSession: (id: number) =>
       request<import("./types").AdHocSession>(`/adhoc-sessions/${id}/`, token),
@@ -323,9 +391,15 @@ export function createApi(token: string) {
     deleteAdHocSession: (id: number) =>
       request<void>(`/adhoc-sessions/${id}/`, token, { method: "DELETE" }),
 
+    bulkDeleteAdHocSessions: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/adhoc-sessions/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Ad-Hoc Session Attendances ---
-    listAdHocSessionAttendances: () =>
-      request<import("./types").AdHocSessionAttendance[]>(`/adhoc-session-attendances/`, token),
+    listAdHocSessionAttendances: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").AdHocSessionAttendance[]>(`/adhoc-session-attendances/${buildQueryString(params)}`, token),
 
     createAdHocSessionAttendance: (data: import("./types").AdHocSessionAttendancePayload) =>
       request<import("./types").AdHocSessionAttendance>(`/adhoc-session-attendances/`, token, {
@@ -342,10 +416,18 @@ export function createApi(token: string) {
     deleteAdHocSessionAttendance: (id: number) =>
       request<void>(`/adhoc-session-attendances/${id}/`, token, { method: "DELETE" }),
 
-    // --- Stats ---
+    bulkDeleteAdHocSessionAttendances: (ids: number[]) =>
+      request<{ deleted_count: number; deleted_ids: number[] }>(`/adhoc-session-attendances/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
+    // --- Users ---
+    listUsers: (params?: Record<string, string | number | undefined | null>) =>
+      request<import("./types").User[]>(`/users/${buildQueryString(params)}`, token),
+
+    // --- Dashboard Stats ---
     getStats: () =>
-      request<import("./types").Stats>(`/stats/`, token),
+      request<import("./types").Stats>(`/dashboard/stats/`, token),
   }
 }
-
-export type Api = ReturnType<typeof createApi>

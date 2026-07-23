@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
@@ -31,7 +32,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-
 
 const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
   const hour = Math.floor(7 + i / 2)
@@ -71,7 +71,7 @@ function parseBackendDateTime(str: string): Date {
       const hours = parseInt(timeParts[0], 10)
       const minutes = parseInt(timeParts[1], 10)
       const seconds = parseInt(timeParts[2], 10)
-      
+
       const date = new Date(year, month, day, hours, minutes, seconds)
       if (!isNaN(date.getTime())) return date
     }
@@ -109,7 +109,7 @@ function formatDateTime(iso: string): string {
 function RowSkeleton() {
   return (
     <TableRow>
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: 9 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -130,6 +130,11 @@ export default function SessionsPage() {
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false)
 
   // Modal state
   const [modalOpen, setModalOpen] = React.useState(false)
@@ -182,6 +187,7 @@ export default function SessionsPage() {
     if (!isSignedIn) return
     setLoading(true)
     setError(null)
+    setSelectedIds([])
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
@@ -232,6 +238,53 @@ export default function SessionsPage() {
   // Pagination
   const pagination = usePagination(sortedSessions, 10)
 
+  // Selection helpers
+  const currentPageIds = React.useMemo(
+    () => pagination.paginatedItems.map((s) => s.id),
+    [pagination.paginatedItems]
+  )
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
+
+  const toggleSelectAll = () => {
+    if (allCurrentPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])))
+    }
+  }
+
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = React.useCallback(async () => {
+    if (selectedIds.length === 0) return
+    setBulkDeleting(true)
+    setError(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      const res = await api.bulkDeleteSessions(selectedIds)
+      showSuccess(`Successfully deleted ${res.deleted_count} session(s).`)
+      setSelectedIds([])
+      setBulkConfirmOpen(false)
+      const data = await api.listSessions()
+      setSessions(data)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred during bulk delete")
+      }
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [getToken, selectedIds, showSuccess])
+
   const filteredSlots = React.useMemo(() => {
     if (!formClassId) return []
     return timetableSlots.filter((slot) => slot.class_obj?.id.toString() === formClassId)
@@ -248,27 +301,20 @@ export default function SessionsPage() {
 
     const slot = timetableSlots.find((s) => s.id.toString() === slotId)
     if (slot) {
-      if (slot.teacher?.id) {
-        setFormTeacherId(slot.teacher.id.toString())
-      }
-      if (slot.start_time) {
-        const formatTimeToSeconds = (time: string): string => {
-          if (!time) return "00:00:00"
-          return time.length === 5 ? `${time}:00` : time
-        }
-        setFormStartTime(formatTimeToSeconds(slot.start_time))
-      }
-      if (slot.end_time && slot.start_time) {
+      if (slot.teacher) setFormTeacherId(slot.teacher.id.toString())
+      if (slot.start_time) setFormStartTime(slot.start_time)
+
+      if (slot.start_time && slot.end_time) {
         const [sh, sm] = slot.start_time.split(":").map(Number)
         const [eh, em] = slot.end_time.split(":").map(Number)
-        const durationMins = (eh * 60 + em) - (sh * 60 + sm)
-        if (durationMins > 0) {
-          const match = DURATIONS.find((d) => d.value === durationMins.toString())
+        const diffMinutes = eh * 60 + em - (sh * 60 + sm)
+        if (diffMinutes > 0) {
+          const match = DURATIONS.find((d) => d.value === diffMinutes.toString())
           if (match) {
             setFormDuration(match.value)
           } else {
             setFormDuration("custom")
-            setFormCustomEndTime(slot.end_time.substring(0, 5))
+            setFormCustomEndTime(slot.end_time)
           }
         }
       }
@@ -277,10 +323,11 @@ export default function SessionsPage() {
 
   const openAddModal = () => {
     setEditingSession(null)
-    setFormDate(new Date().toISOString().substring(0, 10))
-    setFormStartTime("09:00")
+    const today = new Date().toISOString().split("T")[0]
+    setFormDate(today)
+    setFormStartTime("09:00:00")
     setFormDuration("60")
-    setFormCustomEndTime("10:00:00")
+    setFormCustomEndTime("")
     setFormStatus("scheduled")
     setFormPaid(false)
     setFormTeacherId("")
@@ -291,44 +338,45 @@ export default function SessionsPage() {
 
   const openEditModal = (session: Session) => {
     setEditingSession(session)
-    const startDate = parseBackendDateTime(session.start_time)
-    const endDate = parseBackendDateTime(session.end_time)
 
-    if (!isNaN(startDate.getTime())) {
-      const year = startDate.getFullYear()
-      const month = String(startDate.getMonth() + 1).padStart(2, "0")
-      const day = String(startDate.getDate()).padStart(2, "0")
-      setFormDate(`${year}-${month}-${day}`)
+    let dateStr = ""
+    let startTimeStr = "09:00:00"
+    if (session.start_time) {
+      const d = parseBackendDateTime(session.start_time)
+      if (!isNaN(d.getTime())) {
+        dateStr = d.toISOString().split("T")[0]
+        const hh = d.getHours().toString().padStart(2, "0")
+        const mm = d.getMinutes().toString().padStart(2, "0")
+        startTimeStr = `${hh}:${mm}:00`
+      }
+    }
+    setFormDate(dateStr)
+    setFormStartTime(startTimeStr)
 
-      const sh = String(startDate.getHours()).padStart(2, "0")
-      const sm = String(startDate.getMinutes()).padStart(2, "0")
-      const ss = String(startDate.getSeconds()).padStart(2, "0")
-      setFormStartTime(`${sh}:${sm}:${ss}`)
-
-      if (!isNaN(endDate.getTime())) {
-        const diffMins = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
-        const match = DURATIONS.find((d) => d.value === diffMins.toString())
-        if (match) {
-          setFormDuration(match.value)
+    let durationVal = "60"
+    let customEnd = ""
+    if (session.start_time && session.end_time) {
+      const st = parseBackendDateTime(session.start_time)
+      const et = parseBackendDateTime(session.end_time)
+      if (!isNaN(st.getTime()) && !isNaN(et.getTime())) {
+        const diffMin = Math.round((et.getTime() - st.getTime()) / 60000)
+        const found = DURATIONS.find((d) => d.value === diffMin.toString())
+        if (found) {
+          durationVal = found.value
         } else {
-          setFormDuration("custom")
-          const eh = String(endDate.getHours()).padStart(2, "0")
-          const em = String(endDate.getMinutes()).padStart(2, "0")
-          const es = String(endDate.getSeconds()).padStart(2, "0")
-          setFormCustomEndTime(`${eh}:${em}:${es}`)
+          durationVal = customEnd = et.toTimeString().split(" ")[0]
+          durationVal = "custom"
         }
       }
-    } else {
-      setFormDate("")
-      setFormStartTime("")
-      setFormDuration("60")
     }
+    setFormDuration(durationVal)
+    setFormCustomEndTime(customEnd)
 
     setFormStatus(session.status ?? "")
     setFormPaid(session.paid ?? false)
-    setFormTeacherId(session.teacher?.id ? session.teacher.id.toString() : "")
-    setFormClassId(session.class_obj?.id ? session.class_obj.id.toString() : "")
-    setFormTimetableSlotId(session.timetable_slot?.id ? session.timetable_slot.id.toString() : "")
+    setFormTeacherId(session.teacher ? session.teacher.id.toString() : "")
+    setFormClassId(session.class_obj ? session.class_obj.id.toString() : "")
+    setFormTimetableSlotId(session.timetable_slot ? session.timetable_slot.id.toString() : "")
     setModalOpen(true)
   }
 
@@ -344,49 +392,39 @@ export default function SessionsPage() {
     setError(null)
 
     try {
-      const formatTimeToSeconds = (time: string): string => {
-        if (!time) return "00:00:00"
-        return time.length === 5 ? `${time}:00` : time
-      }
-      const startIso = `${formDate}T${formatTimeToSeconds(formStartTime)}`
-      let endIso = ""
-      if (formDuration === "custom") {
-        if (!formCustomEndTime) {
-          setError("Please specify custom end time")
-          setSaving(false)
-          return
-        }
-        endIso = `${formDate}T${formatTimeToSeconds(formCustomEndTime)}`
-      } else {
-        const [h, m, s] = formStartTime.split(":").map(Number)
-        const durationMins = parseInt(formDuration, 10)
-        const totalMins = h * 60 + m + durationMins
-        const endH = String(Math.floor(totalMins / 60) % 24).padStart(2, "0")
-        const endM = String(totalMins % 60).padStart(2, "0")
-        const endS = String(s || 0).padStart(2, "0")
-        endIso = `${formDate}T${endH}:${endM}:${endS}`
-      }
-
-      const payload: SessionPayload = {
-        start_time: startIso,
-        end_time: endIso,
-        status: formStatus ? (formStatus as SessionStatus) : null,
-        paid: formPaid,
-        teacher_id: formTeacherId ? parseInt(formTeacherId, 10) : undefined,
-        class_obj_id: formClassId ? parseInt(formClassId, 10) : null,
-        timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
-      }
-
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
 
+      const startDateTimeStr = `${formDate}T${formStartTime}`
+      const startD = new Date(startDateTimeStr)
+
+      let endD: Date
+      if (formDuration === "custom") {
+        if (!formCustomEndTime) throw new Error("Please specify custom end time")
+        const endTimeStr = `${formDate}T${formCustomEndTime}`
+        endD = new Date(endTimeStr)
+      } else {
+        const addMinutes = parseInt(formDuration, 10)
+        endD = new Date(startD.getTime() + addMinutes * 60 * 1000)
+      }
+
+      const payload: SessionPayload = {
+        start_time: startD.toISOString(),
+        end_time: endD.toISOString(),
+        status: formStatus === "" ? null : (formStatus as SessionStatus),
+        paid: formPaid,
+        teacher_id: formTeacherId ? parseInt(formTeacherId, 10) : null,
+        class_obj_id: formClassId ? parseInt(formClassId, 10) : null,
+        timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
+      }
+
       if (editingSession) {
         await api.updateSession(editingSession.id, payload)
-        showSuccess("Session updated successfully.")
+        showSuccess(`Session #${editingSession.id} updated.`)
       } else {
         await api.createSession(payload)
-        showSuccess("Session created successfully.")
+        showSuccess("New session scheduled successfully.")
       }
 
       closeModal()
@@ -396,7 +434,7 @@ export default function SessionsPage() {
       if (err instanceof ApiError) {
         setError(err.userMessage)
       } else {
-        setError(err instanceof Error ? err.message : "An unexpected error occurred")
+        setError(err instanceof Error ? err.message : "Failed to save session")
       }
     } finally {
       setSaving(false)
@@ -413,6 +451,7 @@ export default function SessionsPage() {
       const api = createApi(token)
       await api.deleteSession(deletingId)
       showSuccess("Session deleted successfully.")
+      setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
       setDeletingId(null)
       const data = await api.listSessions()
       setSessions(data)
@@ -467,7 +506,7 @@ export default function SessionsPage() {
         }}
       />
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -500,11 +539,10 @@ export default function SessionsPage() {
               />
             </div>
 
-            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? "all")}>
               <SelectTrigger className="w-40 text-xs">
                 <SelectValue>
-                  {statusFilter === "all" ? "All Statuses" : SESSION_STATUSES.find((st) => st.value === statusFilter)?.label ?? statusFilter}
+                  {statusFilter === "all" ? "All Statuses" : (SESSION_STATUSES.find((s) => s.value === statusFilter)?.label ?? statusFilter)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -518,17 +556,28 @@ export default function SessionsPage() {
             </Select>
           </div>
 
-          {lastLoaded && sessions && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="px-3 py-1 text-xs">
-                <CalendarCheck className="mr-1.5 size-3.5" />
-                {filteredSessions.length} of {sessions.length} session{sessions.length !== 1 ? "s" : ""}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Loaded {lastLoaded}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {selectedIds.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkConfirmOpen(true)}
+                className="gap-1.5"
+              >
+                <Trash2 className="size-4" />
+                Delete Selected ({selectedIds.length})
+              </Button>
+            )}
+
+            {lastLoaded && sessions && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 text-xs">
+                  <CalendarCheck className="mr-1.5 size-3.5" />
+                  {filteredSessions.length} of {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -559,6 +608,14 @@ export default function SessionsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12 text-center">
+                <Checkbox
+                  checked={allCurrentPageSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all current page"
+                />
+              </TableHead>
+
               <TableHeadSortable
                 className="w-[100px]"
                 sortKey="id"
@@ -633,69 +690,79 @@ export default function SessionsPage() {
               Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
             ) : sessions === null ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                   Click &quot;Load Data&quot; to fetch sessions.
                 </TableCell>
               </TableRow>
             ) : sortedSessions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                   No sessions found.
                 </TableCell>
               </TableRow>
             ) : (
-              pagination.paginatedItems.map((session) => (
-                <TableRow key={session.id}>
-                  <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
-                  <TableCell className="font-medium">{session.teacher?.name ?? "—"}</TableCell>
-                  <TableCell>
-                    {session.class_obj ? (
-                      <Badge variant="outline">
-                        {session.class_obj.education_level} {session.class_obj.cohort_identifier}
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {formatDateTime(session.start_time)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {formatDateTime(session.end_time)}
-                  </TableCell>
-                  <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center">
-                      {session.paid === true ? (
-                        <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+              pagination.paginatedItems.map((session) => {
+                const isSelected = selectedIds.includes(session.id)
+                return (
+                  <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectRow(session.id)}
+                        aria-label={`Select session #${session.id}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
+                    <TableCell className="font-medium">{session.teacher?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      {session.class_obj ? (
+                        <Badge variant="outline">
+                          {session.class_obj.education_level} {session.class_obj.cohort_identifier}
+                        </Badge>
                       ) : (
-                        <Minus className="size-4 text-muted-foreground" />
+                        "—"
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEditModal(session)}
-                        title="Edit"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeletingId(session.id)}
-                        title="Delete"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {formatDateTime(session.start_time)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {formatDateTime(session.end_time)}
+                    </TableCell>
+                    <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center">
+                        {session.paid === true ? (
+                          <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Minus className="size-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openEditModal(session)}
+                          title="Edit"
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeletingId(session.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -901,6 +968,27 @@ export default function SessionsPage() {
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk delete confirmation */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent onClose={() => setBulkConfirmOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Delete Multiple Sessions</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedIds.length} selected session(s)? Paid sessions cannot be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} disabled={bulkDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting && <Loader2 className="mr-2 size-4 animate-spin" />}
               Delete
             </Button>
           </DialogFooter>

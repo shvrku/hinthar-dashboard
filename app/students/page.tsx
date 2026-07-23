@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -37,7 +38,7 @@ import {
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 7 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -195,6 +196,11 @@ export default function StudentsPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false)
+
   // Modal & form state
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editingStudent, setEditingStudent] = React.useState<Student | null>(null)
@@ -221,6 +227,7 @@ export default function StudentsPage() {
   const loadData = React.useCallback(async () => {
     setLoading(true)
     setError(null)
+    setSelectedIds([])
     try {
       const api = await getApi()
       const data = await api.listStudents()
@@ -236,8 +243,6 @@ export default function StudentsPage() {
       setLoading(false)
     }
   }, [getApi])
-
-
 
   const filteredStudents = React.useMemo(() => {
     if (!students) return []
@@ -256,6 +261,51 @@ export default function StudentsPage() {
 
   // Pagination
   const pagination = usePagination(sortedStudents, 10)
+
+  // Selection handlers
+  const currentPageIds = React.useMemo(
+    () => pagination.paginatedItems.map((s) => s.id),
+    [pagination.paginatedItems]
+  )
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
+
+  const toggleSelectAll = () => {
+    if (allCurrentPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])))
+    }
+  }
+
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = React.useCallback(async () => {
+    if (selectedIds.length === 0) return
+    setBulkDeleting(true)
+    setError(null)
+    try {
+      const api = await getApi()
+      const res = await api.bulkDeleteStudents(selectedIds)
+      setSuccess(`Successfully deleted ${res.deleted_count} student(s).`)
+      setSelectedIds([])
+      setBulkConfirmOpen(false)
+      const data = await api.listStudents()
+      setStudents(data)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred during bulk delete")
+      }
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [getApi, selectedIds])
 
   const handleSave = React.useCallback(
     async (payload: StudentPayload) => {
@@ -296,6 +346,7 @@ export default function StudentsPage() {
       await api.deleteStudent(deletingId)
       setSuccess("Student deleted successfully.")
       setDeletingId(null)
+      setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
       const data = await api.listStudents()
       setStudents(data)
     } catch (err) {
@@ -364,7 +415,7 @@ export default function StudentsPage() {
         }}
       />
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -396,17 +447,28 @@ export default function StudentsPage() {
             />
           </div>
 
-          {lastLoaded && students && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="px-3 py-1 text-xs">
-                <UserCheck className="mr-1.5 size-3.5" />
-                {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Loaded {lastLoaded}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {selectedIds.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkConfirmOpen(true)}
+                className="gap-1.5"
+              >
+                <Trash2 className="size-4" />
+                Delete Selected ({selectedIds.length})
+              </Button>
+            )}
+
+            {lastLoaded && students && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 text-xs">
+                  <UserCheck className="mr-1.5 size-3.5" />
+                  {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -434,6 +496,14 @@ export default function StudentsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12 text-center">
+                <Checkbox
+                  checked={allCurrentPageSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all current page"
+                />
+              </TableHead>
+
               <TableHeadSortable
                 className="w-[100px]"
                 sortKey="id"
@@ -488,41 +558,51 @@ export default function StudentsPage() {
               Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
             ) : sortedStudents && sortedStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                   {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
                 </TableCell>
               </TableRow>
             ) : (
-              pagination.paginatedItems.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell className="font-semibold text-foreground">{student.id}</TableCell>
-                  <TableCell className="font-medium">{student.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.contact ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEditModal(student)}
-                        aria-label={`Edit ${student.name}`}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeletingId(student.id)}
-                        aria-label={`Delete ${student.name}`}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              pagination.paginatedItems.map((student) => {
+                const isSelected = selectedIds.includes(student.id)
+                return (
+                  <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectRow(student.id)}
+                        aria-label={`Select student ${student.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-semibold text-foreground">{student.id}</TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.contact ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openEditModal(student)}
+                          aria-label={`Edit ${student.name}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeletingId(student.id)}
+                          aria-label={`Delete ${student.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -551,7 +631,7 @@ export default function StudentsPage() {
         saving={saving}
       />
 
-      {/* Delete confirmation */}
+      {/* Single delete confirmation */}
       <ConfirmDialog
         open={deletingId !== null}
         title="Delete Student"
@@ -563,6 +643,16 @@ export default function StudentsPage() {
         onConfirm={handleDelete}
         onCancel={() => setDeletingId(null)}
         loading={deleting}
+      />
+
+      {/* Bulk delete confirmation */}
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        title="Delete Multiple Students"
+        message={`Are you sure you want to delete ${selectedIds.length} selected student(s)? This action cannot be undone.`}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkConfirmOpen(false)}
+        loading={bulkDeleting}
       />
     </div>
   )

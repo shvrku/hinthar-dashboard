@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -37,7 +38,7 @@ import {
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 3 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -169,6 +170,11 @@ export default function SubjectsPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false)
+
   // Modal & form state
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editingSubject, setEditingSubject] = React.useState<Subject | null>(null)
@@ -195,6 +201,7 @@ export default function SubjectsPage() {
   const loadData = React.useCallback(async () => {
     setLoading(true)
     setError(null)
+    setSelectedIds([])
     try {
       const api = await getApi()
       const data = await api.listSubjects()
@@ -210,8 +217,6 @@ export default function SubjectsPage() {
       setLoading(false)
     }
   }, [getApi])
-
-
 
   const filteredSubjects = React.useMemo(() => {
     if (!subjects) return []
@@ -229,6 +234,51 @@ export default function SubjectsPage() {
 
   // Pagination
   const pagination = usePagination(sortedSubjects, 10)
+
+  // Selection handlers
+  const currentPageIds = React.useMemo(
+    () => pagination.paginatedItems.map((s) => s.id),
+    [pagination.paginatedItems]
+  )
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
+
+  const toggleSelectAll = () => {
+    if (allCurrentPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])))
+    }
+  }
+
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = React.useCallback(async () => {
+    if (selectedIds.length === 0) return
+    setBulkDeleting(true)
+    setError(null)
+    try {
+      const api = await getApi()
+      const res = await api.bulkDeleteSubjects(selectedIds)
+      setSuccess(`Successfully deleted ${res.deleted_count} subject(s).`)
+      setSelectedIds([])
+      setBulkConfirmOpen(false)
+      const data = await api.listSubjects()
+      setSubjects(data)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred during bulk delete")
+      }
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [getApi, selectedIds])
 
   const handleSave = React.useCallback(
     async (payload: SubjectPayload) => {
@@ -268,6 +318,7 @@ export default function SubjectsPage() {
       const api = await getApi()
       await api.deleteSubject(deletingId)
       setSuccess("Subject deleted successfully.")
+      setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
       setDeletingId(null)
       const data = await api.listSubjects()
       setSubjects(data)
@@ -337,7 +388,7 @@ export default function SubjectsPage() {
         }}
       />
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -369,17 +420,28 @@ export default function SubjectsPage() {
             />
           </div>
 
-          {lastLoaded && subjects && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="px-3 py-1 text-xs">
-                <BookOpen className="mr-1.5 size-3.5" />
-                {filteredSubjects.length} of {subjects.length} subject{subjects.length !== 1 ? "s" : ""}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Loaded {lastLoaded}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {selectedIds.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkConfirmOpen(true)}
+                className="gap-1.5"
+              >
+                <Trash2 className="size-4" />
+                Delete Selected ({selectedIds.length})
+              </Button>
+            )}
+
+            {lastLoaded && subjects && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 text-xs">
+                  <BookOpen className="mr-1.5 size-3.5" />
+                  {filteredSubjects.length} of {subjects.length} subject{subjects.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -407,6 +469,14 @@ export default function SubjectsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12 text-center">
+                <Checkbox
+                  checked={allCurrentPageSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all current page"
+                />
+              </TableHead>
+
               <TableHeadSortable
                 className="w-[100px]"
                 sortKey="id"
@@ -434,38 +504,48 @@ export default function SubjectsPage() {
               Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
             ) : sortedSubjects && sortedSubjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                   {subjects === null ? 'Click "Load Data" to fetch subjects.' : 'No subjects found.'}
                 </TableCell>
               </TableRow>
             ) : (
-              pagination.paginatedItems.map((subject) => (
-                <TableRow key={subject.id}>
-                  <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
-                  <TableCell className="font-medium">{subject.name}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEditModal(subject)}
-                        aria-label={`Edit ${subject.name}`}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeletingId(subject.id)}
-                        aria-label={`Delete ${subject.name}`}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              pagination.paginatedItems.map((subject) => {
+                const isSelected = selectedIds.includes(subject.id)
+                return (
+                  <TableRow key={subject.id} data-state={isSelected ? "selected" : undefined}>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectRow(subject.id)}
+                        aria-label={`Select subject ${subject.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
+                    <TableCell className="font-medium">{subject.name}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openEditModal(subject)}
+                          aria-label={`Edit ${subject.name}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeletingId(subject.id)}
+                          aria-label={`Delete ${subject.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -494,7 +574,7 @@ export default function SubjectsPage() {
         saving={saving}
       />
 
-      {/* Delete confirmation */}
+      {/* Single delete confirmation */}
       <ConfirmDialog
         open={deletingId !== null}
         title="Delete Subject"
@@ -506,6 +586,16 @@ export default function SubjectsPage() {
         onConfirm={handleDelete}
         onCancel={() => setDeletingId(null)}
         loading={deleting}
+      />
+
+      {/* Bulk delete confirmation */}
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        title="Delete Multiple Subjects"
+        message={`Are you sure you want to delete ${selectedIds.length} selected subject(s)? This action cannot be undone.`}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkConfirmOpen(false)}
+        loading={bulkDeleting}
       />
     </div>
   )

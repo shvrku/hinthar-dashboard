@@ -33,6 +33,8 @@ export const SESSION_STATUSES: { value: SessionStatus; label: string }[] = [
   { value: "no_show", label: "No Show" },
 ]
 
+export type SessionAttendanceStatus = "present" | "absent" | "late" | "excused"
+
 // --- API Response types ---
 
 export interface Class {
@@ -120,7 +122,7 @@ export interface SessionPayload {
   end_time: string
   status?: SessionStatus | null
   paid?: boolean | null
-  teacher_id?: number
+  teacher_id?: number | null
   class_obj_id?: number | null
   timetable_slot_id?: number | null
 }
@@ -155,8 +157,79 @@ export interface CheckInPayload {
 
 export interface ClassStudent {
   id: number
-  student: Student | number
-  class_obj: Class | number
+  student: Student | number | any
+  class_obj: Class | number | any
+  student_id?: number
+  class_obj_id?: number
+}
+
+// --- Session Attendance & Ad-Hoc Sessions ---
+
+export interface SessionAttendance {
+  id: number
+  session: Session | number | any
+  session_id?: number
+  student: Student | number | any
+  student_id?: number
+  attended?: boolean
+  status?: SessionAttendanceStatus | null
+  remarks: string | null
+}
+
+export interface SessionAttendancePayload {
+  session?: number
+  session_id?: number
+  student?: number
+  student_id?: number
+  attended?: boolean
+  status?: SessionAttendanceStatus | null
+  remarks?: string | null
+}
+
+export interface AdHocSession {
+  id: number
+  title: string
+  teacher: Teacher
+  start_time: string
+  end_time: string
+  date?: string
+  subject?: Subject | null
+  status?: SessionStatus | string | null
+}
+
+export interface AdHocSessionPayload {
+  title?: string
+  teacher_id?: number
+  start_time?: string
+  end_time?: string
+  date?: string
+  subject_id?: number | null
+  status?: SessionStatus | string | null
+}
+
+export interface AdHocSessionAttendance {
+  id: number
+  adhoc_session?: AdHocSession | number | any
+  ad_hoc_session?: AdHocSession | number | any
+  adhoc_session_id?: number
+  ad_hoc_session_id?: number
+  student?: Student | number | any
+  student_id?: number
+  attended?: boolean
+  status?: SessionAttendanceStatus | null
+  remarks: string | null
+}
+
+export interface AdHocSessionAttendancePayload {
+  adhoc_session?: number
+  ad_hoc_session?: number
+  adhoc_session_id?: number
+  ad_hoc_session_id?: number
+  student?: number
+  student_id?: number
+  attended?: boolean
+  status?: SessionAttendanceStatus | null
+  remarks?: string | null
 }
 
 // --- User ---
@@ -178,74 +251,9 @@ export interface Stats {
   students: number
   teachers: number
   staff: number
-  subjects: number
   classes: number
-  class_students: number
-  timetable_slots: number
-  timetable_students: number
   sessions: number
-  session_attendances: number
-  check_ins: number
+  check_ins_today: number
+  subjects?: number
+  [key: string]: number | undefined
 }
-
-// --- Session Attendance ---
-export type SessionAttendanceStatus = "present" | "absent" | "late"
-
-export interface SessionAttendance {
-  id: number
-  status: SessionAttendanceStatus
-  session_id: number
-  session_start_time: string
-  session_end_time: string
-  session_status: string
-  teacher_name: string | null
-  class_name: string | null
-  student_id: number
-  student_name: string
-}
-
-export interface SessionAttendancePayload {
-  session_id: number
-  student_id: number
-  status: SessionAttendanceStatus
-}
-
-// --- Ad-Hoc Sessions ---
-
-export interface AdHocSession {
-  id: number
-  teacher: Teacher
-  subject: Subject
-  date: string // format: YYYY-MM-DD
-  start_time: string // format: HH:MM:SS
-  end_time: string // format: HH:MM:SS
-  status: SessionStatus | null
-  paid: boolean | null
-}
-
-export interface AdHocSessionPayload {
-  teacher_id: number
-  subject_id: number
-  date: string
-  start_time: string
-  end_time: string
-  status?: SessionStatus | null
-  paid?: boolean | null
-}
-
-export interface AdHocSessionAttendance {
-  id: number
-  ad_hoc_session: AdHocSession
-  student: Student
-  status: SessionAttendanceStatus
-  ad_hoc_session_id: number
-  student_id: number
-}
-
-export interface AdHocSessionAttendancePayload {
-  ad_hoc_session_id: number
-  student_id: number
-  status: SessionAttendanceStatus
-}
-
-

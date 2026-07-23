@@ -1,8 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -10,6 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationButton,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination"
 
 interface StandardTablePaginationProps {
   currentPage: number
@@ -78,40 +85,35 @@ export function StandardTablePagination({
           </Select>
         </div>
 
-        {/* Page navigation buttons */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-xs"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage <= 1}
-            title="Previous Page"
-          >
-            <ChevronLeft className="size-3.5" />
-          </Button>
+        {/* Page navigation buttons using shadcn Pagination */}
+        <Pagination className="mx-0 w-auto">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+              />
+            </PaginationItem>
 
-          {pageNumbers.map((page) => (
-            <Button
-              key={page}
-              variant={page === currentPage ? "default" : "outline"}
-              size="xs"
-              onClick={() => onPageChange(page)}
-              className="h-7 w-7 p-0"
-            >
-              {page}
-            </Button>
-          ))}
+            {pageNumbers.map((page) => (
+              <PaginationItem key={page}>
+                <PaginationButton
+                  isActive={page === currentPage}
+                  onClick={() => onPageChange(page)}
+                >
+                  {page}
+                </PaginationButton>
+              </PaginationItem>
+            ))}
 
-          <Button
-            variant="outline"
-            size="icon-xs"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage >= totalPages}
-            title="Next Page"
-          >
-            <ChevronRight className="size-3.5" />
-          </Button>
-        </div>
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   )

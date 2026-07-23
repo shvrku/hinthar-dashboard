@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
@@ -36,14 +37,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 
-
 // ---------------------------------------------------------------------------
 // Skeleton row
 // ---------------------------------------------------------------------------
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -89,9 +89,6 @@ function DeleteDialog({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Teacher form modal (shared between Add & Edit)
-// ---------------------------------------------------------------------------
 interface FormData {
   name: string
   employment_type: string
@@ -185,7 +182,6 @@ function TeacherFormModal({
                   employment_type: !val || val === "none" ? "" : val,
                 }))
               }
-              items={[{ value: "none", label: "None" }, ...EMPLOYMENT_TYPES]}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select Employment Type" />
@@ -251,17 +247,6 @@ function TeacherFormModal({
   )
 }
 
-function employmentLabel(type: string | null) {
-  if (!type) return <span className="text-muted-foreground">—</span>
-  const found = EMPLOYMENT_TYPES.find((et) => et.value === type || et.label.toLowerCase() === type.toLowerCase())
-  const label = found ? found.label : type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-  return (
-    <Badge variant="secondary" className="font-normal">
-      {label}
-    </Badge>
-  )
-}
-
 export default function TeachersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
@@ -271,6 +256,11 @@ export default function TeachersPage() {
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false)
 
   const [showForm, setShowForm] = React.useState(false)
   const [editing, setEditing] = React.useState<Teacher | null>(null)
@@ -295,6 +285,7 @@ export default function TeachersPage() {
   const loadTeachers = React.useCallback(async () => {
     setLoading(true)
     setError(null)
+    setSelectedIds([])
     try {
       const api = await getApi()
       const data = await api.listTeachers()
@@ -310,8 +301,6 @@ export default function TeachersPage() {
       setLoading(false)
     }
   }, [getApi])
-
-
 
   const [typeFilter, setTypeFilter] = React.useState<string>("all")
 
@@ -335,6 +324,51 @@ export default function TeachersPage() {
 
   // Pagination
   const pagination = usePagination(sortedTeachers, 10)
+
+  // Selection handlers
+  const currentPageIds = React.useMemo(
+    () => pagination.paginatedItems.map((t) => t.id),
+    [pagination.paginatedItems]
+  )
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
+
+  const toggleSelectAll = () => {
+    if (allCurrentPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])))
+    }
+  }
+
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = React.useCallback(async () => {
+    if (selectedIds.length === 0) return
+    setBulkDeleting(true)
+    setError(null)
+    try {
+      const api = await getApi()
+      const res = await api.bulkDeleteTeachers(selectedIds)
+      setSuccess(`Successfully deleted ${res.deleted_count} teacher(s).`)
+      setSelectedIds([])
+      setBulkConfirmOpen(false)
+      const data = await api.listTeachers()
+      setTeachers(data)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred during bulk delete")
+      }
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [getApi, selectedIds])
 
   const openAddModal = () => {
     setEditing(null)
@@ -393,6 +427,7 @@ export default function TeachersPage() {
       const api = await getApi()
       await api.deleteTeacher(deleting.id)
       setSuccess(`Teacher "${deleting.name}" deleted.`)
+      setSelectedIds((prev) => prev.filter((id) => id !== deleting.id))
       setDeleting(null)
       const data = await api.listTeachers()
       setTeachers(data)
@@ -447,7 +482,7 @@ export default function TeachersPage() {
         }}
       />
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -480,11 +515,10 @@ export default function TeachersPage() {
               />
             </div>
 
-            {/* Employment Type Filter */}
             <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val ?? "all")}>
               <SelectTrigger className="w-40 text-xs">
                 <SelectValue>
-                  {typeFilter === "all" ? "All Types" : EMPLOYMENT_TYPES.find((t) => t.value === typeFilter)?.label ?? typeFilter}
+                  {typeFilter === "all" ? "All Types" : (EMPLOYMENT_TYPES.find((t) => t.value === typeFilter)?.label ?? typeFilter)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -498,17 +532,28 @@ export default function TeachersPage() {
             </Select>
           </div>
 
-          {lastLoaded && teachers && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="px-3 py-1 text-xs">
-                <UserCheck className="mr-1.5 size-3.5" />
-                {filteredTeachers.length} of {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Loaded {lastLoaded}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {selectedIds.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkConfirmOpen(true)}
+                className="gap-1.5"
+              >
+                <Trash2 className="size-4" />
+                Delete Selected ({selectedIds.length})
+              </Button>
+            )}
+
+            {lastLoaded && teachers && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="px-3 py-1 text-xs">
+                  <UserCheck className="mr-1.5 size-3.5" />
+                  {filteredTeachers.length} of {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -536,6 +581,14 @@ export default function TeachersPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12 text-center">
+                <Checkbox
+                  checked={allCurrentPageSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all current page"
+                />
+              </TableHead>
+
               <TableHeadSortable
                 className="w-[100px]"
                 sortKey="id"
@@ -595,50 +648,60 @@ export default function TeachersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && teachers === null ? (
+            {loading && teachers.length === 0 ? (
               Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
             ) : sortedTeachers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   No teachers found.
                 </TableCell>
               </TableRow>
             ) : (
-              pagination.paginatedItems.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-semibold text-foreground">{t.id}</TableCell>
-                  <TableCell className="font-semibold text-foreground">{t.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
-                  <TableCell className="text-muted-foreground">{t.contact}</TableCell>
-                  <TableCell className="text-muted-foreground">{t.bank_details}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEditModal(t)}
-                        title="Edit"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleting(t)}
-                        title="Delete"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              pagination.paginatedItems.map((t) => {
+                const isSelected = selectedIds.includes(t.id)
+                return (
+                  <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectRow(t.id)}
+                        aria-label={`Select teacher ${t.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-semibold text-foreground">{t.id}</TableCell>
+                    <TableCell className="font-semibold text-foreground">{t.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.contact}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.bank_details}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openEditModal(t)}
+                          title="Edit"
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleting(t)}
+                          title="Delete"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -669,7 +732,7 @@ export default function TeachersPage() {
         />
       )}
 
-      {/* Delete dialog */}
+      {/* Single Delete dialog */}
       {deleting && (
         <DeleteDialog
           teacher={deleting}
@@ -678,6 +741,27 @@ export default function TeachersPage() {
           deleting={deletingInProgress}
         />
       )}
+
+      {/* Bulk Delete dialog */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent onClose={() => setBulkConfirmOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Delete Multiple Teachers</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedIds.length} selected teacher(s)? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} disabled={bulkDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
