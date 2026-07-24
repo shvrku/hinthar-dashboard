@@ -509,8 +509,8 @@ export function createApi(token: string) {
     listUsers: (params?: Record<string, string | number | undefined | null>) =>
       request<import("./types").User[]>(`/users/${buildQueryString(params)}`, token),
 
-    // --- Dashboard Stats ---
+    // --- Stats ---
     getStats: () =>
-      request<import("./types").Stats>(`/dashboard/stats/`, token),
+      request<import("./types").Stats>(`/stats/`, token),
   }
 }

@@ -245,15 +245,17 @@ export interface User {
   is_active: boolean
 }
 
-// --- Dashboard Stats ---
+// --- Stats (GET /api/v1/stats/) ---
 export interface Stats {
   users: number
   students: number
   teachers: number
   staff: number
+  subjects: number
   classes: number
+  class_students: number
+  timetable_slots: number
   sessions: number
-  check_ins_today: number
-  subjects?: number
-  [key: string]: number | undefined
+  session_attendances: number
+  check_ins: number
 }
