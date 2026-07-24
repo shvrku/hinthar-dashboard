@@ -131,6 +131,7 @@ function StudentFormModal({
 }) {
   const [name, setName] = React.useState("")
   const [dob, setDob] = React.useState("")
+  const [enrollmentDate, setEnrollmentDate] = React.useState("")
   const [contact, setContact] = React.useState("")
   const [examCandidateNumber, setExamCandidateNumber] = React.useState("")
 
@@ -138,6 +139,7 @@ function StudentFormModal({
     if (open) {
       setName(initial?.name ?? "")
       setDob(initial?.dob ?? "")
+      setEnrollmentDate(initial?.enrollment_date ? initial.enrollment_date.slice(0, 10) : "")
       setContact(initial?.contact ?? "")
       setExamCandidateNumber(initial?.exam_candidate_number ?? "")
     }
@@ -148,6 +150,7 @@ function StudentFormModal({
     if (!name.trim()) return
     const payload: StudentPayload = { name: name.trim(), school_code: schoolCode }
     if (dob) payload.dob = dob
+    if (enrollmentDate) payload.enrollment_date = enrollmentDate
     if (contact.trim()) payload.contact = contact.trim()
     if (examCandidateNumber.trim()) payload.exam_candidate_number = examCandidateNumber.trim()
     await onSave(payload)
@@ -203,6 +206,15 @@ function StudentFormModal({
               type="date"
               value={dob}
               onChange={(e) => setDob(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Enrollment Date</label>
+            <Input
+              type="date"
+              value={enrollmentDate}
+              onChange={(e) => setEnrollmentDate(e.target.value)}
             />
           </div>
 

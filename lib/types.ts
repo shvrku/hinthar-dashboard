@@ -118,6 +118,7 @@ export interface StudentPayload {
   name: string
   school_code: string
   dob?: string | null
+  enrollment_date?: string | null
   contact?: string | null
   exam_candidate_number?: string | null
 }

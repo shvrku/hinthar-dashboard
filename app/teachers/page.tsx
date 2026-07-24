@@ -110,6 +110,7 @@ interface FormData {
   name: string
   employment_type: string
   default_rate: string
+  join_date: string
   contact: string
   bank_details: string
 }
@@ -118,6 +119,7 @@ const EMPTY_FORM: FormData = {
   name: "",
   employment_type: "",
   default_rate: "",
+  join_date: "",
   contact: "",
   bank_details: "",
 }
@@ -150,14 +152,15 @@ function TeacherFormModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
+    if (!form.default_rate.trim()) return
 
     const payload: TeacherPayload = {
       name: form.name.trim(),
       school_code: schoolCode,
       employment_type:
         form.employment_type === "" ? null : (form.employment_type as TeacherPayload["employment_type"]),
-      default_rate:
-        form.default_rate.trim() === "" ? null : form.default_rate.trim(),
+      default_rate: form.default_rate.trim(),
+      join_date: form.join_date || null,
       contact: form.contact.trim() === "" ? null : form.contact.trim(),
       bank_details:
         form.bank_details.trim() === "" ? null : form.bank_details.trim(),
@@ -242,14 +245,27 @@ function TeacherFormModal({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Default Rate
+              Default Rate <span className="text-destructive">*</span>
             </label>
             <Input
               type="text"
               name="default_rate"
               value={form.default_rate}
               onChange={handleChange}
+              required
               placeholder="e.g. 50000"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">
+              Join Date
+            </label>
+            <Input
+              type="date"
+              name="join_date"
+              value={form.join_date}
+              onChange={handleChange}
             />
           </div>
 
@@ -279,7 +295,7 @@ function TeacherFormModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || !form.name.trim()}>
+            <Button type="submit" disabled={saving || !form.name.trim() || !form.default_rate.trim()}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {editing ? "Save Changes" : "Create Teacher"}
             </Button>
@@ -428,6 +444,7 @@ export default function TeachersPage() {
       name: teacher.name,
       employment_type: teacher.employment_type ?? "",
       default_rate: teacher.default_rate ?? "",
+      join_date: teacher.join_date ? teacher.join_date.slice(0, 10) : "",
       contact: teacher.contact ?? "",
       bank_details: teacher.bank_details ?? "",
     })
