@@ -28,7 +28,7 @@ const geistMono = Geist_Mono({
 const title = "Hinthar — School Management Dashboard"
 const description =
   "Manage classes, students, teachers, sessions, attendance, and payroll all in one place. Built for schools and education centres."
-const ogImage = "/og-image.png"
+const ogImage = "/opengraph-image"
 const siteUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
