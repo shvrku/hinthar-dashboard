@@ -208,7 +208,7 @@ export default function SessionsPage() {
         start_date: genStartDate || undefined,
         end_date: genEndDate || undefined,
       })
-      showSuccess(`Successfully generated ${res.created_count} session(s) from timetable slots.`)
+      showSuccess(`Successfully generated ${res.total_created} session(s) from timetable slots.`)
       setGenerateModalOpen(false)
       const data = await api.listSessions()
       setSessions(data)

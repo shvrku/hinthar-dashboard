@@ -390,7 +390,7 @@ export function createApi(token: string) {
       }),
 
     generateSessionsForClass: (classId: number, data?: { start_date?: string; end_date?: string }) =>
-      request<{ created_count: number; sessions: import("./types").Session[] }>(
+      request<{ class_id: number; total_created: number; total_already_existed: number; created: import("./types").Session[]; already_existed: import("./types").Session[] }>(
         `/sessions/generate/${classId}/`,
         token,
         {

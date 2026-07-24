@@ -25,9 +25,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "Hinthar — School Management Dashboard"
+const description =
+  "Manage classes, students, teachers, sessions, attendance, and payroll all in one place. Built for schools and education centres."
+const ogImage = "/og-image.png"
+const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+
 export const metadata: Metadata = {
-  title: "Hinthar",
-  description: "Management platform for classes, students, teachers, sessions, and attendance.",
+  title,
+  description,
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    title,
+    description,
+    url: siteUrl,
+    siteName: "Hinthar",
+    images: [{ url: ogImage, width: 1200, height: 630, alt: "Hinthar Dashboard" }],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: [ogImage],
+  },
+  appleWebApp: { title: "Hinthar" },
+  applicationName: "Hinthar",
+  generator: "Next.js",
 };
 
 export default function RootLayout({
