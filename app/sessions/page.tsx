@@ -548,10 +548,10 @@ export default function SessionsPage() {
 
       {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
+        <Card className="p-5 border-emerald-500/20 bg-card">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Sessions</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <CalendarCheck className="size-4" />
             </div>
           </div>
@@ -602,9 +602,9 @@ export default function SessionsPage() {
                 if (classes.length > 0 && !genClassId) setGenClassId(classes[0].id.toString())
                 setGenerateModalOpen(true)
               }}
-              className="gap-1.5 font-medium border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+              className="gap-1.5 font-medium border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
             >
-              <Sparkles className="size-4 text-amber-500" />
+              <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
               <span>Generate Month Sessions</span>
             </Button>
           </div>

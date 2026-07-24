@@ -25,6 +25,7 @@ import {
   ArrowRight,
   TrendingUp,
   Percent,
+  ChevronDown,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { 
@@ -121,13 +122,13 @@ function getSessionStartTime(session: Session | AdHocSession): Date {
 function getSelectStyles(status?: string): string {
   switch (status) {
     case "present":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 focus:ring-emerald-500/50 font-semibold"
+      return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30 focus:ring-emerald-500/50 font-semibold"
     case "late":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 focus:ring-amber-500/50 font-semibold"
+      return "bg-emerald-500/10 text-emerald-700/80 dark:text-emerald-400/80 border-emerald-500/20 focus:ring-emerald-500/30 font-medium"
     case "absent":
-      return "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 focus:ring-rose-500/50 font-semibold"
+      return "bg-muted text-muted-foreground border-border/80 focus:ring-ring font-medium"
     default:
-      return "bg-background text-neutral-400 border-neutral-200 dark:border-neutral-800 focus:ring-neutral-400/50 text-center"
+      return "bg-card text-muted-foreground/70 border-border/50 focus:ring-ring/30 text-center font-normal"
   }
 }
 
@@ -157,6 +158,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = React.useState(false)
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const [editingCellKey, setEditingCellKey] = React.useState<string | null>(null)
   
   // Pending cell updates map: "studentId-sessionId" -> boolean
   const [pendingCells, setPendingCells] = React.useState<Record<string, boolean>>({})
@@ -175,7 +177,7 @@ export default function AttendancePage() {
   const [studentSearch, setStudentSearch] = React.useState("")
 
   // Filters
-  const [selectedClassId, setSelectedClassId] = React.useState<string>("all")
+  const [selectedClassId, setSelectedClassId] = React.useState<string>("")
   const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>("all")
   const [selectedTeacherId, setSelectedTeacherId] = React.useState<string>("all")
   
@@ -235,7 +237,7 @@ export default function AttendancePage() {
       setTeachers(teachersData || [])
 
       if (classesData && classesData.length > 0) {
-        setSelectedClassId((prev) => (prev === "all" ? classesData[0].id.toString() : prev))
+        setSelectedClassId((prev) => (!prev || prev === "all" ? classesData[0].id.toString() : prev))
       }
     } catch {
       // silent options prefetch
@@ -263,8 +265,6 @@ export default function AttendancePage() {
       const api = createApi(token)
 
       const filterParams: Record<string, string | number> = {}
-      if (selectedSubjectId !== "all") filterParams.subject_id = selectedSubjectId
-      if (selectedTeacherId !== "all") filterParams.teacher_id = selectedTeacherId
 
       if (rangeMode === "session") {
         if (selectedDate) {
@@ -280,15 +280,22 @@ export default function AttendancePage() {
       }
 
       if (attendanceMode === "class") {
-        if (selectedClassId !== "all") {
-          filterParams.class_id = selectedClassId
+        if (!selectedClassId || selectedClassId === "all") {
+          setSessions([])
+          setStudents([])
+          setAttendances([])
+          setLoading(false)
+          return
         }
 
+        filterParams.class_id = selectedClassId
         const matrixData = await api.getAttendanceMatrix(filterParams)
 
         setSessions(matrixData.sessions || [])
         setStudents(matrixData.students || [])
         setAttendances(matrixData.attendances || [])
+        setAdhocSessions([])
+        setAdhocAttendances([])
         setAdhocSessions([])
         setAdhocAttendances([])
       } else {
@@ -334,10 +341,27 @@ export default function AttendancePage() {
     }
   }, [isLoaded, isSignedIn, loadData])
 
-  // Filtered Sessions
+  // Filtered Sessions (with client-side subject & teacher filtering)
   const activeSessions = React.useMemo(() => {
-    return attendanceMode === "adhoc" ? adhocSessions : sessions
-  }, [attendanceMode, adhocSessions, sessions])
+    let list: any[] = attendanceMode === "adhoc" ? adhocSessions : sessions
+    if (selectedSubjectId !== "all") {
+      list = list.filter(
+        (s: any) =>
+          s.subject_id?.toString() === selectedSubjectId ||
+          s.subject?.id?.toString() === selectedSubjectId ||
+          s.timetable_slot?.subject_id?.toString() === selectedSubjectId ||
+          s.timetable_slot?.subject?.id?.toString() === selectedSubjectId
+      )
+    }
+    if (selectedTeacherId !== "all") {
+      list = list.filter(
+        (s: any) =>
+          s.teacher_id?.toString() === selectedTeacherId ||
+          s.teacher?.id?.toString() === selectedTeacherId
+      )
+    }
+    return list
+  }, [attendanceMode, adhocSessions, sessions, selectedSubjectId, selectedTeacherId])
 
   // Filtered Students by search input
   const rowStudents = React.useMemo(() => {
@@ -363,22 +387,38 @@ export default function AttendancePage() {
     return activeSessions.find((s) => s.id === rosterSessionId) ?? null
   }, [activeSessions, rosterSessionId])
 
-  // Map helper to find attendance status for a student and session
-  const getAttendanceRecord = (studentId: number, sessionId: number) => {
-    if (attendanceMode === "adhoc") {
-      return adhocAttendances.find((a) => {
-        const sId = typeof a.student === "object" && a.student ? a.student.id : a.student_id ?? a.student
-        const sessId = typeof a.adhoc_session === "object" && a.adhoc_session ? a.adhoc_session.id : (a.ad_hoc_session && typeof a.ad_hoc_session === "object" ? a.ad_hoc_session.id : (a.adhoc_session_id ?? a.ad_hoc_session_id ?? a.adhoc_session))
-        return sId === studentId && sessId === sessionId
-      })
-    } else {
-      return attendances.find((a) => {
-        const sId = typeof a.student === "object" && a.student ? a.student.id : a.student_id ?? a.student
-        const sessId = typeof a.session === "object" && a.session ? a.session.id : a.session_id ?? a.session
-        return sId === studentId && sessId === sessionId
-      })
+  // Fast O(1) Map lookups for attendance records to avoid O(N*M) array.find scans
+  const attendanceMap = React.useMemo(() => {
+    const map = new Map<string, SessionAttendance>()
+    for (const a of attendances) {
+      const sId = typeof a.student === "object" && a.student ? a.student.id : a.student_id ?? a.student
+      const sessId = typeof a.session === "object" && a.session ? a.session.id : a.session_id ?? a.session
+      map.set(`${sId}-${sessId}`, a)
     }
-  }
+    return map
+  }, [attendances])
+
+  const adhocAttendanceMap = React.useMemo(() => {
+    const map = new Map<string, AdHocSessionAttendance>()
+    for (const a of adhocAttendances) {
+      const sId = typeof a.student === "object" && a.student ? a.student.id : a.student_id ?? a.student
+      const sessId = typeof a.adhoc_session === "object" && a.adhoc_session ? a.adhoc_session.id : (a.ad_hoc_session && typeof a.ad_hoc_session === "object" ? a.ad_hoc_session.id : (a.adhoc_session_id ?? a.ad_hoc_session_id ?? a.adhoc_session))
+      map.set(`${sId}-${sessId}`, a)
+    }
+    return map
+  }, [adhocAttendances])
+
+  // Fast O(1) Map helper to find attendance record for a student and session
+  const getAttendanceRecord = React.useCallback(
+    (studentId: number, sessionId: number) => {
+      const key = `${studentId}-${sessionId}`
+      if (attendanceMode === "adhoc") {
+        return adhocAttendanceMap.get(key)
+      }
+      return attendanceMap.get(key)
+    },
+    [attendanceMode, attendanceMap, adhocAttendanceMap]
+  )
 
   // Attendance Status Change Handler (with bulk upsert single-call efficiency)
   const handleStatusChange = async (studentId: number, sessionId: number, newStatus: SessionAttendanceStatus) => {
@@ -570,11 +610,13 @@ export default function AttendancePage() {
   }, [attendanceMode, adhocAttendances, attendances, students, activeSessions])
 
   const classItems = React.useMemo(() => {
-    const list = classes.map((c) => ({
-      value: c.id.toString(),
-      label: `${c.education_level} - ${c.cohort_identifier} ${c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}`.trim(),
-    }))
-    return [{ value: "all", label: "All Classes" }, ...list]
+    return classes.map((c) => {
+      const nameStr = `${c.education_level || ""} - ${c.cohort_identifier || ""} ${c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}`.trim() || `Class #${c.id}`
+      return {
+        value: c.id.toString(),
+        label: nameStr,
+      }
+    })
   }, [classes])
 
   const subjectItems = React.useMemo(() => {
@@ -612,7 +654,7 @@ export default function AttendancePage() {
 
   if (!mounted || !isLoaded) {
     return (
-      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl" suppressHydrationWarning>
         <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="rounded-xl border border-border p-6 space-y-4">
@@ -626,7 +668,7 @@ export default function AttendancePage() {
 
   if (!isSignedIn) {
     return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-background">
+      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center" suppressHydrationWarning>
         <p className="text-muted-foreground font-medium">Please sign in to view the attendance dashboard.</p>
       </div>
     )
@@ -680,22 +722,22 @@ export default function AttendancePage() {
 
         <Card className="p-4 bg-card border-border/80 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Present</span>
-            <CheckCircle2 className="size-4 text-emerald-500" />
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Present</span>
+            <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">{stats.presentCount}</span>
+            <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{stats.presentCount}</span>
             <span className="text-[11px] text-muted-foreground">{stats.lateCount} Late</span>
           </div>
         </Card>
 
         <Card className="p-4 bg-card border-border/80 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">Absent</span>
-            <XCircle className="size-4 text-rose-500" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Absent</span>
+            <XCircle className="size-4 text-muted-foreground/70" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">{stats.absentCount}</span>
+            <span className="text-2xl font-extrabold text-muted-foreground">{stats.absentCount}</span>
             <span className="text-[11px] text-muted-foreground">Logged</span>
           </div>
         </Card>
@@ -1273,6 +1315,7 @@ export default function AttendancePage() {
                         const record = getAttendanceRecord(student.id, session.id)
                         const key = `${student.id}-${session.id}`
                         const isPending = pendingCells[key]
+                        const isEditing = editingCellKey === key
 
                         return (
                           <TableCell key={session.id} className="text-center p-2">
@@ -1280,13 +1323,22 @@ export default function AttendancePage() {
                               <div className="flex h-9 items-center justify-center">
                                 <Loader2 className="size-4 animate-spin text-muted-foreground" />
                               </div>
-                            ) : (
+                            ) : isEditing ? (
                               <Select
                                 value={record?.status ?? undefined}
-                                onValueChange={(val) => handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)}
+                                defaultOpen={true}
+                                onOpenChange={(open) => {
+                                  if (!open) setEditingCellKey(null)
+                                }}
+                                onValueChange={(val) => {
+                                  setEditingCellKey(null)
+                                  if (val) {
+                                    handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)
+                                  }
+                                }}
                               >
                                 <SelectTrigger 
-                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${getSelectStyles(record?.status ?? undefined)}`}
+                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 ${getSelectStyles(record?.status ?? undefined)}`}
                                   size="sm"
                                 >
                                   <SelectValue placeholder="—">
@@ -1301,6 +1353,19 @@ export default function AttendancePage() {
                                   <SelectItem value="absent" className="text-rose-600 dark:text-rose-400 font-semibold">Absent</SelectItem>
                                 </SelectContent>
                               </Select>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setEditingCellKey(key)}
+                                className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSelectStyles(record?.status ?? undefined)}`}
+                              >
+                                <span>
+                                  {record?.status
+                                    ? (statusItems.find((st) => st.value === record.status)?.label ?? record.status)
+                                    : "—"}
+                                </span>
+                                <ChevronDown className="size-3 opacity-60" />
+                              </button>
                             )}
                           </TableCell>
                         )
