@@ -60,15 +60,8 @@ async function request<T>(
           } else if (typeof json.message === "string") {
             detail = json.message
           } else {
-            // Concatenate field validation errors
-            const msgs: string[] = []
-            for (const [key, val] of Object.entries(json)) {
-              const strVal = Array.isArray(val) ? val.join(", ") : String(val)
-              msgs.push(`${key}: ${strVal}`)
-            }
-            if (msgs.length > 0) {
-              detail = msgs.join("; ")
-            }
+            const formatted = formatErrorDetail(json)
+            if (formatted) detail = formatted
           }
         }
       } catch {
@@ -90,6 +83,26 @@ async function request<T>(
     return (data as { results: unknown[] }).results as unknown as T
   }
   return data as T
+}
+
+function formatErrorDetail(data: unknown): string {
+  if (!data) return ""
+  if (typeof data === "string") return data
+  if (Array.isArray(data)) {
+    return data.map((item) => formatErrorDetail(item)).filter(Boolean).join(", ")
+  }
+  if (typeof data === "object") {
+    const parts: string[] = []
+    for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
+      const formattedVal = formatErrorDetail(val)
+      if (formattedVal) {
+        const prefix = !isNaN(Number(key)) ? `Row ${Number(key) + 1}` : key
+        parts.push(`${prefix}: ${formattedVal}`)
+      }
+    }
+    return parts.join("; ")
+  }
+  return String(data)
 }
 
 interface CacheEntry<T> {
@@ -205,6 +218,12 @@ export function createApi(token: string) {
       request<{ deleted_count: number; deleted_ids: number[] }>(`/students/bulk_delete/`, token, {
         method: "DELETE",
         body: JSON.stringify({ ids }),
+      }),
+
+    bulkCreateStudents: (items: import("./types").StudentPayload[]) =>
+      request<{ created_count: number; items: import("./types").Student[] }>(`/students/bulk_create/`, token, {
+        method: "POST",
+        body: JSON.stringify({ items }),
       }),
 
     getCheckInToken: (id: number) =>
@@ -356,6 +375,15 @@ export function createApi(token: string) {
       const res = await request<{ deleted_count: number; deleted_ids: number[] }>(`/teachers/bulk_delete/`, token, {
         method: "DELETE",
         body: JSON.stringify({ ids }),
+      })
+      clearApiCache("/teachers/")
+      return res
+    },
+
+    bulkCreateTeachers: async (items: import("./types").TeacherPayload[]) => {
+      const res = await request<{ created_count: number; items: import("./types").Teacher[] }>(`/teachers/bulk_create/`, token, {
+        method: "POST",
+        body: JSON.stringify({ items }),
       })
       clearApiCache("/teachers/")
       return res

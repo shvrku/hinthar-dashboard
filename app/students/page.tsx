@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck, Upload } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { SCHOOL_CODES, type Student, StudentPayload } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { BulkImportModal } from "@/components/bulk-import-modal"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
@@ -38,7 +39,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -58,14 +60,26 @@ function TableSkeletonRow() {
 // ---------------------------------------------------------------------------
 // Truncated cell content with tooltip
 // ---------------------------------------------------------------------------
-function TruncatedContent({ value }: { value: string | null }) {
-  if (!value) return <span className="text-muted-foreground">—</span>
+function TruncatedContent({
+  value,
+  className = "",
+}: {
+  value: string | null | undefined
+  className?: string
+}) {
+  if (!value || !value.trim()) return <span className="text-muted-foreground">—</span>
+  const text = value.trim()
   return (
     <Tooltip>
-      <TooltipTrigger className="block max-w-full truncate cursor-default">
-        {value}
+      <TooltipTrigger className={cn("group/trunc relative block w-full text-left focus:outline-none cursor-pointer", className)}>
+        <span className="block truncate transition-colors duration-150 group-hover/trunc:text-primary group-hover/trunc:underline decoration-dashed decoration-primary/40 underline-offset-3">
+          {text}
+        </span>
       </TooltipTrigger>
-      <TooltipContent>{value}</TooltipContent>
+      <TooltipContent side="top" className="max-w-xs break-words text-xs font-normal shadow-lg border border-border/80 bg-popover text-popover-foreground px-3 py-2 rounded-xl space-y-0.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Full Text</p>
+        <p className="text-xs font-medium text-foreground">{text}</p>
+      </TooltipContent>
     </Tooltip>
   )
 }
@@ -273,6 +287,7 @@ export default function StudentsPage() {
 
   // Modal & form state
   const [modalOpen, setModalOpen] = React.useState(false)
+  const [bulkModalOpen, setBulkModalOpen] = React.useState(false)
   const [editingStudent, setEditingStudent] = React.useState<Student | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [schoolCode, setSchoolCode] = React.useState<string>("HIS")
@@ -315,17 +330,24 @@ export default function StudentsPage() {
     }
   }, [getApi])
 
+  const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
+
   const filteredStudents = React.useMemo(() => {
     if (!students) return []
-    if (searchQuery.trim() === "") return students
-    const query = searchQuery.toLowerCase().trim()
-    return students.filter(
-      (s) =>
+    return students.filter((s) => {
+      const matchesSchool = schoolFilter === "all" || s.school_code === schoolFilter
+      if (!matchesSchool) return false
+      if (searchQuery.trim() === "") return true
+      const query = searchQuery.toLowerCase().trim()
+      return (
         s.name.toLowerCase().includes(query) ||
         String(s.id).includes(query) ||
+        (s.unique_code && s.unique_code.toLowerCase().includes(query)) ||
+        (s.school_code && s.school_code.toLowerCase().includes(query)) ||
         (s.contact && s.contact.toLowerCase().includes(query))
-    )
-  }, [students, searchQuery])
+      )
+    })
+  }, [students, schoolFilter, searchQuery])
 
   // Sorting
   const { items: sortedStudents, requestSort, sortConfig } = useSortableData(filteredStudents, "id", "asc")
@@ -486,7 +508,17 @@ export default function StudentsPage() {
           onClick: loadData,
           icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
         }}
-      />
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setBulkModalOpen(true)}
+          className="gap-1.5"
+        >
+          <Upload className="size-4" />
+          Import CSV
+        </Button>
+      </StandardPageHeader>
 
       {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -509,15 +541,33 @@ export default function StudentsPage() {
       {/* Standardized Management Toolbar Card */}
       <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search students by name, ID or contact..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex flex-1 items-center gap-3 max-w-lg">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search students by name, code, ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={schoolFilter} onValueChange={(val) => setSchoolFilter(val ?? "all")}>
+              <SelectTrigger className="w-36 text-xs">
+                <SelectValue>
+                  {schoolFilter === "all" ? "All Schools" : schoolFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Schools</SelectItem>
+                {SCHOOL_CODES.map((sc) => (
+                  <SelectItem key={sc.value} value={sc.value}>
+                    {sc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -565,144 +615,156 @@ export default function StudentsPage() {
       )}
 
       {/* Floating Table Card */}
-      <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 text-center">
-                <Checkbox
-                  checked={allCurrentPageSelected}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="Select all current page"
-                />
-              </TableHead>
-
-              <TableHeadSortable
-                className="w-[120px]"
-                sortKey="unique_code"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Unique Identifier
-              </TableHeadSortable>
-
-              <TableHead className="w-[90px]">School Code</TableHead>
-
-              <TableHeadSortable
-                sortKey="name"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Name
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="dob"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                DOB
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[140px]"
-                sortKey="contact"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Contact
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[140px]"
-                sortKey="exam_candidate_number"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Exam Candidate No.
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="enrollment_date"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Enrollment Date
-              </TableHeadSortable>
-
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && !students ? (
-              Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-            ) : sortedStudents && sortedStudents.length === 0 ? (
+      <TooltipProvider>
+        <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
-                </TableCell>
+                <TableHead className="w-12 text-center">
+                  <Checkbox
+                    checked={allCurrentPageSelected}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all current page"
+                  />
+                </TableHead>
+
+                <TableHeadSortable
+                  className="w-[120px]"
+                  sortKey="unique_code"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Unique Identifier
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[100px]"
+                  sortKey="school_code"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  School Code
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="name"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Name
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="dob"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  DOB
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[140px]"
+                  sortKey="contact"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Contact
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[140px]"
+                  sortKey="exam_candidate_number"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Exam Candidate No.
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="enrollment_date"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Enrollment Date
+                </TableHeadSortable>
+
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              pagination.paginatedItems.map((student) => {
-                const isSelected = selectedIds.includes(student.id)
-                return (
-                  <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelectRow(student.id)}
-                        aria-label={`Select student ${student.name}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-semibold text-foreground">{student.unique_code}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs font-normal">
-                        {student.school_code}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
-                    <TableCell className="max-w-[140px]">
-                      <TruncatedContent value={student.contact} />
-                    </TableCell>
-                    <TableCell className="max-w-[140px]">
-                      <TruncatedContent value={student.exam_candidate_number} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditModal(student)}
-                          aria-label={`Edit ${student.name}`}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeletingId(student.id)}
-                          aria-label={`Delete ${student.name}`}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+            </TableHeader>
+            <TableBody>
+              {loading && !students ? (
+                Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+              ) : sortedStudents && sortedStudents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                    {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pagination.paginatedItems.map((student) => {
+                  const isSelected = selectedIds.includes(student.id)
+                  return (
+                    <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelectRow(student.id)}
+                          aria-label={`Select student ${student.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{student.unique_code}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          {student.school_code}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <TruncatedContent value={student.name} className="font-medium text-foreground" />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
+                      <TableCell className="max-w-[140px]">
+                        <TruncatedContent value={student.contact} />
+                      </TableCell>
+                      <TableCell className="max-w-[140px]">
+                        <TruncatedContent value={student.exam_candidate_number} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditModal(student)}
+                            aria-label={`Edit ${student.name}`}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeletingId(student.id)}
+                            aria-label={`Delete ${student.name}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      </TooltipProvider>
 
       {/* Standardized Table Pagination Footer */}
       {sortedStudents && sortedStudents.length > 0 && (
@@ -751,6 +813,21 @@ export default function StudentsPage() {
         onConfirm={handleBulkDelete}
         onCancel={() => setBulkConfirmOpen(false)}
         loading={bulkDeleting}
+      />
+
+      {/* CSV Bulk Import Modal */}
+      <BulkImportModal
+        open={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        entityType="student"
+        onImport={async (items) => {
+          const api = await getApi()
+          return api.bulkCreateStudents(items)
+        }}
+        onSuccess={(count) => {
+          setSuccess(`Successfully imported ${count} student(s).`)
+          loadData()
+        }}
       />
     </div>
   )

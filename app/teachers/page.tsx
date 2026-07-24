@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck, Upload } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
+import { BulkImportModal } from "@/components/bulk-import-modal"
 import {
   type Teacher,
   type TeacherPayload,
@@ -37,7 +38,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -57,14 +59,26 @@ function TableSkeletonRow() {
 // ---------------------------------------------------------------------------
 // Truncated cell content with tooltip
 // ---------------------------------------------------------------------------
-function TruncatedContent({ value }: { value: string | null }) {
-  if (!value) return <span className="text-muted-foreground">—</span>
+function TruncatedContent({
+  value,
+  className = "",
+}: {
+  value: string | null | undefined
+  className?: string
+}) {
+  if (!value || !value.trim()) return <span className="text-muted-foreground">—</span>
+  const text = value.trim()
   return (
     <Tooltip>
-      <TooltipTrigger className="block max-w-full truncate cursor-default">
-        {value}
+      <TooltipTrigger className={cn("group/trunc relative block w-full text-left focus:outline-none cursor-pointer", className)}>
+        <span className="block truncate transition-colors duration-150 group-hover/trunc:text-primary group-hover/trunc:underline decoration-dashed decoration-primary/40 underline-offset-3">
+          {text}
+        </span>
       </TooltipTrigger>
-      <TooltipContent>{value}</TooltipContent>
+      <TooltipContent side="top" className="max-w-xs break-words text-xs font-normal shadow-lg border border-border/80 bg-popover text-popover-foreground px-3 py-2 rounded-xl space-y-0.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Full Text</p>
+        <p className="text-xs font-medium text-foreground">{text}</p>
+      </TooltipContent>
     </Tooltip>
   )
 }
@@ -320,6 +334,7 @@ export default function TeachersPage() {
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
   const [bulkDeleting, setBulkDeleting] = React.useState(false)
   const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false)
+  const [bulkModalOpen, setBulkModalOpen] = React.useState(false)
 
   const [showForm, setShowForm] = React.useState(false)
   const [editing, setEditing] = React.useState<Teacher | null>(null)
@@ -364,21 +379,25 @@ export default function TeachersPage() {
   }, [getApi])
 
   const [typeFilter, setTypeFilter] = React.useState<string>("all")
+  const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
 
   const filteredTeachers = React.useMemo(() => {
     return teachers.filter((t) => {
       const matchesType = typeFilter === "all" || t.employment_type === typeFilter
-      if (!matchesType) return false
+      const matchesSchool = schoolFilter === "all" || t.school_code === schoolFilter
+      if (!matchesType || !matchesSchool) return false
       if (!searchQuery.trim()) return true
       const q = searchQuery.toLowerCase().trim()
       return (
         t.name.toLowerCase().includes(q) ||
         String(t.id).includes(q) ||
+        (t.unique_code && t.unique_code.toLowerCase().includes(q)) ||
+        (t.school_code && t.school_code.toLowerCase().includes(q)) ||
         (t.contact && t.contact.toLowerCase().includes(q)) ||
         (t.employment_type && t.employment_type.toLowerCase().includes(q))
       )
     })
-  }, [teachers, typeFilter, searchQuery])
+  }, [teachers, typeFilter, schoolFilter, searchQuery])
 
   // Sorting
   const { items: sortedTeachers, requestSort, sortConfig } = useSortableData(filteredTeachers, "id", "asc")
@@ -544,7 +563,17 @@ export default function TeachersPage() {
           onClick: loadTeachers,
           icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
         }}
-      />
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setBulkModalOpen(true)}
+          className="gap-1.5"
+        >
+          <Upload className="size-4" />
+          Import CSV
+        </Button>
+      </StandardPageHeader>
 
       {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -579,8 +608,24 @@ export default function TeachersPage() {
               />
             </div>
 
+            <Select value={schoolFilter} onValueChange={(val) => setSchoolFilter(val ?? "all")}>
+              <SelectTrigger className="w-32 text-xs">
+                <SelectValue>
+                  {schoolFilter === "all" ? "All Schools" : schoolFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Schools</SelectItem>
+                {SCHOOL_CODES.map((sc) => (
+                  <SelectItem key={sc.value} value={sc.value}>
+                    {sc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val ?? "all")}>
-              <SelectTrigger className="w-40 text-xs">
+              <SelectTrigger className="w-36 text-xs">
                 <SelectValue>
                   {typeFilter === "all" ? "All Types" : (EMPLOYMENT_TYPES.find((t) => t.value === typeFilter)?.label ?? typeFilter)}
                 </SelectValue>
@@ -641,156 +686,160 @@ export default function TeachersPage() {
       )}
 
       {/* Floating Table Card */}
-      <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 text-center">
-                <Checkbox
-                  checked={allCurrentPageSelected}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="Select all current page"
-                />
-              </TableHead>
-
-              <TableHeadSortable
-                className="w-[110px]"
-                sortKey="unique_code"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                ID
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[80px]"
-                sortKey="school_code"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                School
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="name"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Name
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[100px]"
-                sortKey="employment_type"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Type
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[100px]"
-                sortKey="default_rate"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Rate
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[130px]"
-                sortKey="contact"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Contact
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                className="w-[130px]"
-                sortKey="bank_details"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Bank
-              </TableHeadSortable>
-
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && teachers.length === 0 ? (
-              Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-            ) : sortedTeachers.length === 0 ? (
+      <TooltipProvider>
+        <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  No teachers found.
-                </TableCell>
+                <TableHead className="w-12 text-center">
+                  <Checkbox
+                    checked={allCurrentPageSelected}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all current page"
+                  />
+                </TableHead>
+
+                <TableHeadSortable
+                  className="w-[110px]"
+                  sortKey="unique_code"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  ID
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[80px]"
+                  sortKey="school_code"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  School
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  sortKey="name"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Name
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[100px]"
+                  sortKey="employment_type"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Type
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[100px]"
+                  sortKey="default_rate"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Rate
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[130px]"
+                  sortKey="contact"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Contact
+                </TableHeadSortable>
+
+                <TableHeadSortable
+                  className="w-[130px]"
+                  sortKey="bank_details"
+                  currentSortKey={sortConfig.key}
+                  currentSortOrder={sortConfig.order}
+                  onSort={requestSort}
+                >
+                  Bank
+                </TableHeadSortable>
+
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              pagination.paginatedItems.map((t) => {
-                const isSelected = selectedIds.includes(t.id)
-                return (
-                  <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelectRow(t.id)}
-                        aria-label={`Select teacher ${t.name}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{t.school_code}</Badge>
-                    </TableCell>
-                    <TableCell className="font-semibold text-foreground">{t.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
-                    <TableCell className="max-w-[130px]">
-                      <TruncatedContent value={t.contact} />
-                    </TableCell>
-                    <TableCell className="max-w-[130px]">
-                      <TruncatedContent value={t.bank_details} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditModal(t)}
-                          title="Edit"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleting(t)}
-                          title="Delete"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+            </TableHeader>
+            <TableBody>
+              {loading && teachers.length === 0 ? (
+                Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+              ) : sortedTeachers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                    No teachers found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pagination.paginatedItems.map((t) => {
+                  const isSelected = selectedIds.includes(t.id)
+                  return (
+                    <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelectRow(t.id)}
+                          aria-label={`Select teacher ${t.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{t.school_code}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <TruncatedContent value={t.name} className="font-semibold text-foreground" />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
+                      <TableCell className="max-w-[140px]">
+                        <TruncatedContent value={t.contact} />
+                      </TableCell>
+                      <TableCell className="max-w-[140px]">
+                        <TruncatedContent value={t.bank_details} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditModal(t)}
+                            title="Edit"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleting(t)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      </TooltipProvider>
 
       {/* Standardized Table Pagination Footer */}
       {sortedTeachers.length > 0 && (
@@ -849,6 +898,21 @@ export default function TeachersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* CSV Bulk Import Modal */}
+      <BulkImportModal
+        open={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        entityType="teacher"
+        onImport={async (items) => {
+          const api = await getApi()
+          return api.bulkCreateTeachers(items)
+        }}
+        onSuccess={(count) => {
+          setSuccess(`Successfully imported ${count} teacher(s).`)
+          loadTeachers()
+        }}
+      />
     </div>
   )
 }
