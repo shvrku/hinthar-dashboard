@@ -452,6 +452,12 @@ export function createApi(token: string) {
         body: JSON.stringify({ ids }),
       }),
 
+    bulkCreateAdHocSessions: (records: import("./types").AdHocSessionPayload[]) =>
+      request<import("./types").AdHocSession[]>(`/adhoc-sessions/bulk_create/`, token, {
+        method: "POST",
+        body: JSON.stringify(records),
+      }),
+
     // --- Ad-Hoc Session Attendances ---
     listAdHocSessionAttendances: (params?: Record<string, string | number | undefined | null>) =>
       request<import("./types").AdHocSessionAttendance[]>(`/adhoc-session-attendances/${buildQueryString(params)}`, token),

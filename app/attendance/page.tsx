@@ -788,7 +788,7 @@ export default function AttendancePage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <BookOpen className="size-3.5 text-amber-500" />
+              <BookOpen className="size-3.5" />
               <span>Ad-Hoc / Tutoring Sessions</span>
             </button>
           </div>

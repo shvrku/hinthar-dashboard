@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Minus, Search, CalendarCheck, Sparkles } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Minus, Search, CalendarCheck, Sparkles, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot } from "@/lib/types"
+import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot, type AdHocSession, type AdHocSessionPayload, type Subject } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -122,8 +123,10 @@ export default function SessionsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
   const [sessions, setSessions] = React.useState<Session[] | null>(null)
+  const [adhocSessions, setAdHocSessions] = React.useState<AdHocSession[] | null>(null)
   const [teachers, setTeachers] = React.useState<Teacher[]>([])
   const [classes, setClasses] = React.useState<Class[]>([])
+  const [subjects, setSubjects] = React.useState<Subject[]>([])
   const [timetableSlots, setTimetableSlots] = React.useState<TimetableSlot[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -140,6 +143,9 @@ export default function SessionsPage() {
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editingSession, setEditingSession] = React.useState<Session | null>(null)
   const [saving, setSaving] = React.useState(false)
+
+  // Tab mode
+  const [sessionMode, setSessionMode] = React.useState<"regular" | "adhoc">("regular")
 
   // Batch Session Generator Modal state
   const [generateModalOpen, setGenerateModalOpen] = React.useState(false)
@@ -167,6 +173,15 @@ export default function SessionsPage() {
   const [formClassId, setFormClassId] = React.useState<string>("")
   const [formTimetableSlotId, setFormTimetableSlotId] = React.useState<string>("")
 
+  // Ad-Hoc Session form state
+  const [adhocModalOpen, setAdhocModalOpen] = React.useState(false)
+  const [adhocSaving, setAdhocSaving] = React.useState(false)
+  const [adhocSubjectId, setAdhocSubjectId] = React.useState<string>("")
+  const [adhocTeacherId, setAdhocTeacherId] = React.useState<string>("")
+  const [adhocDate, setAdhocDate] = React.useState<string>(new Date().toISOString().split("T")[0])
+  const [adhocStartTime, setAdhocStartTime] = React.useState<string>("09:00")
+  const [adhocEndTime, setAdhocEndTime] = React.useState<string>("10:00")
+
   const successTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const showSuccess = React.useCallback((msg: string) => {
@@ -181,13 +196,15 @@ export default function SessionsPage() {
       const token = await getToken()
       if (!token) return
       const api = createApi(token)
-      const [teachersData, classesData, slotsData] = await Promise.all([
+      const [teachersData, classesData, subjectsData, slotsData] = await Promise.all([
         api.listTeachers(),
         api.listClasses(),
+        api.listSubjects(),
         api.listTimetableSlots(),
       ])
       setTeachers(teachersData)
       setClasses(classesData)
+      setSubjects(subjectsData)
       setTimetableSlots(slotsData)
     } catch {
       // silent
@@ -223,6 +240,38 @@ export default function SessionsPage() {
     }
   }
 
+  const handleCreateAdHocSession = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!adhocSubjectId || !adhocTeacherId || !adhocDate || !adhocStartTime || !adhocEndTime) return
+
+    setAdhocSaving(true)
+    setError(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      const formattedStart = adhocStartTime.length === 5 ? `${adhocStartTime}:00` : adhocStartTime
+      const formattedEnd = adhocEndTime.length === 5 ? `${adhocEndTime}:00` : adhocEndTime
+      await api.createAdHocSession({
+        subject_id: Number(adhocSubjectId),
+        teacher_id: Number(adhocTeacherId),
+        date: adhocDate,
+        start_time: formattedStart,
+        end_time: formattedEnd,
+        status: "scheduled",
+      })
+      setAdhocModalOpen(false)
+      showSuccess("Ad-hoc session created successfully.")
+      // Reload adhoc sessions
+      const data = await api.listAdHocSessions()
+      setAdHocSessions(data)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.userMessage : "Failed to create ad-hoc session")
+    } finally {
+      setAdhocSaving(false)
+    }
+  }
+
   const loadSessions = React.useCallback(async () => {
     if (!isSignedIn) return
     setLoading(true)
@@ -232,8 +281,13 @@ export default function SessionsPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const data = await api.listSessions()
-      setSessions(data)
+      if (sessionMode === "adhoc") {
+        const data = await api.listAdHocSessions()
+        setAdHocSessions(data)
+      } else {
+        const data = await api.listSessions()
+        setSessions(data)
+      }
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
@@ -244,7 +298,7 @@ export default function SessionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, isSignedIn])
+  }, [getToken, isSignedIn, sessionMode])
 
   React.useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -308,12 +362,19 @@ export default function SessionsPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const res = await api.bulkDeleteSessions(selectedIds)
-      showSuccess(`Successfully deleted ${res.deleted_count} session(s).`)
+      if (sessionMode === "adhoc") {
+        const res = await api.bulkDeleteAdHocSessions(selectedIds)
+        showSuccess(`Successfully deleted ${res.deleted_count} ad-hoc session(s).`)
+        const data = await api.listAdHocSessions()
+        setAdHocSessions(data)
+      } else {
+        const res = await api.bulkDeleteSessions(selectedIds)
+        showSuccess(`Successfully deleted ${res.deleted_count} session(s).`)
+        const data = await api.listSessions()
+        setSessions(data)
+      }
       setSelectedIds([])
       setBulkConfirmOpen(false)
-      const data = await api.listSessions()
-      setSessions(data)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -323,7 +384,7 @@ export default function SessionsPage() {
     } finally {
       setBulkDeleting(false)
     }
-  }, [getToken, selectedIds, showSuccess])
+  }, [getToken, selectedIds, sessionMode, showSuccess])
 
   const filteredSlots = React.useMemo(() => {
     if (!formClassId) return []
@@ -489,12 +550,19 @@ export default function SessionsPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      await api.deleteSession(deletingId)
-      showSuccess("Session deleted successfully.")
+      if (sessionMode === "adhoc") {
+        await api.deleteAdHocSession(deletingId)
+        showSuccess("Ad-hoc session deleted successfully.")
+        const data = await api.listAdHocSessions()
+        setAdHocSessions(data)
+      } else {
+        await api.deleteSession(deletingId)
+        showSuccess("Session deleted successfully.")
+        const data = await api.listSessions()
+        setSessions(data)
+      }
       setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
       setDeletingId(null)
-      const data = await api.listSessions()
-      setSessions(data)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -535,8 +603,14 @@ export default function SessionsPage() {
         title="Sessions"
         description="Schedule and manage class sessions, statuses, and teacher assignments."
         primaryAction={{
-          label: "Add Session",
-          onClick: openAddModal,
+          label: sessionMode === "adhoc" ? "Add Ad-Hoc Session" : "Add Session",
+          onClick: sessionMode === "adhoc" ? () => {
+             if (subjects.length > 0) setAdhocSubjectId(subjects[0].id.toString())
+             if (teachers.length > 0) setAdhocTeacherId(teachers[0].id.toString())
+             setAdhocStartTime("09:00")
+             setAdhocEndTime("10:00")
+             setAdhocModalOpen(true)
+           } : openAddModal,
           icon: <Plus className="size-4" />,
         }}
         secondaryAction={{
@@ -548,15 +622,17 @@ export default function SessionsPage() {
 
       {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 border-emerald-500/20 bg-card">
+        <Card className="p-5 border-primary/20 bg-card">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Sessions</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <CalendarCheck className="size-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{sessions?.length ?? 0}</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">
+              {sessionMode === "regular" ? (sessions?.length ?? 0) : (adhocSessions?.length ?? 0)}
+            </h2>
             {lastLoaded && (
               <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
             )}
@@ -565,7 +641,35 @@ export default function SessionsPage() {
       </div>
 
       {/* Standardized Management Toolbar Card */}
-      <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
+      <Card className="p-4 shadow-2xs border-border/80 bg-card">
+        {/* Mode toggle — same pattern as attendance matrix */}
+        <div className="mb-3 flex rounded-lg border border-border bg-muted/40 p-1 w-fit">
+          <button
+            onClick={() => setSessionMode("regular")}
+            className={cn(
+              "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer",
+              sessionMode === "regular"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <CalendarCheck className="size-3.5" />
+            Regular Sessions
+          </button>
+          <button
+            onClick={() => setSessionMode("adhoc")}
+            className={cn(
+              "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer",
+              sessionMode === "adhoc"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <BookOpen className="size-3.5" />
+            Ad-Hoc Sessions
+          </button>
+        </div>
+
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div className="flex flex-1 items-center gap-3 max-w-lg">
             <div className="relative flex-1">
@@ -579,34 +683,37 @@ export default function SessionsPage() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? "all")}>
-              <SelectTrigger className="w-40 text-xs">
-                <SelectValue>
-                  {statusFilter === "all" ? "All Statuses" : (SESSION_STATUSES.find((s) => s.value === statusFilter)?.label ?? statusFilter)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {SESSION_STATUSES.map((st) => (
-                  <SelectItem key={st.value} value={st.value}>
-                    {st.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {sessionMode === "regular" && (
+              <>
+                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? "all")}>
+                  <SelectTrigger className="w-40 text-xs">
+                    <SelectValue>
+                      {statusFilter === "all" ? "All Statuses" : (SESSION_STATUSES.find((s) => s.value === statusFilter)?.label ?? statusFilter)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {SESSION_STATUSES.map((st) => (
+                      <SelectItem key={st.value} value={st.value}>
+                        {st.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (classes.length > 0 && !genClassId) setGenClassId(classes[0].id.toString())
-                setGenerateModalOpen(true)
-              }}
-              className="gap-1.5 font-medium border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
-            >
-              <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Generate Month Sessions</span>
-            </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    if (classes.length > 0 && !genClassId) setGenClassId(classes[0].id.toString())
+                    setGenerateModalOpen(true)
+                  }}
+                  className="cursor-pointer"
+                >
+                  Generate Month
+                </Button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -622,11 +729,20 @@ export default function SessionsPage() {
               </Button>
             )}
 
-            {lastLoaded && sessions && (
+            {lastLoaded && (
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="px-3 py-1 text-xs">
-                  <CalendarCheck className="mr-1.5 size-3.5" />
-                  {filteredSessions.length} of {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+                  {sessionMode === "adhoc" ? (
+                    <>
+                      <BookOpen className="mr-1.5 size-3.5" />
+                      {adhocSessions?.length ?? 0} ad-hoc session{(adhocSessions?.length ?? 0) !== 1 ? "s" : ""}
+                    </>
+                  ) : (
+                    <>
+                      <CalendarCheck className="mr-1.5 size-3.5" />
+                      {filteredSessions.length} of {sessions?.length ?? 0} session{(sessions?.length ?? 0) !== 1 ? "s" : ""}
+                    </>
+                  )}
                 </Badge>
               </div>
             )}
@@ -636,7 +752,7 @@ export default function SessionsPage() {
 
       {/* Banners */}
       {success && (
-        <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
           <div className="flex items-center gap-2">
             <Check className="size-4 shrink-0" />
             <span>{success}</span>
@@ -656,183 +772,142 @@ export default function SessionsPage() {
         </div>
       )}
 
-      {/* Floating Table Card */}
-      <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 text-center">
-                <Checkbox
-                  checked={allCurrentPageSelected}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="Select all current page"
-                />
-              </TableHead>
+      {/* Table Card — Regular Sessions */}
+      {sessionMode === "regular" && (
+        <>
+          <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12 text-center">
+                    <Checkbox
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all current page"
+                    />
+                  </TableHead>
+                  <TableHeadSortable className="w-[100px]" sortKey="id" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>ID</TableHeadSortable>
+                  <TableHeadSortable sortKey="teacher.name" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>Teacher Name</TableHeadSortable>
+                  <TableHeadSortable sortKey="class_obj.cohort_identifier" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>Class</TableHeadSortable>
+                  <TableHeadSortable sortKey="start_time" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>Start Time</TableHeadSortable>
+                  <TableHeadSortable sortKey="end_time" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>End Time</TableHeadSortable>
+                  <TableHeadSortable sortKey="status" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort} align="center">Status</TableHeadSortable>
+                  <TableHeadSortable sortKey="paid" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort} align="center">Paid</TableHeadSortable>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
+                ) : sessions === null ? (
+                  <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch sessions.</TableCell></TableRow>
+                ) : sortedSessions.length === 0 ? (
+                  <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">No sessions found.</TableCell></TableRow>
+                ) : (
+                  pagination.paginatedItems.map((session) => {
+                    const isSelected = selectedIds.includes(session.id)
+                    return (
+                      <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
+                        <TableCell className="text-center">
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select session #${session.id}`} />
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
+                        <TableCell className="font-medium">{session.teacher?.name ?? "—"}</TableCell>
+                        <TableCell>
+                          {session.class_obj ? (
+                            <Badge variant="outline">{session.class_obj.education_level} {session.class_obj.cohort_identifier}</Badge>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(session.start_time)}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(session.end_time)}</TableCell>
+                        <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
+                        <TableCell className="text-center">
+                          {session.paid === true ? <Check className="size-4 text-primary" /> : <Minus className="size-4 text-muted-foreground" />}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon-sm" onClick={() => openEditModal(session)} title="Edit"><Pencil className="size-4" /></Button>
+                            <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+          {sortedSessions.length > 0 && (
+            <StandardTablePagination
+              currentPage={pagination.currentPage} totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems} startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex} pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage} onPageSizeChange={pagination.setPageSize}
+            />
+          )}
+        </>
+      )}
 
-              <TableHeadSortable
-                className="w-[100px]"
-                sortKey="id"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                ID
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="teacher.name"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Teacher Name
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="class_obj.cohort_identifier"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Class
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="start_time"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                Start Time
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="end_time"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-              >
-                End Time
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="status"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-                align="center"
-              >
-                Status
-              </TableHeadSortable>
-
-              <TableHeadSortable
-                sortKey="paid"
-                currentSortKey={sortConfig.key}
-                currentSortOrder={sortConfig.order}
-                onSort={requestSort}
-                align="center"
-              >
-                Paid
-              </TableHeadSortable>
-
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && !sessions ? (
-              Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-            ) : sessions === null ? (
-              <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  Click &quot;Load Data&quot; to fetch sessions.
-                </TableCell>
-              </TableRow>
-            ) : sortedSessions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  No sessions found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              pagination.paginatedItems.map((session) => {
-                const isSelected = selectedIds.includes(session.id)
-                return (
-                  <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelectRow(session.id)}
-                        aria-label={`Select session #${session.id}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
-                    <TableCell className="font-medium">{session.teacher?.name ?? "—"}</TableCell>
-                    <TableCell>
-                      {session.class_obj ? (
-                        <Badge variant="outline">
-                          {session.class_obj.education_level} {session.class_obj.cohort_identifier}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {formatDateTime(session.start_time)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {formatDateTime(session.end_time)}
-                    </TableCell>
-                    <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center">
-                        {session.paid === true ? (
-                          <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Minus className="size-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditModal(session)}
-                          title="Edit"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeletingId(session.id)}
-                          title="Delete"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
-
-      {/* Standardized Table Pagination Footer */}
-      {sortedSessions.length > 0 && (
-        <StandardTablePagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          totalItems={pagination.totalItems}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
-          pageSize={pagination.pageSize}
-          onPageChange={pagination.setCurrentPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
+      {/* Table Card — Ad-Hoc Sessions */}
+      {sessionMode === "adhoc" && (
+        <>
+          <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12 text-center">
+                    <Checkbox
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all current page"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[80px]">ID</TableHead>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  <TableHead align="center">Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
+                ) : adhocSessions === null ? (
+                  <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch ad-hoc sessions.</TableCell></TableRow>
+                ) : adhocSessions.length === 0 ? (
+                  <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">No ad-hoc sessions found.</TableCell></TableRow>
+                ) : (
+                  adhocSessions.map((session) => {
+                    const isSelected = selectedIds.includes(session.id)
+                    return (
+                      <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
+                        <TableCell className="text-center">
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select #${session.id}`} />
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
+                        <TableCell>{session.teacher?.name ?? "—"}</TableCell>
+                        <TableCell>{session.subject?.name ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{session.date ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{session.start_time ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{session.end_time ?? "—"}</TableCell>
+                        <TableCell className="text-center">{renderStatusBadge(session.status as SessionStatus | null)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon-sm" title="Edit"><Pencil className="size-4" /></Button>
+                            <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </>
       )}
 
       {/* Form modal */}
@@ -1010,9 +1085,9 @@ export default function SessionsPage() {
       <Dialog open={deletingId !== null} onOpenChange={(val) => !val && setDeletingId(null)}>
         <DialogContent onClose={() => setDeletingId(null)}>
           <DialogHeader>
-            <DialogTitle>Delete Session</DialogTitle>
+            <DialogTitle>Delete {sessionMode === "adhoc" ? "Ad-Hoc Session" : "Session"}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete session #{deletingId}? This action cannot be undone.
+              Are you sure you want to delete {sessionMode === "adhoc" ? "ad-hoc" : ""} session #{deletingId}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1053,7 +1128,7 @@ export default function SessionsPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="size-5 text-amber-500" />
+              <Sparkles className="size-5" />
               Generate Sessions from Timetable
             </DialogTitle>
             <DialogDescription>
@@ -1132,6 +1207,105 @@ export default function SessionsPage() {
                     <Sparkles className="size-4" />
                     <span>Generate Sessions</span>
                   </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Ad-Hoc Session Dialog */}
+      <Dialog open={adhocModalOpen} onOpenChange={setAdhocModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Ad-Hoc Session</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateAdHocSession} className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Subject</label>
+              <Select value={adhocSubjectId} onValueChange={(val) => setAdhocSubjectId(val ?? "")}>
+                <SelectTrigger className="w-full bg-background">
+                  <SelectValue placeholder="Select Subject">
+                    {subjects.find((s) => s.id.toString() === adhocSubjectId)?.name ?? "Select Subject"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id.toString()}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Teacher</label>
+              <Select value={adhocTeacherId} onValueChange={(val) => setAdhocTeacherId(val ?? "")}>
+                <SelectTrigger className="w-full bg-background">
+                  <SelectValue placeholder="Select Teacher">
+                    {teachers.find((t) => t.id.toString() === adhocTeacherId)?.name ?? "Select Teacher"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={t.id.toString()}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</label>
+              <Input
+                type="date"
+                value={adhocDate}
+                onChange={(e) => setAdhocDate(e.target.value)}
+                required
+                className="bg-background w-full"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Start Time</label>
+                <Input
+                  type="time"
+                  step="1"
+                  value={adhocStartTime}
+                  onChange={(e) => setAdhocStartTime(e.target.value)}
+                  required
+                  className="bg-background"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">End Time</label>
+                <Input
+                  type="time"
+                  step="1"
+                  value={adhocEndTime}
+                  onChange={(e) => setAdhocEndTime(e.target.value)}
+                  required
+                  className="bg-background"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setAdhocModalOpen(false)} disabled={adhocSaving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={adhocSaving}>
+                {adhocSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Session"
                 )}
               </Button>
             </DialogFooter>
