@@ -147,7 +147,9 @@ function StudentFormModal({
 }) {
   const [name, setName] = React.useState("")
   const [dob, setDob] = React.useState("")
-  const [enrollmentDate, setEnrollmentDate] = React.useState("")
+  const [enrollmentDate, setEnrollmentDate] = React.useState(
+    () => new Date().toISOString().slice(0, 10)
+  )
   const [contact, setContact] = React.useState("")
   const [examCandidateNumber, setExamCandidateNumber] = React.useState("")
 
@@ -155,7 +157,11 @@ function StudentFormModal({
     if (open) {
       setName(initial?.name ?? "")
       setDob(initial?.dob ?? "")
-      setEnrollmentDate(initial?.enrollment_date ? initial.enrollment_date.slice(0, 10) : "")
+      setEnrollmentDate(
+        initial?.enrollment_date
+          ? initial.enrollment_date.slice(0, 10)
+          : new Date().toISOString().slice(0, 10)
+      )
       setContact(initial?.contact ?? "")
       setExamCandidateNumber(initial?.exam_candidate_number ?? "")
     }

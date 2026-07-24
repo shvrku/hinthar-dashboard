@@ -454,7 +454,7 @@ export default function TeachersPage() {
 
   const openAddModal = () => {
     setEditing(null)
-    setFormInitial(EMPTY_FORM)
+    setFormInitial({ ...EMPTY_FORM, join_date: new Date().toISOString().slice(0, 10) })
     setSchoolCode("HIS")
     setShowForm(true)
   }

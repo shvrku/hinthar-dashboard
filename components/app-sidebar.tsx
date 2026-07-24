@@ -83,8 +83,8 @@ const checkInSubItems = [
 ]
 
 const secondaryItems = [
-  { title: "Support", url: "#", icon: LifeBuoy },
-  { title: "Feedback", url: "#", icon: Send },
+  { title: "Support", url: "/support", icon: LifeBuoy },
+  { title: "Feedback", url: "/feedback", icon: Send },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
