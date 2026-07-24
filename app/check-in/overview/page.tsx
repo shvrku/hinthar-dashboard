@@ -240,9 +240,10 @@ export default function CheckInOverviewPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
+      const todayStr = new Date().toISOString().split("T")[0]
       const [studs, cis, cls, css] = await Promise.all([
         api.listStudents(),
-        api.listCheckIns(),
+        api.listCheckIns({ date: todayStr }),
         api.listClasses(),
         api.listClassStudents(),
       ])

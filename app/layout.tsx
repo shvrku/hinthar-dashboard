@@ -67,7 +67,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="h-full flex flex-col bg-background text-foreground overflow-hidden">
+      <body className="h-full flex flex-col bg-background text-foreground overflow-hidden" suppressHydrationWarning>
         <FocusProvider>
           <ThemeProvider>
             <ClerkThemeProvider>

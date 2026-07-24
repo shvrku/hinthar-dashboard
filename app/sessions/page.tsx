@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Minus, Search, CalendarCheck } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Minus, Search, CalendarCheck, Sparkles } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
@@ -141,6 +141,17 @@ export default function SessionsPage() {
   const [editingSession, setEditingSession] = React.useState<Session | null>(null)
   const [saving, setSaving] = React.useState(false)
 
+  // Batch Session Generator Modal state
+  const [generateModalOpen, setGenerateModalOpen] = React.useState(false)
+  const [genClassId, setGenClassId] = React.useState<string>("")
+  const [genStartDate, setGenStartDate] = React.useState<string>(new Date().toISOString().split("T")[0])
+  const [genEndDate, setGenEndDate] = React.useState<string>(() => {
+    const d = new Date()
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+    return lastDay.toISOString().split("T")[0]
+  })
+  const [isGenerating, setIsGenerating] = React.useState(false)
+
   // Delete confirmation
   const [deletingId, setDeletingId] = React.useState<number | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -182,6 +193,35 @@ export default function SessionsPage() {
       // silent
     }
   }, [getToken, isSignedIn])
+
+  const handleBatchGenerateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!genClassId) return
+    setIsGenerating(true)
+    setError(null)
+
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No auth token available")
+      const api = createApi(token)
+      const res = await api.generateSessionsForClass(Number(genClassId), {
+        start_date: genStartDate || undefined,
+        end_date: genEndDate || undefined,
+      })
+      showSuccess(`Successfully generated ${res.created_count} session(s) from timetable slots.`)
+      setGenerateModalOpen(false)
+      const data = await api.listSessions()
+      setSessions(data)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.userMessage)
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to generate sessions")
+      }
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const loadSessions = React.useCallback(async () => {
     if (!isSignedIn) return
@@ -554,6 +594,19 @@ export default function SessionsPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (classes.length > 0 && !genClassId) setGenClassId(classes[0].id.toString())
+                setGenerateModalOpen(true)
+              }}
+              className="gap-1.5 font-medium border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+            >
+              <Sparkles className="size-4 text-amber-500" />
+              <span>Generate Month Sessions</span>
+            </Button>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -992,6 +1045,97 @@ export default function SessionsPage() {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Session Generator Modal */}
+      <Dialog open={generateModalOpen} onOpenChange={setGenerateModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="size-5 text-amber-500" />
+              Generate Sessions from Timetable
+            </DialogTitle>
+            <DialogDescription>
+              Automatically create dated sessions for a class based on its active weekly timetable slots.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleBatchGenerateSubmit} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">Target Class *</label>
+              <Select value={genClassId} onValueChange={(val) => setGenClassId(val ?? "")}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Select class...">
+                    {genClassId
+                      ? (() => {
+                          const found = classes.find((c) => c.id.toString() === genClassId)
+                          return found
+                            ? `${found.education_level} ${found.cohort_identifier}${found.cohort_sub_category ? ` (${found.cohort_sub_category})` : ""}`
+                            : "Select class..."
+                        })()
+                      : "Select class..."}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="z-50 min-w-48">
+                  {classes.map((c) => {
+                    const label = `${c.education_level} ${c.cohort_identifier}${c.cohort_sub_category ? ` (${c.cohort_sub_category})` : ""}`
+                    return (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Start Date</label>
+                <Input
+                  type="date"
+                  value={genStartDate}
+                  onChange={(e) => setGenStartDate(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">End Date</label>
+                <Input
+                  type="date"
+                  value={genEndDate}
+                  onChange={(e) => setGenEndDate(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setGenerateModalOpen(false)}
+                disabled={isGenerating}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isGenerating || !genClassId} className="gap-1.5">
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-4" />
+                    <span>Generate Sessions</span>
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

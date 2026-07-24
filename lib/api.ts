@@ -12,11 +12,12 @@ const API_BASE = (
 ).replace(/\/+$/, "") + "/api/v1"
 
 function buildQueryString(params?: Record<string, string | number | undefined | null>): string {
-  if (!params) return ""
   const query = new URLSearchParams()
-  for (const [key, val] of Object.entries(params)) {
-    if (val !== undefined && val !== null && val !== "" && val !== "all") {
-      query.append(key, String(val))
+  if (params) {
+    for (const [key, val] of Object.entries(params)) {
+      if (val !== undefined && val !== null && val !== "" && val !== "all") {
+        query.append(key, String(val))
+      }
     }
   }
   const str = query.toString()
@@ -88,74 +89,97 @@ async function request<T>(
     "results" in data &&
     Array.isArray((data as { results: unknown }).results)
   ) {
-    let combinedResults = [...(data as { results: unknown[] }).results]
-    let nextUrl = (data as { next?: string | null }).next
-
-    // Automatically follow pagination `next` links to retrieve all items matching the query
-    while (nextUrl) {
-      try {
-        let nextPath: string
-        if (nextUrl.startsWith("http://") || nextUrl.startsWith("https://")) {
-          const parsedUrl = new URL(nextUrl)
-          nextPath = parsedUrl.pathname.replace(/^\/api\/v1/, "") + parsedUrl.search
-        } else {
-          nextPath = nextUrl.startsWith("/") ? nextUrl.replace(/^\/api\/v1/, "") : `/${nextUrl}`
-        }
-
-        const nextRes = await fetch(`${API_BASE}${nextPath}`, {
-          ...options,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            ...options.headers,
-          },
-        })
-        if (!nextRes.ok) break
-        const nextData = await nextRes.json()
-        if (nextData && Array.isArray(nextData.results)) {
-          combinedResults = combinedResults.concat(nextData.results)
-          nextUrl = nextData.next
-        } else {
-          break
-        }
-      } catch {
-        break
-      }
-    }
-    return combinedResults as unknown as T
+    return (data as { results: unknown[] }).results as unknown as T
   }
   return data as T
+}
+
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+const apiCache = new Map<string, CacheEntry<unknown>>()
+const DEFAULT_TTL_MS = 60_000 // 1 minute default TTL for dropdown metadata
+
+export function clearApiCache(prefix?: string) {
+  if (!prefix) {
+    apiCache.clear()
+    return
+  }
+  for (const key of apiCache.keys()) {
+    if (key.includes(prefix)) {
+      apiCache.delete(key)
+    }
+  }
+}
+
+async function cachedRequest<T>(
+  endpoint: string,
+  token: string,
+  options: RequestInit = {},
+  ttlMs = DEFAULT_TTL_MS,
+  forceRefresh = false
+): Promise<T> {
+  const method = (options.method || "GET").toUpperCase()
+  if (method !== "GET") {
+    return request<T>(endpoint, token, options)
+  }
+
+  const cacheKey = `${token}:${endpoint}`
+  if (!forceRefresh) {
+    const cached = apiCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < ttlMs) {
+      return cached.data as T
+    }
+  }
+
+  const data = await request<T>(endpoint, token, options)
+  apiCache.set(cacheKey, { data, timestamp: Date.now() })
+  return data
 }
 
 export function createApi(token: string) {
   return {
     // --- Classes ---
-    listClasses: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").Class[]>(`/classes/${buildQueryString(params)}`, token),
+    listClasses: (params?: Record<string, string | number | undefined | null>, forceRefresh = false) =>
+      cachedRequest<import("./types").Class[]>(`/classes/${buildQueryString(params)}`, token, {}, DEFAULT_TTL_MS, forceRefresh),
 
     getClass: (id: number) =>
       request<import("./types").Class>(`/classes/${id}/`, token),
 
-    createClass: (data: import("./types").ClassPayload) =>
-      request<import("./types").Class>(`/classes/`, token, {
+    createClass: async (data: import("./types").ClassPayload) => {
+      const res = await request<import("./types").Class>(`/classes/`, token, {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/classes/")
+      return res
+    },
 
-    updateClass: (id: number, data: import("./types").ClassPayload) =>
-      request<import("./types").Class>(`/classes/${id}/`, token, {
+    updateClass: async (id: number, data: import("./types").ClassPayload) => {
+      const res = await request<import("./types").Class>(`/classes/${id}/`, token, {
         method: "PUT",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/classes/")
+      return res
+    },
 
-    deleteClass: (id: number) =>
-      request<void>(`/classes/${id}/`, token, { method: "DELETE" }),
+    deleteClass: async (id: number) => {
+      const res = await request<void>(`/classes/${id}/`, token, { method: "DELETE" })
+      clearApiCache("/classes/")
+      return res
+    },
 
-    bulkDeleteClasses: (ids: number[]) =>
-      request<{ deleted_count: number; deleted_ids: number[] }>(`/classes/bulk_delete/`, token, {
+    bulkDeleteClasses: async (ids: number[]) => {
+      const res = await request<{ deleted_count: number; deleted_ids: number[] }>(`/classes/bulk_delete/`, token, {
         method: "DELETE",
         body: JSON.stringify({ ids }),
-      }),
+      })
+      clearApiCache("/classes/")
+      return res
+    },
 
     // --- Students ---
     listStudents: (params?: Record<string, string | number | undefined | null>) =>
@@ -229,82 +253,115 @@ export function createApi(token: string) {
       }),
 
     // --- Subjects ---
-    listSubjects: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").Subject[]>(`/subjects/${buildQueryString(params)}`, token),
+    listSubjects: (params?: Record<string, string | number | undefined | null>, forceRefresh = false) =>
+      cachedRequest<import("./types").Subject[]>(`/subjects/${buildQueryString(params)}`, token, {}, DEFAULT_TTL_MS, forceRefresh),
 
     getSubject: (id: number) =>
       request<import("./types").Subject>(`/subjects/${id}/`, token),
 
-    createSubject: (data: import("./types").SubjectPayload) =>
-      request<import("./types").Subject>(`/subjects/`, token, {
+    createSubject: async (data: import("./types").SubjectPayload) => {
+      const res = await request<import("./types").Subject>(`/subjects/`, token, {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/subjects/")
+      return res
+    },
 
-    updateSubject: (id: number, data: import("./types").SubjectPayload) =>
-      request<import("./types").Subject>(`/subjects/${id}/`, token, {
+    updateSubject: async (id: number, data: import("./types").SubjectPayload) => {
+      const res = await request<import("./types").Subject>(`/subjects/${id}/`, token, {
         method: "PUT",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/subjects/")
+      return res
+    },
 
-    deleteSubject: (id: number) =>
-      request<void>(`/subjects/${id}/`, token, { method: "DELETE" }),
+    deleteSubject: async (id: number) => {
+      const res = await request<void>(`/subjects/${id}/`, token, { method: "DELETE" })
+      clearApiCache("/subjects/")
+      return res
+    },
 
-    bulkDeleteSubjects: (ids: number[]) =>
-      request<{ deleted_count: number; deleted_ids: number[] }>(`/subjects/bulk_delete/`, token, {
+    bulkDeleteSubjects: async (ids: number[]) => {
+      const res = await request<{ deleted_count: number; deleted_ids: number[] }>(`/subjects/bulk_delete/`, token, {
         method: "DELETE",
         body: JSON.stringify({ ids }),
-      }),
+      })
+      clearApiCache("/subjects/")
+      return res
+    },
 
     // --- Timetable Slots ---
-    listTimetableSlots: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").TimetableSlot[]>(`/timetable-slots/${buildQueryString(params)}`, token),
+    listTimetableSlots: (params?: Record<string, string | number | undefined | null>, forceRefresh = false) =>
+      cachedRequest<import("./types").TimetableSlot[]>(`/timetable-slots/${buildQueryString(params)}`, token, {}, DEFAULT_TTL_MS, forceRefresh),
 
     getTimetableSlot: (id: number) =>
       request<import("./types").TimetableSlot>(`/timetable-slots/${id}/`, token),
 
-    createTimetableSlot: (data: import("./types").TimetableSlotPayload) =>
-      request<import("./types").TimetableSlot>(`/timetable-slots/`, token, {
+    createTimetableSlot: async (data: import("./types").TimetableSlotPayload) => {
+      const res = await request<import("./types").TimetableSlot>(`/timetable-slots/`, token, {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/timetable-slots/")
+      return res
+    },
 
-    updateTimetableSlot: (id: number, data: import("./types").TimetableSlotPayload) =>
-      request<import("./types").TimetableSlot>(`/timetable-slots/${id}/`, token, {
+    updateTimetableSlot: async (id: number, data: import("./types").TimetableSlotPayload) => {
+      const res = await request<import("./types").TimetableSlot>(`/timetable-slots/${id}/`, token, {
         method: "PUT",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/timetable-slots/")
+      return res
+    },
 
-    deleteTimetableSlot: (id: number) =>
-      request<void>(`/timetable-slots/${id}/`, token, { method: "DELETE" }),
+    deleteTimetableSlot: async (id: number) => {
+      const res = await request<void>(`/timetable-slots/${id}/`, token, { method: "DELETE" })
+      clearApiCache("/timetable-slots/")
+      return res
+    },
 
     // --- Teachers ---
-    listTeachers: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").Teacher[]>(`/teachers/${buildQueryString(params)}`, token),
+    listTeachers: (params?: Record<string, string | number | undefined | null>, forceRefresh = false) =>
+      cachedRequest<import("./types").Teacher[]>(`/teachers/${buildQueryString(params)}`, token, {}, DEFAULT_TTL_MS, forceRefresh),
 
     getTeacher: (id: number) =>
       request<import("./types").Teacher>(`/teachers/${id}/`, token),
 
-    createTeacher: (data: import("./types").TeacherPayload) =>
-      request<import("./types").Teacher>(`/teachers/`, token, {
+    createTeacher: async (data: import("./types").TeacherPayload) => {
+      const res = await request<import("./types").Teacher>(`/teachers/`, token, {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/teachers/")
+      return res
+    },
 
-    updateTeacher: (id: number, data: import("./types").TeacherPayload) =>
-      request<import("./types").Teacher>(`/teachers/${id}/`, token, {
+    updateTeacher: async (id: number, data: import("./types").TeacherPayload) => {
+      const res = await request<import("./types").Teacher>(`/teachers/${id}/`, token, {
         method: "PUT",
         body: JSON.stringify(data),
-      }),
+      })
+      clearApiCache("/teachers/")
+      return res
+    },
 
-    deleteTeacher: (id: number) =>
-      request<void>(`/teachers/${id}/`, token, { method: "DELETE" }),
+    deleteTeacher: async (id: number) => {
+      const res = await request<void>(`/teachers/${id}/`, token, { method: "DELETE" })
+      clearApiCache("/teachers/")
+      return res
+    },
 
-    bulkDeleteTeachers: (ids: number[]) =>
-      request<{ deleted_count: number; deleted_ids: number[] }>(`/teachers/bulk_delete/`, token, {
+    bulkDeleteTeachers: async (ids: number[]) => {
+      const res = await request<{ deleted_count: number; deleted_ids: number[] }>(`/teachers/bulk_delete/`, token, {
         method: "DELETE",
         body: JSON.stringify({ ids }),
-      }),
+      })
+      clearApiCache("/teachers/")
+      return res
+    },
 
     // --- Sessions ---
     listSessions: (params?: Record<string, string | number | undefined | null>) =>
@@ -421,6 +478,34 @@ export function createApi(token: string) {
         method: "DELETE",
         body: JSON.stringify({ ids }),
       }),
+
+    bulkUpsertSessionAttendances: (records: Array<{ session_id: number; student_id: number; status: string; remarks?: string }>) =>
+      request<{ created_count: number; updated_count: number }>(`/session-attendances/bulk_upsert/`, token, {
+        method: "POST",
+        body: JSON.stringify({ records }),
+      }),
+
+    bulkUpsertAdHocSessionAttendances: (records: Array<{ adhoc_session_id?: number; ad_hoc_session_id?: number; student_id: number; status: string; attended?: boolean; remarks?: string }>) =>
+      request<{ created_count: number; updated_count: number }>(`/adhoc-session-attendances/bulk_upsert/`, token, {
+        method: "POST",
+        body: JSON.stringify({ records }),
+      }),
+
+    // --- Attendance Matrix Endpoints ---
+    getAttendanceMatrix: (params?: Record<string, string | number | undefined | null>) =>
+      request<{
+        class_id?: string
+        sessions: import("./types").Session[]
+        students: import("./types").Student[] & { records?: Record<string, string> }[]
+        attendances: import("./types").SessionAttendance[]
+      }>(`/attendance/matrix/${buildQueryString(params)}`, token),
+
+    getAdHocAttendanceMatrix: (params?: Record<string, string | number | undefined | null>) =>
+      request<{
+        sessions: import("./types").AdHocSession[]
+        students: import("./types").Student[]
+        attendances: import("./types").AdHocSessionAttendance[]
+      }>(`/adhoc-attendance/matrix/${buildQueryString(params)}`, token),
 
     // --- Users ---
     listUsers: (params?: Record<string, string | number | undefined | null>) =>
