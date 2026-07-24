@@ -700,17 +700,17 @@ export default function TeachersPage() {
                 </TableHead>
 
                 <TableHeadSortable
-                  className="w-[110px]"
+                  className="min-w-[130px]"
                   sortKey="unique_code"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
                   onSort={requestSort}
                 >
-                  ID
+                  Identifier
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[80px]"
+                  className="min-w-[90px]"
                   sortKey="school_code"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -720,6 +720,7 @@ export default function TeachersPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
+                  className="min-w-[140px]"
                   sortKey="name"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -729,7 +730,7 @@ export default function TeachersPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[100px]"
+                  className="min-w-[100px]"
                   sortKey="employment_type"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -739,7 +740,7 @@ export default function TeachersPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[100px]"
+                  className="min-w-[100px]"
                   sortKey="default_rate"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -749,7 +750,7 @@ export default function TeachersPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[130px]"
+                  className="min-w-[130px]"
                   sortKey="contact"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -759,7 +760,7 @@ export default function TeachersPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[130px]"
+                  className="min-w-[130px]"
                   sortKey="bank_details"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}

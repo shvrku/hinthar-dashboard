@@ -629,26 +629,27 @@ export default function StudentsPage() {
                 </TableHead>
 
                 <TableHeadSortable
-                  className="w-[120px]"
+                  className="min-w-[130px]"
                   sortKey="unique_code"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
                   onSort={requestSort}
                 >
-                  Unique Identifier
+                  Identifier
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[100px]"
+                  className="min-w-[90px]"
                   sortKey="school_code"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
                   onSort={requestSort}
                 >
-                  School Code
+                  School
                 </TableHeadSortable>
 
                 <TableHeadSortable
+                  className="min-w-[140px]"
                   sortKey="name"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -658,6 +659,7 @@ export default function StudentsPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
+                  className="min-w-[90px]"
                   sortKey="dob"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -667,7 +669,7 @@ export default function StudentsPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[140px]"
+                  className="min-w-[130px]"
                   sortKey="contact"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
@@ -677,22 +679,23 @@ export default function StudentsPage() {
                 </TableHeadSortable>
 
                 <TableHeadSortable
-                  className="w-[140px]"
+                  className="min-w-[100px]"
                   sortKey="exam_candidate_number"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
                   onSort={requestSort}
                 >
-                  Exam Candidate No.
+                  UCI
                 </TableHeadSortable>
 
                 <TableHeadSortable
+                  className="min-w-[120px]"
                   sortKey="enrollment_date"
                   currentSortKey={sortConfig.key}
                   currentSortOrder={sortConfig.order}
                   onSort={requestSort}
                 >
-                  Enrollment Date
+                  Enrollment
                 </TableHeadSortable>
 
                 <TableHead className="text-right">Actions</TableHead>
