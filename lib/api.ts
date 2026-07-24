@@ -5,11 +5,9 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_ORIGIN ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000"
-).replace(/\/+$/, "") + "/api/v1"
+// Always use a relative path — Next.js proxies to the backend via rewrites.
+// This keeps all browser requests same-origin, avoiding CORS entirely.
+const API_BASE = "/api/v1"
 
 function buildQueryString(params?: Record<string, string | number | undefined | null>): string {
   const query = new URLSearchParams()
