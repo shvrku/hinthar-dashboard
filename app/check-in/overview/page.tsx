@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import {
   Table,
   TableHeader,
@@ -284,63 +285,69 @@ export default function CheckInOverviewPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Check-In Overview"
-        description="View all students and their check-in status, grouped by cohort class."
-        secondaryAction={{
-          label: loading ? "Loading..." : "Load Data",
-          onClick: loadData,
-          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-        }}
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Check-In Overview"
+          description="View all students and their check-in status, grouped by cohort class."
+          secondaryAction={{
+            label: loading ? "Loading..." : "Load Data",
+            onClick: loadData,
+            icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+          }}
+        />
+      </StaggerItem>
 
       {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Check-In Logs</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <QrCode className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Check-In Logs</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <QrCode className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{checkIns.length}</h2>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{checkIns.length}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
+
+      {/* Management Toolbar Card */}
+      <StaggerItem>
+        <Card className="p-4 shadow-2xs border-border/80 bg-card">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search students, classes, cohorts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
             {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge variant="secondary" className="px-3 py-1 text-xs">
+                  <QrCode className="mr-1.5 size-3.5" />
+                  {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Loaded {lastLoaded}
+                </span>
+              </div>
             )}
           </div>
         </Card>
-      </div>
-
-      {/* Management Toolbar Card */}
-      <Card className="p-4 shadow-2xs border-border/80 bg-card">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search students, classes, cohorts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {lastLoaded && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="px-3 py-1 text-xs">
-                <QrCode className="mr-1.5 size-3.5" />
-                {sortedGroupedClasses.reduce((sum, g) => sum + g.rows.length, 0)} students across {sortedGroupedClasses.length} cohorts
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Loaded {lastLoaded}
-              </span>
-            </div>
-          )}
-        </div>
-      </Card>
+      </StaggerItem>
 
       {/* Banners */}
       <AnimatePresence>
@@ -405,17 +412,11 @@ export default function CheckInOverviewPage() {
           transition={{ duration: 0.3 }}
           className="space-y-8"
         >
-          {sortedGroupedClasses.map(({ classObj, label, rows }, idx) => {
+          {sortedGroupedClasses.map(({ classObj, label, rows }) => {
             const checkedIn = rows.filter((r) => r.checkIn !== null).length
 
             return (
-              <motion.section
-                key={classObj.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05, duration: 0.25 }}
-                className="space-y-3"
-              >
+              <StaggerItem key={classObj.id} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <h2 className="text-xl font-semibold tracking-tight">{label}</h2>
@@ -431,11 +432,11 @@ export default function CheckInOverviewPage() {
                 </div>
 
                 <CohortTable rows={rows} />
-              </motion.section>
+              </StaggerItem>
             )
           })}
         </motion.div>
       )}
-    </div>
+    </StaggerContainer>
   )
 }

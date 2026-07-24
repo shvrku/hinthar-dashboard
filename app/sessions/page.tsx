@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
@@ -597,48 +598,52 @@ export default function SessionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Sessions"
-        description="Schedule and manage class sessions, statuses, and teacher assignments."
-        primaryAction={{
-          label: sessionMode === "adhoc" ? "Add Ad-Hoc Session" : "Add Session",
-          onClick: sessionMode === "adhoc" ? () => {
-             if (subjects.length > 0) setAdhocSubjectId(subjects[0].id.toString())
-             if (teachers.length > 0) setAdhocTeacherId(teachers[0].id.toString())
-             setAdhocStartTime("09:00")
-             setAdhocEndTime("10:00")
-             setAdhocModalOpen(true)
-           } : openAddModal,
-          icon: <Plus className="size-4" />,
-        }}
-        secondaryAction={{
-          label: loading ? "Loading..." : "Load Data",
-          onClick: loadSessions,
-          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-        }}
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Sessions"
+          description="Schedule and manage class sessions, statuses, and teacher assignments."
+          primaryAction={{
+            label: sessionMode === "adhoc" ? "Add Ad-Hoc Session" : "Add Session",
+            onClick: sessionMode === "adhoc" ? () => {
+               if (subjects.length > 0) setAdhocSubjectId(subjects[0].id.toString())
+               if (teachers.length > 0) setAdhocTeacherId(teachers[0].id.toString())
+               setAdhocStartTime("09:00")
+               setAdhocEndTime("10:00")
+               setAdhocModalOpen(true)
+             } : openAddModal,
+            icon: <Plus className="size-4" />,
+          }}
+          secondaryAction={{
+            label: loading ? "Loading..." : "Load Data",
+            onClick: loadSessions,
+            icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+          }}
+        />
+      </StaggerItem>
 
       {/* Metric Highlights Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 border-primary/20 bg-card">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Sessions</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <CalendarCheck className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5 border-primary/20 bg-card">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Sessions</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <CalendarCheck className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">
-              {sessionMode === "regular" ? (sessions?.length ?? 0) : (adhocSessions?.length ?? 0)}
-            </h2>
-            {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-            )}
-          </div>
-        </Card>
-      </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                {sessionMode === "regular" ? (sessions?.length ?? 0) : (adhocSessions?.length ?? 0)}
+              </h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Standardized Management Toolbar Card */}
       <Card className="p-4 shadow-2xs border-border/80 bg-card">
@@ -1312,6 +1317,6 @@ export default function SessionsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </StaggerContainer>
   )
 }

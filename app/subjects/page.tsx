@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
@@ -371,40 +372,44 @@ export default function SubjectsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Subjects"
-        description="Manage academic subjects, curriculum offerings, and course definitions."
-        primaryAction={{
-          label: "Add Subject",
-          onClick: openCreateModal,
-          icon: <Plus className="size-4" />,
-        }}
-        secondaryAction={{
-          label: loading ? "Loading..." : "Load Data",
-          onClick: loadData,
-          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-        }}
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Subjects"
+          description="Manage academic subjects, curriculum offerings, and course definitions."
+          primaryAction={{
+            label: "Add Subject",
+            onClick: openCreateModal,
+            icon: <Plus className="size-4" />,
+          }}
+          secondaryAction={{
+            label: loading ? "Loading..." : "Load Data",
+            onClick: loadData,
+            icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+          }}
+        />
+      </StaggerItem>
 
       {/* Metric Highlights Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Subjects</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <BookOpen className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Subjects</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <BookOpen className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{subjects ? subjects.length : 0}</h2>
-            {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-            )}
-          </div>
-        </Card>
-      </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{subjects ? subjects.length : 0}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Standardized Management Toolbar Card */}
       <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
@@ -597,6 +602,6 @@ export default function SubjectsPage() {
         onCancel={() => setBulkConfirmOpen(false)}
         loading={bulkDeleting}
       />
-    </div>
+    </StaggerContainer>
   )
 }

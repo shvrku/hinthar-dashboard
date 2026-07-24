@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import {
   Table,
   TableHeader,
@@ -680,82 +681,87 @@ export default function AttendancePage() {
   )
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standard Header */}
-      <StandardPageHeader
-        title="Session Attendance"
-        description="View and log attendance with high-performance ranged query filters."
-        secondaryAction={{
-          label: lastLoaded ? "Refresh" : "Load Data",
-          onClick: loadData,
-          icon: <RotateCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />,
-        }}
-        primaryAction={
-          attendanceMode === "adhoc"
-            ? {
-                label: "Add Ad-Hoc Session",
-                onClick: () => {
-                  setIsAddSessionOpen(true)
-                  if (subjects.length > 0) setNewSubjectId(subjects[0].id.toString())
-                  if (teachers.length > 0) setNewTeacherId(teachers[0].id.toString())
-                  setNewStartTime("09:00:00")
-                  setNewEndTime("10:00:00")
-                },
-                icon: <Plus className="size-4" />,
-              }
-            : undefined
-        }
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Session Attendance"
+          description="View and log attendance with high-performance ranged query filters."
+          secondaryAction={{
+            label: lastLoaded ? "Refresh" : "Load Data",
+            onClick: loadData,
+            icon: <RotateCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />,
+          }}
+          primaryAction={
+            attendanceMode === "adhoc"
+              ? {
+                  label: "Add Ad-Hoc Session",
+                  onClick: () => {
+                    setIsAddSessionOpen(true)
+                    if (subjects.length > 0) setNewSubjectId(subjects[0].id.toString())
+                    if (teachers.length > 0) setNewTeacherId(teachers[0].id.toString())
+                    setNewStartTime("09:00:00")
+                    setNewEndTime("10:00:00")
+                  },
+                  icon: <Plus className="size-4" />,
+                }
+              : undefined
+          }
+        />
+      </StaggerItem>
 
       {/* Summary KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-4 bg-card border-border/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Students</span>
-            <Users className="size-4 text-primary" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-foreground">{stats.totalStudents}</span>
-            <span className="text-[11px] text-muted-foreground">{stats.totalSessions} Sessions</span>
-          </div>
-        </Card>
+      <StaggerItem>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="p-4 bg-card border-border/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Students</span>
+              <Users className="size-4 text-primary" />
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-extrabold text-foreground">{stats.totalStudents}</span>
+              <span className="text-[11px] text-muted-foreground">{stats.totalSessions} Sessions</span>
+            </div>
+          </Card>
 
-        <Card className="p-4 bg-card border-border/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Present</span>
-            <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{stats.presentCount}</span>
-            <span className="text-[11px] text-muted-foreground">{stats.lateCount} Late</span>
-          </div>
-        </Card>
+          <Card className="p-4 bg-card border-border/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Present</span>
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{stats.presentCount}</span>
+              <span className="text-[11px] text-muted-foreground">{stats.lateCount} Late</span>
+            </div>
+          </Card>
 
-        <Card className="p-4 bg-card border-border/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Absent</span>
-            <XCircle className="size-4 text-muted-foreground/70" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-muted-foreground">{stats.absentCount}</span>
-            <span className="text-[11px] text-muted-foreground">Logged</span>
-          </div>
-        </Card>
+          <Card className="p-4 bg-card border-border/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Absent</span>
+              <XCircle className="size-4 text-muted-foreground/70" />
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-extrabold text-muted-foreground">{stats.absentCount}</span>
+              <span className="text-[11px] text-muted-foreground">Logged</span>
+            </div>
+          </Card>
 
-        <Card className="p-4 bg-card border-border/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attendance Rate</span>
-            <Percent className="size-4 text-primary" />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-foreground">{stats.attendanceRate}%</span>
-            <span className="text-[11px] text-muted-foreground">Average</span>
-          </div>
-        </Card>
-      </div>
+          <Card className="p-4 bg-card border-border/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attendance Rate</span>
+              <Percent className="size-4 text-primary" />
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-extrabold text-foreground">{stats.attendanceRate}%</span>
+              <span className="text-[11px] text-muted-foreground">Average</span>
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Main Unified Control Bar */}
-      <Card className="p-4 border-border/80 bg-card shadow-xs space-y-4">
+      <StaggerItem>
+        <Card className="p-4 border-border/80 bg-card shadow-xs space-y-4">
         {/* Top Control Bar: Mode Switchers */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border/60 pb-4">
           {/* Attendance Type Mode */}
@@ -993,6 +999,7 @@ export default function AttendancePage() {
           />
         </div>
       </Card>
+      </StaggerItem>
 
       {/* Error Banner */}
       {error && (
@@ -1107,7 +1114,8 @@ export default function AttendancePage() {
       </Dialog>
 
       {/* ── MAIN CONTENT DISPLAY ── */}
-      {viewLayout === "roster" ? (
+      <StaggerItem>
+        {viewLayout === "roster" ? (
         /* ── SESSION ROSTER VIEW ── */
         <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
@@ -1341,11 +1349,7 @@ export default function AttendancePage() {
                                   className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 ${getSelectStyles(record?.status ?? undefined)}`}
                                   size="sm"
                                 >
-                                  <SelectValue placeholder="—">
-                                    {record?.status
-                                      ? (statusItems.find((st) => st.value === record.status)?.label ?? record.status)
-                                      : "—"}
-                                  </SelectValue>
+                                  <SelectValue placeholder="—" />
                                 </SelectTrigger>
                                 <SelectContent align="center" className="min-w-28">
                                   <SelectItem value="present" className="text-emerald-600 dark:text-emerald-400 font-semibold">Present</SelectItem>
@@ -1354,30 +1358,31 @@ export default function AttendancePage() {
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => setEditingCellKey(key)}
-                                className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSelectStyles(record?.status ?? undefined)}`}
-                              >
-                                <span>
-                                  {record?.status
-                                    ? (statusItems.find((st) => st.value === record.status)?.label ?? record.status)
-                                    : "—"}
-                                </span>
-                                <ChevronDown className="size-3 opacity-60" />
-                              </button>
-                            )}
-                          </TableCell>
-                        )
-                      })}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
-    </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCellKey(key)}
+                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSelectStyles(record?.status ?? undefined)}`}
+                                >
+                                  <span>
+                                    {record?.status
+                                      ? (statusItems.find((st) => st.value === record.status)?.label ?? record.status)
+                                      : "—"}
+                                  </span>
+                                  <ChevronDown className="size-3 opacity-60" />
+                                </button>
+                              )}
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        )}
+      </StaggerItem>
+    </StaggerContainer>
   )
 }

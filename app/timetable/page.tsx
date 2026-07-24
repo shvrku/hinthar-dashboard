@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { Badge } from "@/components/ui/badge"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -745,36 +746,41 @@ export default function TimetablePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Timetables"
-        description="View, manage, and schedule class session timetables."
-        secondaryAction={{
-          label: lastLoaded ? "Refresh" : "Load Data",
-          onClick: loadData,
-          icon: <RotateCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />,
-        }}
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Timetables"
+          description="View, manage, and schedule class session timetables."
+          secondaryAction={{
+            label: lastLoaded ? "Refresh" : "Load Data",
+            onClick: loadData,
+            icon: <RotateCcw className={`size-4 ${loading ? "animate-spin" : ""}`} />,
+          }}
+        />
+      </StaggerItem>
 
       {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Timetable Slots</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <Calendar className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Timetable Slots</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <Calendar className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{lessons.length}</h2>
-            <span className="text-[11px] text-muted-foreground">{classes.length} Classes active</span>
-          </div>
-        </Card>
-      </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{lessons.length}</h2>
+              <span className="text-[11px] text-muted-foreground">{classes.length} Classes active</span>
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Sleek Timetable Toolbar */}
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-2xs">
+      <StaggerItem>
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-2xs">
         {/* Tier 1: Primary Controls */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Left: Class Search Input (Replaces dropdown & arrows) */}
@@ -868,6 +874,7 @@ export default function TimetablePage() {
           </div>
         )}
       </div>
+      </StaggerItem>
 
       {/* ── BANNERS ── */}
       <div>
@@ -891,7 +898,7 @@ export default function TimetablePage() {
       </div>
 
       {/* ── MAIN CONTENT ── */}
-      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 max-w-7xl flex-1 overflow-hidden min-h-0">
+      <StaggerItem className="container mx-auto px-4 sm:px-6 md:px-8 py-6 max-w-7xl flex-1 overflow-hidden min-h-0">
         {/* ── LIST VIEW ── */}
         {viewMode === "list" && (
           <div className="max-w-4xl mx-auto space-y-5 pb-20">
@@ -1094,7 +1101,7 @@ export default function TimetablePage() {
             </div>
           </div>
         )}
-      </div>
+      </StaggerItem>
 
       {/* ── LESSON MODAL ── */}
       {modal && (
@@ -1132,6 +1139,6 @@ export default function TimetablePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </StaggerContainer>
   )
 }

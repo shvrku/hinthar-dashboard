@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
 const statCards = [
   { key: "sessions" as const, label: "Sessions", icon: CalendarCheck },
@@ -142,37 +143,39 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl">
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Overview of your school management system metrics.
-          </p>
-        </div>
+    <StaggerContainer className="space-y-6">
+      <StaggerItem>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Overview of your school management system metrics.
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <Button onClick={loadStats} disabled={loading} variant="default" className="shadow-xs">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <RotateCcw className="mr-2 size-4" />
-                Load Data
-              </>
+          <div className="flex items-center gap-3">
+            <Button onClick={loadStats} disabled={loading} variant="default" className="shadow-xs">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-2 size-4" />
+                  Load Data
+                </>
+              )}
+            </Button>
+
+            {stats !== null && !loading && (
+              <Badge variant="secondary" className="px-3 py-1.5 text-xs">
+                Loaded {new Date().toLocaleTimeString()}
+              </Badge>
             )}
-          </Button>
-
-          {stats !== null && !loading && (
-            <Badge variant="secondary" className="px-3 py-1.5 text-xs">
-              Loaded {new Date().toLocaleTimeString()}
-            </Badge>
-          )}
+          </div>
         </div>
-      </div>
+      </StaggerItem>
 
       {error && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -185,16 +188,17 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card) => (
-          <StatCard
-            key={card.key}
-            label={card.label}
-            icon={card.icon}
-            value={stats?.[card.key]}
-            loading={loading}
-            hasData={stats !== null}
-          />
+          <StaggerItem key={card.key}>
+            <StatCard
+              label={card.label}
+              icon={card.icon}
+              value={stats?.[card.key]}
+              loading={loading}
+              hasData={stats !== null}
+            />
+          </StaggerItem>
         ))}
       </div>
-    </div>
+    </StaggerContainer>
   )
 }

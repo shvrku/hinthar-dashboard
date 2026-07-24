@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import {
   Table,
   TableHeader,
@@ -160,61 +161,67 @@ export default function CheckInManagementPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Check-In Management"
-        description="View, generate, and export QR check-in codes for students."
-        secondaryAction={{
-          label: loading ? "Refreshing..." : "Refresh",
-          onClick: loadStudents,
-          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-        }}
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Check-In Management"
+          description="View, generate, and export QR check-in codes for students."
+          secondaryAction={{
+            label: loading ? "Refreshing..." : "Refresh",
+            onClick: loadStudents,
+            icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+          }}
+        />
+      </StaggerItem>
 
       {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Student Tokens</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <QrCode className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Student Tokens</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <QrCode className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{students ? students.length : 0}</h2>
-            {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-            )}
-          </div>
-        </Card>
-      </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{students ? students.length : 0}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Toolbar */}
-      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search students..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        {lastLoaded && students && (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1 text-xs">
-              <UserCheck className="mr-1.5 size-3.5" />
-              {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              Loaded {lastLoaded}
-            </span>
+      <StaggerItem>
+        <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        )}
-      </div>
+
+          {lastLoaded && students && (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="px-3 py-1 text-xs">
+                <UserCheck className="mr-1.5 size-3.5" />
+                {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Loaded {lastLoaded}
+              </span>
+            </div>
+          )}
+        </div>
+      </StaggerItem>
 
       {/* Banners */}
       {error && (
@@ -237,139 +244,140 @@ export default function CheckInManagementPage() {
 
       <div className="flex flex-col gap-6 lg:flex-row items-start">
         {/* Floating Student Table Card */}
-        <div className="min-w-0 flex-1 w-full">
+        <StaggerItem className="min-w-0 flex-1 w-full">
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHeadSortable
-                    className="w-[100px]"
-                    sortKey="id"
-                    currentSortKey={sortConfig.key}
-                    currentSortOrder={sortConfig.order}
-                    onSort={requestSort}
-                  >
-                    ID
-                  </TableHeadSortable>
-
-                  <TableHeadSortable
-                    sortKey="name"
-                    currentSortKey={sortConfig.key}
-                    currentSortOrder={sortConfig.order}
-                    onSort={requestSort}
-                  >
-                    Name
-                  </TableHeadSortable>
-
-                  <TableHeadSortable
-                    sortKey="check_in_token"
-                    currentSortKey={sortConfig.key}
-                    currentSortOrder={sortConfig.order}
-                    onSort={requestSort}
-                  >
-                    Token
-                  </TableHeadSortable>
-
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && students.length === 0 ? (
-                  [1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)
-                ) : sortedStudents.length === 0 ? (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                      {students.length === 0 ? 'Click "Refresh" to fetch students.' : 'No students found.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedStudents.map((student) => (
-                    <TableRow
-                      key={student.id}
-                      className={`cursor-pointer ${
-                        selected?.id === student.id ? "bg-muted/60 font-medium" : ""
-                      }`}
-                      onClick={() => setSelected(student)}
+                    <TableHeadSortable
+                      className="w-[100px]"
+                      sortKey="id"
+                      currentSortKey={sortConfig.key}
+                      currentSortOrder={sortConfig.order}
+                      onSort={requestSort}
                     >
-                      <TableCell className="font-semibold text-foreground">{student.id}</TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>
-                        <code className="text-xs text-muted-foreground font-mono">
-                          {student.check_in_token ? `${student.check_in_token.slice(0, 10)}...` : "—"}
-                        </code>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelected(student)
-                          }}
-                        >
-                          View QR
-                        </Button>
+                      ID
+                    </TableHeadSortable>
+
+                    <TableHeadSortable
+                      className="w-[80px]"
+                      sortKey="school_code"
+                      currentSortKey={sortConfig.key}
+                      currentSortOrder={sortConfig.order}
+                      onSort={requestSort}
+                    >
+                      School
+                    </TableHeadSortable>
+
+                    <TableHeadSortable
+                      sortKey="name"
+                      currentSortKey={sortConfig.key}
+                      currentSortOrder={sortConfig.order}
+                      onSort={requestSort}
+                    >
+                      Name
+                    </TableHeadSortable>
+
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading && students.length === 0 ? (
+                    Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
+                  ) : sortedStudents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                        No students found.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </div>
-
-        {/* QR Code Card (Sticky on scroll) */}
-        <div className="w-full lg:w-80 shrink-0 lg:sticky lg:top-6 lg:z-10 self-start h-fit">
-          {selected ? (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span>{selected.name}</span>
-                  <Badge variant="outline">#{selected.id}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-center p-3.5 rounded-xl bg-muted/60 border border-border/60">
-                  <QrCanvas value={selected.check_in_token} size={200} />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Check-in Token</label>
-                  <code className="block break-all rounded-lg border bg-muted/40 p-2 text-xs font-mono text-muted-foreground">
-                    {selected.check_in_token}
-                  </code>
-                </div>
-
-                <div className="flex flex-col gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleRegenerate}
-                    disabled={regenerating}
-                  >
-                    {regenerating ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="mr-2 size-4" />
-                    )}
-                    Regenerate Token
-                  </Button>
-                  <Button onClick={downloadQr}>
-                    <Download className="mr-2 size-4" />
-                    Download QR Code
-                  </Button>
-                </div>
-              </CardContent>
+                  ) : (
+                    sortedStudents.map((s) => (
+                      <TableRow
+                        key={s.id}
+                        className="cursor-pointer"
+                        data-state={selected?.id === s.id ? "selected" : undefined}
+                        onClick={() => setSelected(s)}
+                      >
+                        <TableCell className="font-semibold text-foreground">{s.unique_code}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{s.school_code}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelected(s)
+                            }}
+                          >
+                            <Eye className="mr-1.5 size-3.5" />
+                            QR
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </Card>
-          ) : (
-            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center">
-              <QrCode className="mb-3 size-10 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">
-                Select a student to view or download their QR code
-              </p>
-            </div>
-          )}
+          </StaggerItem>
+
+          {/* QR Detail Card */}
+          <StaggerItem className="w-full lg:w-80 shrink-0">
+            {selected ? (
+              <Card className="rounded-xl border border-border/80 bg-card shadow-2xs">
+                <CardHeader>
+                  <CardTitle className="text-base">{selected.name}</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Code: {selected.unique_code} • School: {selected.school_code}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selected.check_in_token ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <QrCanvas value={selected.check_in_token} size={180} />
+                      <p className="font-mono text-xs text-muted-foreground break-all text-center">
+                        {selected.check_in_token}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No check-in token generated for this student.
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleRegenerate}
+                      disabled={regenerating}
+                    >
+                      {regenerating ? (
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 size-4" />
+                      )}
+                      Regenerate Token
+                    </Button>
+                    <Button onClick={downloadQr}>
+                      <Download className="mr-2 size-4" />
+                      Download QR Code
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center">
+                <QrCode className="mb-3 size-10 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">
+                  Select a student to view or download their QR code
+                </p>
+              </div>
+            )}
+          </StaggerItem>
         </div>
-      </div>
-    </div>
+    </StaggerContainer>
   )
 }

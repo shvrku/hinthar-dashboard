@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useFocusMode } from "@/components/focus-context"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
 function Clock() {
   const [time, setTime] = React.useState(new Date())
@@ -286,19 +287,16 @@ export default function TerminalPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: isFocused ? 1.02 : 1 }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-6"
-    >
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Check-In Terminal"
-        description="Scan student QR codes or look up ID manually for real-time attendance verification."
-      >
-        <Clock />
-      </StandardPageHeader>
+      <StaggerItem>
+        <StandardPageHeader
+          title="Check-In Terminal"
+          description="Scan student QR codes or look up ID manually for real-time attendance verification."
+        >
+          <Clock />
+        </StandardPageHeader>
+      </StaggerItem>
 
       {/* Notifications */}
       <AnimatePresence>
@@ -337,7 +335,8 @@ export default function TerminalPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col gap-6 lg:flex-row">
+      <StaggerItem>
+        <div className="flex flex-col gap-6 lg:flex-row">
         {/* Left: QR Scanner */}
         <div className="min-w-0 flex-1">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">Scan QR Code</h2>
@@ -436,35 +435,34 @@ export default function TerminalPage() {
             )}
           </AnimatePresence>
 
-          {/* Manual entry */}
-          <div className="mt-6 rounded-xl border border-border bg-card/60 p-5 shadow-xs text-foreground">
-            <h3 className="mb-1 text-sm font-semibold text-foreground">
-              Manual Lookup
-            </h3>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Search by typing in the student ID manually
-            </p>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                value={manualId}
-                onChange={(e) => setManualId(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleManualLookup() }}
-                placeholder="Student ID (e.g. 101)"
-                className="min-w-0 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-background text-foreground placeholder:text-muted-foreground"
-              />
-              <Button
-                onClick={handleManualLookup}
-                variant="outline"
-                className="shadow-xs gap-1.5"
-              >
-                <Search className="size-4" />
-                Look Up
-              </Button>
+            {/* Manual Lookup Form */}
+            <div className="rounded-xl border border-border/80 bg-card p-6 shadow-2xs space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Manual ID Search</h3>
+              <p className="text-xs text-muted-foreground">
+                Search by typing in the student ID manually
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={manualId}
+                  onChange={(e) => setManualId(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleManualLookup() }}
+                  placeholder="Student ID (e.g. 101)"
+                  className="min-w-0 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-background text-foreground placeholder:text-muted-foreground"
+                />
+                <Button
+                  onClick={handleManualLookup}
+                  variant="outline"
+                  className="shadow-xs gap-1.5"
+                >
+                  <Search className="size-4" />
+                  Look Up
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </StaggerItem>
+    </StaggerContainer>
   )
 }

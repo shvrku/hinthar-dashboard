@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -349,40 +350,44 @@ export default function ClassesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Classes"
-        description="Manage education levels, cohort identifiers, sub-categories, and student enrollments."
-        primaryAction={{
-          label: "Add Class",
-          onClick: openAddModal,
-          icon: <Plus className="size-4" />,
-        }}
-        secondaryAction={{
-          label: loading ? "Loading..." : "Load Data",
-          onClick: loadData,
-          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-        }}
-      />
+      <StaggerItem>
+        <StandardPageHeader
+          title="Classes"
+          description="Manage education levels, cohort identifiers, sub-categories, and student enrollments."
+          primaryAction={{
+            label: "Add Class",
+            onClick: openAddModal,
+            icon: <Plus className="size-4" />,
+          }}
+          secondaryAction={{
+            label: loading ? "Loading..." : "Load Data",
+            onClick: loadData,
+            icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+          }}
+        />
+      </StaggerItem>
 
       {/* Metric Highlight Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Classes</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <GraduationCap className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Classes</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <GraduationCap className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{classes.length}</h2>
-            {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-            )}
-          </div>
-        </Card>
-      </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{classes.length}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Banners */}
       {successMessage && (
@@ -818,6 +823,6 @@ export default function ClassesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </StaggerContainer>
   )
 }

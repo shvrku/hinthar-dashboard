@@ -3,8 +3,10 @@
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck, Upload } from "lucide-react"
+import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
 import { BulkImportModal } from "@/components/bulk-import-modal"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import {
   type Teacher,
   type TeacherPayload,
@@ -548,123 +550,129 @@ export default function TeachersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
-      <StandardPageHeader
-        title="Teachers"
-        description="Manage teacher profiles, employment types, rates, and contact information."
-        primaryAction={{
-          label: "Add Teacher",
-          onClick: openAddModal,
-          icon: <Plus className="size-4" />,
-        }}
-        secondaryAction={{
-          label: loading ? "Loading..." : "Load Data",
-          onClick: loadTeachers,
-          icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
-        }}
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setBulkModalOpen(true)}
-          className="gap-1.5"
+      <StaggerItem>
+        <StandardPageHeader
+          title="Teachers"
+          description="Manage teacher profiles, employment types, rates, and contact information."
+          primaryAction={{
+            label: "Add Teacher",
+            onClick: openAddModal,
+            icon: <Plus className="size-4" />,
+          }}
+          secondaryAction={{
+            label: loading ? "Loading..." : "Load Data",
+            onClick: loadTeachers,
+            icon: loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />,
+          }}
         >
-          <Upload className="size-4" />
-          Import CSV
-        </Button>
-      </StandardPageHeader>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBulkModalOpen(true)}
+            className="gap-1.5"
+          >
+            <Upload className="size-4" />
+            Import CSV
+          </Button>
+        </StandardPageHeader>
+      </StaggerItem>
 
       {/* Metric Highlights Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Teachers</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <UserCheck className="size-4" />
+      <StaggerItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Teachers</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <UserCheck className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{teachers.length}</h2>
-            {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-            )}
-          </div>
-        </Card>
-      </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{teachers.length}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </div>
+      </StaggerItem>
 
       {/* Standardized Management Toolbar Card */}
-      <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex flex-1 items-center gap-3 max-w-lg">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search teachers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+      <StaggerItem>
+        <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-1 items-center gap-3 max-w-lg">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search teachers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <Select value={schoolFilter} onValueChange={(val) => setSchoolFilter(val ?? "all")}>
+                <SelectTrigger className="w-32 text-xs">
+                  <SelectValue>
+                    {schoolFilter === "all" ? "All Schools" : schoolFilter}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {SCHOOL_CODES.map((sc) => (
+                    <SelectItem key={sc.value} value={sc.value}>
+                      {sc.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val ?? "all")}>
+                <SelectTrigger className="w-36 text-xs">
+                  <SelectValue>
+                    {typeFilter === "all" ? "All Types" : (EMPLOYMENT_TYPES.find((t) => t.value === typeFilter)?.label ?? typeFilter)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {EMPLOYMENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <Select value={schoolFilter} onValueChange={(val) => setSchoolFilter(val ?? "all")}>
-              <SelectTrigger className="w-32 text-xs">
-                <SelectValue>
-                  {schoolFilter === "all" ? "All Schools" : schoolFilter}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Schools</SelectItem>
-                {SCHOOL_CODES.map((sc) => (
-                  <SelectItem key={sc.value} value={sc.value}>
-                    {sc.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-3 shrink-0">
+              {selectedIds.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkConfirmOpen(true)}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="size-4" />
+                  Delete Selected ({selectedIds.length})
+                </Button>
+              )}
 
-            <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val ?? "all")}>
-              <SelectTrigger className="w-36 text-xs">
-                <SelectValue>
-                  {typeFilter === "all" ? "All Types" : (EMPLOYMENT_TYPES.find((t) => t.value === typeFilter)?.label ?? typeFilter)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {EMPLOYMENT_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {lastLoaded && teachers && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="px-3 py-1 text-xs">
+                    <UserCheck className="mr-1.5 size-3.5" />
+                    {filteredTeachers.length} of {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
+                  </Badge>
+                </div>
+              )}
+            </div>
           </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {selectedIds.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setBulkConfirmOpen(true)}
-                className="gap-1.5"
-              >
-                <Trash2 className="size-4" />
-                Delete Selected ({selectedIds.length})
-              </Button>
-            )}
-
-            {lastLoaded && teachers && (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="px-3 py-1 text-xs">
-                  <UserCheck className="mr-1.5 size-3.5" />
-                  {filteredTeachers.length} of {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
-                </Badge>
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </StaggerItem>
 
       {/* Banners */}
       {success && (
@@ -686,174 +694,178 @@ export default function TeachersPage() {
       )}
 
       {/* Floating Table Card */}
-      <TooltipProvider>
-        <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12 text-center">
-                  <Checkbox
-                    checked={allCurrentPageSelected}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all current page"
-                  />
-                </TableHead>
-
-                <TableHeadSortable
-                  className="min-w-[130px]"
-                  sortKey="unique_code"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Identifier
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[90px]"
-                  sortKey="school_code"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  School
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[140px]"
-                  sortKey="name"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Name
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[100px]"
-                  sortKey="employment_type"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Type
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[100px]"
-                  sortKey="default_rate"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Rate
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[130px]"
-                  sortKey="contact"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Contact
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[130px]"
-                  sortKey="bank_details"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Bank
-                </TableHeadSortable>
-
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && teachers.length === 0 ? (
-                Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-              ) : sortedTeachers.length === 0 ? (
+      <StaggerItem>
+        <TooltipProvider>
+          <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                    No teachers found.
-                  </TableCell>
+                  <TableHead className="w-12 text-center">
+                    <Checkbox
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all current page"
+                    />
+                  </TableHead>
+
+                  <TableHeadSortable
+                    className="min-w-[130px]"
+                    sortKey="unique_code"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Identifier
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[90px]"
+                    sortKey="school_code"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    School
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[140px]"
+                    sortKey="name"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Name
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[100px]"
+                    sortKey="employment_type"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Type
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[100px]"
+                    sortKey="default_rate"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Rate
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[130px]"
+                    sortKey="contact"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Contact
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[130px]"
+                    sortKey="bank_details"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Bank
+                  </TableHeadSortable>
+
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                pagination.paginatedItems.map((t) => {
-                  const isSelected = selectedIds.includes(t.id)
-                  return (
-                    <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelectRow(t.id)}
-                          aria-label={`Select teacher ${t.name}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{t.school_code}</Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        <TruncatedContent value={t.name} className="font-semibold text-foreground" />
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
-                      <TableCell className="max-w-[140px]">
-                        <TruncatedContent value={t.contact} />
-                      </TableCell>
-                      <TableCell className="max-w-[140px]">
-                        <TruncatedContent value={t.bank_details} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => openEditModal(t)}
-                            title="Edit"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setDeleting(t)}
-                            title="Delete"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      </TooltipProvider>
+              </TableHeader>
+              <TableBody>
+                {loading && teachers.length === 0 ? (
+                  Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+                ) : sortedTeachers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                      No teachers found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  pagination.paginatedItems.map((t) => {
+                    const isSelected = selectedIds.includes(t.id)
+                    return (
+                      <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelectRow(t.id)}
+                            aria-label={`Select teacher ${t.name}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{t.school_code}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[180px]">
+                          <TruncatedContent value={t.name} className="font-semibold text-foreground" />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
+                        <TableCell className="max-w-[140px]">
+                          <TruncatedContent value={t.contact} />
+                        </TableCell>
+                        <TableCell className="max-w-[140px]">
+                          <TruncatedContent value={t.bank_details} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => openEditModal(t)}
+                              title="Edit"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleting(t)}
+                              title="Delete"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TooltipProvider>
+      </StaggerItem>
 
       {/* Standardized Table Pagination Footer */}
       {sortedTeachers.length > 0 && (
-        <StandardTablePagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          totalItems={pagination.totalItems}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
-          pageSize={pagination.pageSize}
-          onPageChange={pagination.setCurrentPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
+        <StaggerItem>
+          <StandardTablePagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setCurrentPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </StaggerItem>
       )}
 
       {/* Form modal */}
@@ -914,6 +926,6 @@ export default function TeachersPage() {
           loadTeachers()
         }}
       />
-    </div>
+    </StaggerContainer>
   )
 }

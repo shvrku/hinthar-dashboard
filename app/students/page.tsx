@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck, Upload } from "lucide-react"
+import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
 import { SCHOOL_CODES, type Student, StudentPayload } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
@@ -13,6 +14,7 @@ import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { BulkImportModal } from "@/components/bulk-import-modal"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
@@ -493,7 +495,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerContainer className="space-y-6">
       {/* Standardized Header */}
       <StandardPageHeader
         title="Students"
@@ -522,20 +524,27 @@ export default function StudentsPage() {
 
       {/* Metric Highlights Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Students</p>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <UserCheck className="size-4" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ y: -2, transition: { duration: 0.15 } }}
+          transition={{ duration: 0.3, delay: 0.05 }}
+        >
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Students</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <UserCheck className="size-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">{students ? students.length : 0}</h2>
-            {lastLoaded && (
-              <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
-            )}
-          </div>
-        </Card>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{students ? students.length : 0}</h2>
+              {lastLoaded && (
+                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              )}
+            </div>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Standardized Management Toolbar Card */}
@@ -615,172 +624,176 @@ export default function StudentsPage() {
       )}
 
       {/* Floating Table Card */}
-      <TooltipProvider>
-        <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12 text-center">
-                  <Checkbox
-                    checked={allCurrentPageSelected}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all current page"
-                  />
-                </TableHead>
-
-                <TableHeadSortable
-                  className="min-w-[130px]"
-                  sortKey="unique_code"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Identifier
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[90px]"
-                  sortKey="school_code"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  School
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[140px]"
-                  sortKey="name"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Name
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[90px]"
-                  sortKey="dob"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  DOB
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[130px]"
-                  sortKey="contact"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Contact
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[100px]"
-                  sortKey="exam_candidate_number"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  UCI
-                </TableHeadSortable>
-
-                <TableHeadSortable
-                  className="min-w-[120px]"
-                  sortKey="enrollment_date"
-                  currentSortKey={sortConfig.key}
-                  currentSortOrder={sortConfig.order}
-                  onSort={requestSort}
-                >
-                  Enrollment
-                </TableHeadSortable>
-
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && !students ? (
-                Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-              ) : sortedStudents && sortedStudents.length === 0 ? (
+      <StaggerItem>
+        <TooltipProvider>
+          <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                    {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
-                  </TableCell>
+                  <TableHead className="w-12 text-center">
+                    <Checkbox
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all current page"
+                    />
+                  </TableHead>
+
+                  <TableHeadSortable
+                    className="min-w-[130px]"
+                    sortKey="unique_code"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Identifier
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[90px]"
+                    sortKey="school_code"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    School
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[140px]"
+                    sortKey="name"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Name
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[90px]"
+                    sortKey="dob"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    DOB
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[130px]"
+                    sortKey="contact"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Contact
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[100px]"
+                    sortKey="exam_candidate_number"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    UCI
+                  </TableHeadSortable>
+
+                  <TableHeadSortable
+                    className="min-w-[120px]"
+                    sortKey="enrollment_date"
+                    currentSortKey={sortConfig.key}
+                    currentSortOrder={sortConfig.order}
+                    onSort={requestSort}
+                  >
+                    Enrollment
+                  </TableHeadSortable>
+
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                pagination.paginatedItems.map((student) => {
-                  const isSelected = selectedIds.includes(student.id)
-                  return (
-                    <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelectRow(student.id)}
-                          aria-label={`Select student ${student.name}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-semibold text-foreground">{student.unique_code}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          {student.school_code}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        <TruncatedContent value={student.name} className="font-medium text-foreground" />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
-                      <TableCell className="max-w-[140px]">
-                        <TruncatedContent value={student.contact} />
-                      </TableCell>
-                      <TableCell className="max-w-[140px]">
-                        <TruncatedContent value={student.exam_candidate_number} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => openEditModal(student)}
-                            aria-label={`Edit ${student.name}`}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setDeletingId(student.id)}
-                            aria-label={`Delete ${student.name}`}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      </TooltipProvider>
+              </TableHeader>
+              <TableBody>
+                {loading && !students ? (
+                  Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
+                ) : sortedStudents && sortedStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                      {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  pagination.paginatedItems.map((student) => {
+                    const isSelected = selectedIds.includes(student.id)
+                    return (
+                      <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelectRow(student.id)}
+                            aria-label={`Select student ${student.name}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">{student.unique_code}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {student.school_code}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[180px]">
+                          <TruncatedContent value={student.name} className="font-medium text-foreground" />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
+                        <TableCell className="max-w-[140px]">
+                          <TruncatedContent value={student.contact} />
+                        </TableCell>
+                        <TableCell className="max-w-[140px]">
+                          <TruncatedContent value={student.exam_candidate_number} />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => openEditModal(student)}
+                              aria-label={`Edit ${student.name}`}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeletingId(student.id)}
+                              aria-label={`Delete ${student.name}`}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TooltipProvider>
+      </StaggerItem>
 
       {/* Standardized Table Pagination Footer */}
       {sortedStudents && sortedStudents.length > 0 && (
-        <StandardTablePagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          totalItems={pagination.totalItems}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
-          pageSize={pagination.pageSize}
-          onPageChange={pagination.setCurrentPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
+        <StaggerItem>
+          <StandardTablePagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setCurrentPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </StaggerItem>
       )}
 
       {/* Form modal */}
@@ -832,6 +845,6 @@ export default function StudentsPage() {
           loadData()
         }}
       />
-    </div>
+    </StaggerContainer>
   )
 }
