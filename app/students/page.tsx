@@ -4,7 +4,7 @@ import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Plus, Pencil, Trash2, RotateCcw, Loader2, Search, UserCheck } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import type { Student, StudentPayload } from "@/lib/types"
+import { SCHOOL_CODES, type Student, StudentPayload } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +24,13 @@ import {
   TableCell,
 } from "@/components/ui/table"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -31,6 +38,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -38,12 +46,27 @@ import {
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: 9 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
       ))}
     </TableRow>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Truncated cell content with tooltip
+// ---------------------------------------------------------------------------
+function TruncatedContent({ value }: { value: string | null }) {
+  if (!value) return <span className="text-muted-foreground">—</span>
+  return (
+    <Tooltip>
+      <TooltipTrigger className="block max-w-full truncate cursor-default">
+        {value}
+      </TooltipTrigger>
+      <TooltipContent>{value}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -95,31 +118,38 @@ function StudentFormModal({
   onClose,
   onSave,
   saving,
+  schoolCode,
+  setSchoolCode,
 }: {
   open: boolean
   initial: Student | null
   onClose: () => void
   onSave: (payload: StudentPayload) => Promise<void>
   saving: boolean
+  schoolCode: string
+  setSchoolCode: (val: string) => void
 }) {
   const [name, setName] = React.useState("")
   const [dob, setDob] = React.useState("")
   const [contact, setContact] = React.useState("")
+  const [examCandidateNumber, setExamCandidateNumber] = React.useState("")
 
   React.useEffect(() => {
     if (open) {
       setName(initial?.name ?? "")
       setDob(initial?.dob ?? "")
       setContact(initial?.contact ?? "")
+      setExamCandidateNumber(initial?.exam_candidate_number ?? "")
     }
   }, [open, initial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    const payload: StudentPayload = { name: name.trim() }
+    const payload: StudentPayload = { name: name.trim(), school_code: schoolCode }
     if (dob) payload.dob = dob
     if (contact.trim()) payload.contact = contact.trim()
+    if (examCandidateNumber.trim()) payload.exam_candidate_number = examCandidateNumber.trim()
     await onSave(payload)
   }
 
@@ -136,6 +166,24 @@ function StudentFormModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              School Code <span className="text-destructive">*</span>
+            </label>
+            <Select value={schoolCode} onValueChange={(val) => val && setSchoolCode(val)}>
+              <SelectTrigger className="mt-1.5 w-full">
+                <SelectValue placeholder="Select School Code" />
+              </SelectTrigger>
+              <SelectContent>
+                {SCHOOL_CODES.map((sc) => (
+                  <SelectItem key={sc.value} value={sc.value}>
+                    {sc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <label className="mb-1.5 block text-sm font-medium">
               Name <span className="text-destructive">*</span>
@@ -165,6 +213,16 @@ function StudentFormModal({
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               placeholder="Phone number or email"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Exam Candidate Number</label>
+            <Input
+              type="text"
+              value={examCandidateNumber}
+              onChange={(e) => setExamCandidateNumber(e.target.value)}
+              placeholder="Exam candidate identifier"
             />
           </div>
 
@@ -205,6 +263,7 @@ export default function StudentsPage() {
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editingStudent, setEditingStudent] = React.useState<Student | null>(null)
   const [saving, setSaving] = React.useState(false)
+  const [schoolCode, setSchoolCode] = React.useState<string>("HIS")
 
   // Delete confirmation
   const [deletingId, setDeletingId] = React.useState<number | null>(null)
@@ -362,11 +421,13 @@ export default function StudentsPage() {
 
   const openCreateModal = () => {
     setEditingStudent(null)
+    setSchoolCode("HIS")
     setModalOpen(true)
   }
 
   const openEditModal = (student: Student) => {
     setEditingStudent(student)
+    setSchoolCode(student.school_code)
     setModalOpen(true)
   }
 
@@ -505,14 +566,16 @@ export default function StudentsPage() {
               </TableHead>
 
               <TableHeadSortable
-                className="w-[100px]"
-                sortKey="id"
+                className="w-[120px]"
+                sortKey="unique_code"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
                 onSort={requestSort}
               >
-                ID
+                Unique Identifier
               </TableHeadSortable>
+
+              <TableHead className="w-[90px]">School Code</TableHead>
 
               <TableHeadSortable
                 sortKey="name"
@@ -533,12 +596,23 @@ export default function StudentsPage() {
               </TableHeadSortable>
 
               <TableHeadSortable
+                className="w-[140px]"
                 sortKey="contact"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
                 onSort={requestSort}
               >
                 Contact
+              </TableHeadSortable>
+
+              <TableHeadSortable
+                className="w-[140px]"
+                sortKey="exam_candidate_number"
+                currentSortKey={sortConfig.key}
+                currentSortOrder={sortConfig.order}
+                onSort={requestSort}
+              >
+                Exam Candidate No.
               </TableHeadSortable>
 
               <TableHeadSortable
@@ -558,7 +632,7 @@ export default function StudentsPage() {
               Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
             ) : sortedStudents && sortedStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                   {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
                 </TableCell>
               </TableRow>
@@ -574,10 +648,20 @@ export default function StudentsPage() {
                         aria-label={`Select student ${student.name}`}
                       />
                     </TableCell>
-                    <TableCell className="font-semibold text-foreground">{student.id}</TableCell>
+                    <TableCell className="font-semibold text-foreground">{student.unique_code}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        {student.school_code}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-medium">{student.name}</TableCell>
                     <TableCell className="text-muted-foreground">{student.dob ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.contact ?? "—"}</TableCell>
+                    <TableCell className="max-w-[140px]">
+                      <TruncatedContent value={student.contact} />
+                    </TableCell>
+                    <TableCell className="max-w-[140px]">
+                      <TruncatedContent value={student.exam_candidate_number} />
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -629,6 +713,8 @@ export default function StudentsPage() {
         onClose={closeModal}
         onSave={handleSave}
         saving={saving}
+        schoolCode={schoolCode}
+        setSchoolCode={setSchoolCode}
       />
 
       {/* Single delete confirmation */}

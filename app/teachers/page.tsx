@@ -8,6 +8,7 @@ import {
   type Teacher,
   type TeacherPayload,
   EMPLOYMENT_TYPES,
+  SCHOOL_CODES,
 } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
@@ -36,6 +37,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -43,12 +45,27 @@ import {
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: 9 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
       ))}
     </TableRow>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Truncated cell content with tooltip
+// ---------------------------------------------------------------------------
+function TruncatedContent({ value }: { value: string | null }) {
+  if (!value) return <span className="text-muted-foreground">—</span>
+  return (
+    <Tooltip>
+      <TooltipTrigger className="block max-w-full truncate cursor-default">
+        {value}
+      </TooltipTrigger>
+      <TooltipContent>{value}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -111,12 +128,16 @@ function TeacherFormModal({
   onSave,
   onClose,
   saving,
+  schoolCode,
+  onSchoolCodeChange,
 }: {
   editing: Teacher | null
   initial: FormData
   onSave: (data: TeacherPayload) => void
   onClose: () => void
   saving: boolean
+  schoolCode: string
+  onSchoolCodeChange: (sc: string) => void
 }) {
   const [form, setForm] = React.useState<FormData>(initial)
 
@@ -132,6 +153,7 @@ function TeacherFormModal({
 
     const payload: TeacherPayload = {
       name: form.name.trim(),
+      school_code: schoolCode,
       employment_type:
         form.employment_type === "" ? null : (form.employment_type as TeacherPayload["employment_type"]),
       default_rate:
@@ -156,6 +178,27 @@ function TeacherFormModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              School Code <span className="text-destructive">*</span>
+            </label>
+            <Select
+              value={schoolCode}
+              onValueChange={(value) => onSchoolCodeChange(value ?? "")}
+            >
+              <SelectTrigger className="mt-1.5 w-full">
+                <SelectValue placeholder="Select School Code" />
+              </SelectTrigger>
+              <SelectContent>
+                {SCHOOL_CODES.map((sc) => (
+                  <SelectItem key={sc.value} value={sc.value}>
+                    {sc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <label className="mb-1.5 block text-sm font-medium">
               Name <span className="text-destructive">*</span>
@@ -270,6 +313,8 @@ export default function TeachersPage() {
   const [deleting, setDeleting] = React.useState<Teacher | null>(null)
   const [deletingInProgress, setDeletingInProgress] = React.useState(false)
 
+  const [schoolCode, setSchoolCode] = React.useState<string>("HIS")
+
   React.useEffect(() => {
     if (!success) return
     const id = setTimeout(() => setSuccess(null), 4000)
@@ -373,6 +418,7 @@ export default function TeachersPage() {
   const openAddModal = () => {
     setEditing(null)
     setFormInitial(EMPTY_FORM)
+    setSchoolCode("HIS")
     setShowForm(true)
   }
 
@@ -385,6 +431,7 @@ export default function TeachersPage() {
       contact: teacher.contact ?? "",
       bank_details: teacher.bank_details ?? "",
     })
+    setSchoolCode(teacher.school_code)
     setShowForm(true)
   }
 
@@ -590,13 +637,23 @@ export default function TeachersPage() {
               </TableHead>
 
               <TableHeadSortable
-                className="w-[100px]"
-                sortKey="id"
+                className="w-[110px]"
+                sortKey="unique_code"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
                 onSort={requestSort}
               >
                 ID
+              </TableHeadSortable>
+
+              <TableHeadSortable
+                className="w-[80px]"
+                sortKey="school_code"
+                currentSortKey={sortConfig.key}
+                currentSortOrder={sortConfig.order}
+                onSort={requestSort}
+              >
+                School
               </TableHeadSortable>
 
               <TableHeadSortable
@@ -609,24 +666,27 @@ export default function TeachersPage() {
               </TableHeadSortable>
 
               <TableHeadSortable
+                className="w-[100px]"
                 sortKey="employment_type"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
                 onSort={requestSort}
               >
-                Employment Type
+                Type
               </TableHeadSortable>
 
               <TableHeadSortable
+                className="w-[100px]"
                 sortKey="default_rate"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
                 onSort={requestSort}
               >
-                Default Rate
+                Rate
               </TableHeadSortable>
 
               <TableHeadSortable
+                className="w-[130px]"
                 sortKey="contact"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
@@ -636,12 +696,13 @@ export default function TeachersPage() {
               </TableHeadSortable>
 
               <TableHeadSortable
+                className="w-[130px]"
                 sortKey="bank_details"
                 currentSortKey={sortConfig.key}
                 currentSortOrder={sortConfig.order}
                 onSort={requestSort}
               >
-                Bank Details
+                Bank
               </TableHeadSortable>
 
               <TableHead className="text-right">Actions</TableHead>
@@ -652,7 +713,7 @@ export default function TeachersPage() {
               Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
             ) : sortedTeachers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                   No teachers found.
                 </TableCell>
               </TableRow>
@@ -668,7 +729,10 @@ export default function TeachersPage() {
                         aria-label={`Select teacher ${t.name}`}
                       />
                     </TableCell>
-                    <TableCell className="font-semibold text-foreground">{t.id}</TableCell>
+                    <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{t.school_code}</Badge>
+                    </TableCell>
                     <TableCell className="font-semibold text-foreground">{t.name}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">
@@ -676,8 +740,12 @@ export default function TeachersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
-                    <TableCell className="text-muted-foreground">{t.contact}</TableCell>
-                    <TableCell className="text-muted-foreground">{t.bank_details}</TableCell>
+                    <TableCell className="max-w-[130px]">
+                      <TruncatedContent value={t.contact} />
+                    </TableCell>
+                    <TableCell className="max-w-[130px]">
+                      <TruncatedContent value={t.bank_details} />
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
@@ -729,6 +797,8 @@ export default function TeachersPage() {
           onSave={handleSave}
           onClose={closeFormModal}
           saving={saving}
+          schoolCode={schoolCode}
+          onSchoolCodeChange={setSchoolCode}
         />
       )}
 

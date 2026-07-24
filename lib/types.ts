@@ -1,5 +1,14 @@
 // --- Enums ---
 
+export const SCHOOL_CODES = [
+  { value: "HIS", label: "HIS" },
+  { value: "SPD", label: "SPD" },
+  { value: "SPN", label: "SPN" },
+  { value: "YWM", label: "YWM" },
+] as const
+
+export type SchoolCode = (typeof SCHOOL_CODES)[number]["value"]
+
 export type EducationLevel =
   | "IAL" | "IG"
   | "Year1" | "Year2" | "Year3" | "Year4" | "Year5"
@@ -46,21 +55,27 @@ export interface Class {
 
 export interface Student {
   id: number
+  unique_code: string
   name: string
   dob: string | null
   enrollment_date: string
+  school_code: string
   contact: string | null
+  exam_candidate_number: string | null
   user_id: number
   check_in_token: string
 }
 
 export interface Teacher {
   id: number
+  unique_code: string
   name: string
   employment_type: EmploymentType | null
   default_rate: string | null
   contact: string | null
   bank_details: string | null
+  school_code: string
+  join_date: string | null
   user_id: number
 }
 
@@ -101,8 +116,10 @@ export interface ClassPayload {
 
 export interface StudentPayload {
   name: string
+  school_code: string
   dob?: string | null
   contact?: string | null
+  exam_candidate_number?: string | null
 }
 
 export interface SubjectPayload {
@@ -111,10 +128,12 @@ export interface SubjectPayload {
 
 export interface TeacherPayload {
   name: string
+  school_code: string
   employment_type?: EmploymentType | null
   default_rate?: string | null
   contact?: string | null
   bank_details?: string | null
+  join_date?: string | null
 }
 
 export interface SessionPayload {
