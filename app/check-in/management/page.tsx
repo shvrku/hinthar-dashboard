@@ -7,6 +7,8 @@ import { createApi, ApiError } from "@/lib/api"
 import type { Student } from "@/lib/types"
 import QRCode from "qrcode"
 import { useSortableData } from "@/lib/use-sortable-data"
+import { usePagination } from "@/components/use-pagination"
+import { StandardTablePagination } from "@/components/standard-table-pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -89,6 +91,9 @@ export default function CheckInManagementPage() {
 
   // Sorting
   const { items: sortedStudents, requestSort, sortConfig } = useSortableData(filteredStudents, "id", "asc")
+
+  // Pagination
+  const pagination = usePagination(sortedStudents, 10)
 
   const selectStudent = React.useCallback(async (student: Student) => {
     setSelected(student)
@@ -291,7 +296,7 @@ export default function CheckInManagementPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sortedStudents.map((s) => (
+                    pagination.paginatedItems.map((s) => (
                       <TableRow
                         key={s.id}
                         className="cursor-pointer"
@@ -322,6 +327,19 @@ export default function CheckInManagementPage() {
                 </TableBody>
               </Table>
             </Card>
+
+            {sortedStudents.length > 0 && (
+              <StandardTablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                startIndex={pagination.startIndex}
+                endIndex={pagination.endIndex}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+              />
+            )}
           </StaggerItem>
 
           {/* QR Detail Card */}
