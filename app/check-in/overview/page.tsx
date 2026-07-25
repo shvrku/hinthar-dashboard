@@ -139,7 +139,7 @@ export default function CheckInOverviewPage() {
   const studentNameMap = React.useMemo(() => {
     const map = new Map<number, string>()
     if (students) {
-      for (const s of students) map.set(s.id, s.name)
+      for (const s of students) map.set(Number(s.id), s.name)
     }
     return map
   }, [students])
@@ -154,9 +154,10 @@ export default function CheckInOverviewPage() {
     
     for (const ci of checkIns) {
       if (ci.date === todayStr) {
-        const existing = map.get(ci.student)
+        const studentId = Number(ci.student)
+        const existing = map.get(studentId)
         if (!existing || new Date(ci.timestamp) > new Date(existing.timestamp)) {
-          map.set(ci.student, ci)
+          map.set(studentId, ci)
         }
       }
     }
@@ -167,14 +168,15 @@ export default function CheckInOverviewPage() {
     if (!students || classes.length === 0) return []
 
     const classMap = new Map<number, Class>()
-    for (const c of classes) classMap.set(c.id, c)
+    for (const c of classes) classMap.set(Number(c.id), c)
 
     const groups = new Map<number, StudentRow[]>()
     for (const cs of classStudents) {
-      const cls = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj : classMap.get(cs.class_obj)
+      const classId = typeof cs.class_obj === "object" && cs.class_obj !== null ? Number(cs.class_obj.id) : Number(cs.class_obj)
+      const cls = typeof cs.class_obj === "object" && cs.class_obj !== null ? cs.class_obj : classMap.get(classId)
       if (!cls) continue
 
-      const studentId = typeof cs.student === "object" && cs.student !== null ? cs.student.id : cs.student
+      const studentId = typeof cs.student === "object" && cs.student !== null ? Number(cs.student.id) : Number(cs.student)
       const name = typeof cs.student === "object" && cs.student !== null ? cs.student.name : studentNameMap.get(studentId)
       if (!name) continue
 
@@ -261,6 +263,12 @@ export default function CheckInOverviewPage() {
       setLoading(false)
     }
   }, [getToken, isSignedIn])
+
+  React.useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      loadData()
+    }
+  }, [isLoaded, isSignedIn, loadData])
 
   if (!isLoaded) {
     return (
@@ -368,7 +376,7 @@ export default function CheckInOverviewPage() {
 
       {/* Cohort groups */}
       {loading && !students ? (
-        <div className="space-y-8">
+        <div key="loading-skeleton" className="space-y-8">
           {[1, 2, 3].map((g) => (
             <div key={g} className="space-y-3">
               <Skeleton className="h-6 w-32" />
@@ -389,29 +397,20 @@ export default function CheckInOverviewPage() {
           ))}
         </div>
       ) : students === null ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center"
-        >
-          <QrCode className="mb-3 size-10 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">Click &quot;Load Data&quot; to view check-in status.</p>
-        </motion.div>
+        <StaggerItem key="unloaded-state">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+            <QrCode className="mb-3 size-10 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">Click &quot;Load Data&quot; to view check-in status.</p>
+          </div>
+        </StaggerItem>
       ) : sortedGroupedClasses.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center"
-        >
-          <p className="text-sm text-muted-foreground">No students found in any cohort classes.</p>
-        </motion.div>
+        <StaggerItem key="empty-state">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+            <p className="text-sm text-muted-foreground">No students found in any cohort classes.</p>
+          </div>
+        </StaggerItem>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-8"
-        >
+        <StaggerContainer key="loaded-cohorts" className="space-y-8">
           {sortedGroupedClasses.map(({ classObj, label, rows }) => {
             const checkedIn = rows.filter((r) => r.checkIn !== null).length
 
@@ -435,7 +434,7 @@ export default function CheckInOverviewPage() {
               </StaggerItem>
             )
           })}
-        </motion.div>
+        </StaggerContainer>
       )}
     </StaggerContainer>
   )

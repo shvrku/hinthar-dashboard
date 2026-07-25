@@ -57,23 +57,23 @@ export function StandardTablePagination({
   }, [currentPage, totalPages])
 
   return (
-    <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-4 py-3 rounded-xl border border-border/80 bg-card shadow-2xs text-xs text-muted-foreground">
+    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 px-4 py-3 rounded-xl border border-border/80 bg-card shadow-2xs text-xs text-muted-foreground w-full">
       {/* Items range summary */}
-      <div>
+      <div className="text-center sm:text-left text-muted-foreground w-full sm:w-auto">
         Showing <span className="font-semibold text-foreground">{startIndex}</span> to{" "}
         <span className="font-semibold text-foreground">{endIndex}</span> of{" "}
         <span className="font-semibold text-foreground">{totalItems}</span> items
       </div>
 
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
         {/* Rows per page selector */}
-        <div className="flex items-center gap-2">
-          <span>Rows per page</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="whitespace-nowrap">Rows per page</span>
           <Select
             value={pageSize.toString()}
             onValueChange={(val) => onPageSizeChange(Number(val))}
           >
-            <SelectTrigger className="h-8 w-16 text-xs">
+            <SelectTrigger className="h-8 w-16 text-xs bg-background">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -86,8 +86,8 @@ export function StandardTablePagination({
         </div>
 
         {/* Page navigation buttons using shadcn Pagination */}
-        <Pagination className="mx-0 w-auto">
-          <PaginationContent>
+        <Pagination className="mx-0 w-auto shrink-0">
+          <PaginationContent className="gap-1">
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => onPageChange(currentPage - 1)}
@@ -95,16 +95,22 @@ export function StandardTablePagination({
               />
             </PaginationItem>
 
-            {pageNumbers.map((page) => (
-              <PaginationItem key={page}>
-                <PaginationButton
-                  isActive={page === currentPage}
-                  onClick={() => onPageChange(page)}
-                >
-                  {page}
-                </PaginationButton>
-              </PaginationItem>
-            ))}
+            {pageNumbers.map((page) => {
+              const isCurrent = page === currentPage
+              const isAdjacent = Math.abs(page - currentPage) <= 1
+              const isHiddenOnMobile = !isCurrent && !isAdjacent && pageNumbers.length > 3
+
+              return (
+                <PaginationItem key={page} className={isHiddenOnMobile ? "hidden sm:inline-block" : ""}>
+                  <PaginationButton
+                    isActive={isCurrent}
+                    onClick={() => onPageChange(page)}
+                  >
+                    {page}
+                  </PaginationButton>
+                </PaginationItem>
+              )
+            })}
 
             <PaginationItem>
               <PaginationNext

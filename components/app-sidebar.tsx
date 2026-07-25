@@ -57,6 +57,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const overviewItems = [
@@ -91,6 +92,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, isSignedIn, isLoaded } = useUser()
   const { openUserProfile, signOut } = useClerk()
+  const { isMobile, setOpenMobile } = useSidebar()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
 
   React.useEffect(() => {
@@ -98,6 +100,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       setCheckInOpen(true)
     }
   }, [pathname])
+
+  React.useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [pathname, isMobile, setOpenMobile])
+
+  const handleNavClick = React.useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [isMobile, setOpenMobile])
 
   const userName = user?.fullName || user?.username || "User Account"
   const userEmail = user?.primaryEmailAddress?.emailAddress || ""
@@ -109,7 +123,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" render={<Link href="/" />}>
+            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" render={<Link href="/" onClick={handleNavClick} />}>
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold">
                 <School className="size-4" />
               </div>
@@ -132,7 +146,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               const isActive = pathname === item.url
               return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} />}>
+                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -150,7 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               const isActive = pathname === item.url
               return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} />}>
+                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -168,7 +182,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               const isActive = pathname === item.url
               return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} />}>
+                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -196,7 +210,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenuSub>
                     {checkInSubItems.map((sub) => (
                       <SidebarMenuSubItem key={sub.title}>
-                        <SidebarMenuSubButton isActive={pathname === sub.url} render={<Link href={sub.url} />}>
+                        <SidebarMenuSubButton isActive={pathname === sub.url} render={<Link href={sub.url} onClick={handleNavClick} />}>
                           <sub.icon className="size-3.5" />
                           <span>{sub.title}</span>
                         </SidebarMenuSubButton>
@@ -214,7 +228,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             {secondaryItems.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton render={<Link href={item.url} />} size="sm">
+                <SidebarMenuButton render={<Link href={item.url} onClick={handleNavClick} />} size="sm">
                   <item.icon />
                   <span>{item.title}</span>
                 </SidebarMenuButton>
