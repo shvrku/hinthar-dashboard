@@ -13,7 +13,7 @@ export default function CheckInMessagesPage() {
     <div className="space-y-6">
       <StandardPageHeader
         title="Messages"
-        description="Just a page for messages"
+        description="This page is apart of the messages section "
       />
 
       <StaggerContainer className="flex items-center justify-center py-12">

@@ -1,70 +1,66 @@
 "use client"
 
 import * as React from "react"
-import { useAuth } from "@clerk/nextjs"
-import { Calendar } from "@/components/ui/calendar"
 import Link from "next/link"
+import { Bell, Info, ArrowRight } from "lucide-react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
-export default function TestPage() {
-  const { isLoaded, isSignedIn } = useAuth()
-  const [date, setDate] = React.useState<Date | undefined>(new Date())
-
-  if (!isLoaded)
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    )
-  if (!isSignedIn)
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Please sign in to view this page.
-      </div>
-    )
-
+export default function CheckInMessagesPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-2 text-3xl font-bold tracking-tight">
-        Component Test Page
-      </h1>
-      <p className="mb-6 text-muted-foreground">
-        Use this area to test components.{" "}
-        <Link
-          href="/test/design-system"
-          className="font-medium text-primary underline underline-offset-4"
-        >
-          View Design System Demo (sidebar-08)
-        </Link>
-      </p>
+    <div className="space-y-6">
+      <StandardPageHeader
+        title="Test"
+        description="This page is used for testings components"
+      />
 
-      <section className="mb-12">
-        <h2 className="mb-4 text-xl font-semibold">Calendar</h2>
-        <div className="flex flex-wrap gap-6">
-          <div>
-            <p className="mb-2 text-sm text-muted-foreground">
-              Selected date: {date?.toDateString() ?? "None"}
+      <StaggerContainer className="flex items-center justify-center py-12">
+        <StaggerItem>
+          <Card className="max-w-lg w-full p-8 text-center">
+            <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-full bg-muted">
+              <Bell className="size-5 text-muted-foreground" />
+            </div>
+
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              Feedback Form
+            </h2>
+
+            <p className="mb-6 text-sm text-muted-foreground leading-relaxed">
+              We don't really have any feedback forms set up yet. So please just contact
+              me from telegram{" "}
+              <a
+                href="https://t.me/shvrkus"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline hover:no-underline"
+              >
+                @shvrkus
+              </a> for any issues you are facing.
             </p>
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md border shadow-sm"
-            />
-          </div>
-          <div>
-            <p className="mb-2 text-sm text-muted-foreground">
-              With dropdown caption
-            </p>
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md border shadow-sm"
-              captionLayout="dropdown"
-            />
-          </div>
-        </div>
-      </section>
+
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+              >
+                <Info className="size-3.5" />
+                
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                render={<Link href="/" />}
+              >
+                <ArrowRight className="size-3.5" />
+                Return Home
+              </Button>
+            </div>
+          </Card>
+        </StaggerItem>
+      </StaggerContainer>
     </div>
   )
 }
