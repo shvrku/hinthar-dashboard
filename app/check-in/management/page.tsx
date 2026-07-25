@@ -343,7 +343,7 @@ export default function CheckInManagementPage() {
           </StaggerItem>
 
           {/* QR Detail Card */}
-          <StaggerItem className="w-full lg:w-80 shrink-0">
+          <StaggerItem className="w-full lg:w-80 shrink-0 lg:sticky lg:top-20">
             {selected ? (
               <Card className="rounded-xl border border-border/80 bg-card shadow-2xs">
                 <CardHeader>

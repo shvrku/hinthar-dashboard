@@ -1,11 +1,23 @@
 "use client"
 
-import React from "react"
+import React, { useContext, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "motion/react"
+import { LayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime"
 
 interface PageTransitionProps {
   children: React.ReactNode
+}
+
+function FrozenRouter({ children }: { children: React.ReactNode }) {
+  const context = useContext(LayoutRouterContext)
+  const frozen = useRef(context).current
+
+  return (
+    <LayoutRouterContext.Provider value={frozen}>
+      {children}
+    </LayoutRouterContext.Provider>
+  )
 }
 
 export function PageTransition({ children }: PageTransitionProps) {
@@ -24,7 +36,7 @@ export function PageTransition({ children }: PageTransitionProps) {
         }}
         className="w-full flex-1 flex flex-col min-h-full origin-top"
       >
-        {children}
+        <FrozenRouter>{children}</FrozenRouter>
       </motion.div>
     </AnimatePresence>
   )
