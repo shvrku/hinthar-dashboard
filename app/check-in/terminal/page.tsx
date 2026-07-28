@@ -228,12 +228,27 @@ export default function TerminalPage() {
     const queryLower = rawInput.toLowerCase()
     const numId = parseInt(rawInput, 10)
 
-    const match = students.find(
-      (s) =>
-        (!isNaN(numId) && s.id === numId) ||
-        (s.unique_code && s.unique_code.toLowerCase() === queryLower) ||
-        (s.unique_code && s.unique_code.toLowerCase().includes(queryLower))
-    )
+    const match = students.find((s) => {
+      if (!isNaN(numId) && s.id === numId) return true
+      if (!s.unique_code) return false
+      const codeLower = s.unique_code.toLowerCase()
+      if (codeLower === queryLower || codeLower.includes(queryLower)) return true
+      
+      const codeParts = codeLower.split("-")
+      const queryParts = queryLower.split("-")
+      if (codeParts.length === 2 && queryParts.length === 2) {
+        const [codePrefix, codeNumStr] = codeParts
+        const [queryPrefix, queryNumStr] = queryParts
+        if (codePrefix.includes(queryPrefix) || queryPrefix.includes(codePrefix)) {
+          const codeNum = parseInt(codeNumStr, 10)
+          const queryNum = parseInt(queryNumStr, 10)
+          if (!isNaN(codeNum) && !isNaN(queryNum) && codeNum === queryNum) {
+            return true
+          }
+        }
+      }
+      return false
+    })
     setMatchedStudent(match ?? null)
     if (!match) {
       setError(`No student found matching "${rawInput}".`)
@@ -380,7 +395,9 @@ export default function TerminalPage() {
                     <User className="size-8 text-primary" />
                   </motion.div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">ID: {matchedStudent.id}</p>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Code: {matchedStudent.unique_code || `#${matchedStudent.id}`}
+                    </p>
                     <p className="text-xl font-bold tracking-tight text-foreground">{matchedStudent.name}</p>
                     <p className="text-xs font-semibold text-primary mt-0.5">
                       {getStudentClassName(matchedStudent.id)}
@@ -438,26 +455,26 @@ export default function TerminalPage() {
                   Ready to scan
                 </p>
                 <p className="text-xs text-muted-foreground/70 mt-1">
-                  Point QR code at camera or type student ID
+                  Point QR code at camera or type student Code
                 </p>
               </motion.div>
             )}
           </AnimatePresence>
 
-            {/* Manual Lookup Form */}
-            <div className="rounded-xl border border-border/80 bg-card p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Manual ID Search</h3>
+            {/* Manual Lookup Form with Top Spacing */}
+            <div className="mt-6 rounded-xl border border-border/80 bg-card p-6 shadow-2xs space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Manual Search</h3>
               <p className="text-xs text-muted-foreground">
-                Search by typing in the student ID manually
+                Search by typing the student Code or ID manually
               </p>
               <div className="flex gap-2">
                 <Input
-                  type="number"
+                  type="text"
                   value={manualId}
                   onChange={(e) => setManualId(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleManualLookup() }}
-                  placeholder="Student ID (e.g. 101)"
-                  className="min-w-0 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-background text-foreground placeholder:text-muted-foreground"
+                  placeholder="Student Code or ID (e.g. HIS26-00001)"
+                  className="min-w-0 flex-1 bg-background text-foreground placeholder:text-muted-foreground"
                 />
                 <Button
                   onClick={handleManualLookup}

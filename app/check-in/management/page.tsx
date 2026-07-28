@@ -49,6 +49,35 @@ function RowSkeleton() {
   )
 }
 
+export function matchStudentQuery(s: Student, rawQuery: string): boolean {
+  if (!rawQuery.trim()) return true
+  const query = rawQuery.toLowerCase().trim()
+  if (s.name.toLowerCase().includes(query)) return true
+  if (String(s.id).includes(query)) return true
+  if (s.school_code && s.school_code.toLowerCase().includes(query)) return true
+  if (s.contact && s.contact.toLowerCase().includes(query)) return true
+  
+  if (s.unique_code) {
+    const codeLower = s.unique_code.toLowerCase()
+    if (codeLower.includes(query)) return true
+
+    const codeParts = codeLower.split("-")
+    const queryParts = query.split("-")
+    if (codeParts.length === 2 && queryParts.length === 2) {
+      const [codePrefix, codeNumStr] = codeParts
+      const [queryPrefix, queryNumStr] = queryParts
+      if (codePrefix.includes(queryPrefix) || queryPrefix.includes(codePrefix)) {
+        const codeNum = parseInt(codeNumStr, 10)
+        const queryNum = parseInt(queryNumStr, 10)
+        if (!isNaN(codeNum) && !isNaN(queryNum) && codeNum === queryNum) {
+          return true
+        }
+      }
+    }
+  }
+  return false
+}
+
 export default function CheckInManagementPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const [students, setStudents] = React.useState<Student[]>([])
@@ -81,14 +110,7 @@ export default function CheckInManagementPage() {
 
   const filteredStudents = React.useMemo(() => {
     if (searchQuery.trim() === "") return students
-    const query = searchQuery.toLowerCase().trim()
-    return students.filter(
-      (s) =>
-        s.name.toLowerCase().includes(query) ||
-        String(s.id).includes(query) ||
-        (s.unique_code && s.unique_code.toLowerCase().includes(query)) ||
-        (s.school_code && s.school_code.toLowerCase().includes(query))
-    )
+    return students.filter((s) => matchStudentQuery(s, searchQuery))
   }, [students, searchQuery])
 
   // Sorting

@@ -164,7 +164,18 @@ export default function CheckInOverviewPage() {
     const todayStr = `${year}-${month}-${day}`
     
     for (const ci of checkIns) {
-      if (ci.date === todayStr) {
+      let ciDateStr = ci.date
+      if (ci.timestamp) {
+        const tDate = new Date(ci.timestamp)
+        if (!isNaN(tDate.getTime())) {
+          const y = tDate.getFullYear()
+          const m = String(tDate.getMonth() + 1).padStart(2, '0')
+          const dt = String(tDate.getDate()).padStart(2, '0')
+          ciDateStr = `${y}-${m}-${dt}`
+        }
+      }
+
+      if (ciDateStr === todayStr) {
         const sObj = ci.student as unknown
         const studentId = typeof sObj === "object" && sObj !== null
           ? Number((sObj as { id: number }).id)
@@ -202,7 +213,27 @@ export default function CheckInOverviewPage() {
         const matchesName = name.toLowerCase().includes(query)
         const matchesId = String(studentId).includes(query)
         const studentCode = studentCodeMap.get(studentId)
-        const matchesCode = studentCode ? studentCode.toLowerCase().includes(query) : false
+        let matchesCode = false
+        if (studentCode) {
+          const codeLower = studentCode.toLowerCase()
+          if (codeLower.includes(query)) {
+            matchesCode = true
+          } else {
+            const codeParts = codeLower.split("-")
+            const queryParts = query.split("-")
+            if (codeParts.length === 2 && queryParts.length === 2) {
+              const [codePrefix, codeNumStr] = codeParts
+              const [queryPrefix, queryNumStr] = queryParts
+              if (codePrefix.includes(queryPrefix) || queryPrefix.includes(codePrefix)) {
+                const codeNum = parseInt(codeNumStr, 10)
+                const queryNum = parseInt(queryNumStr, 10)
+                if (!isNaN(codeNum) && !isNaN(queryNum) && codeNum === queryNum) {
+                  matchesCode = true
+                }
+              }
+            }
+          }
+        }
         const matchesClass =
           cls.education_level.toLowerCase().includes(query) ||
           cls.cohort_identifier.toLowerCase().includes(query) ||
@@ -330,20 +361,41 @@ export default function CheckInOverviewPage() {
         />
       </StaggerItem>
 
-      {/* Metric Highlights Strip (Total Count Card + Auto-layout space) */}
+      {/* Metric Highlights Strip */}
       <StaggerItem>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Check-In Logs</p>
-              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <QrCode className="size-4" />
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Checked In Today</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <Check className="size-4" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">{checkIns.length}</h2>
-              {lastLoaded && (
-                <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{todayCheckInMap.size}</h2>
+              {students && (
+                <span className="text-xs text-muted-foreground">
+                  of {students.length} students
+                </span>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Absent Today</p>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <X className="size-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                {students ? Math.max(0, students.length - todayCheckInMap.size) : 0}
+              </h2>
+              {students && students.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {(((students.length - todayCheckInMap.size) / students.length) * 100).toFixed(0)}% absent
+                </span>
               )}
             </div>
           </Card>
