@@ -99,12 +99,14 @@ export default function ClassesPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const [classesData, classStudentsData] = await Promise.all([
+      const [classesData, classStudentsData, studentsData] = await Promise.all([
         api.listClasses(),
         api.listClassStudents(),
+        api.listStudents(),
       ])
       setClasses(classesData)
       setClassStudents(classStudentsData)
+      setStudents(studentsData)
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {

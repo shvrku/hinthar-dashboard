@@ -26,6 +26,7 @@ import {
 
 interface StudentRow {
   studentId: number
+  studentCode?: string
   studentName: string
   checkIn: CheckIn | null
 }
@@ -51,13 +52,13 @@ function CohortTable({ rows }: { rows: StudentRow[] }) {
         <TableHeader>
           <TableRow>
             <TableHeadSortable
-              className="w-[120px]"
-              sortKey="studentId"
+              className="w-[140px]"
+              sortKey="studentCode"
               currentSortKey={sortConfig.key}
               currentSortOrder={sortConfig.order}
               onSort={requestSort}
             >
-              Student ID
+              Student Code
             </TableHeadSortable>
 
             <TableHeadSortable
@@ -89,9 +90,9 @@ function CohortTable({ rows }: { rows: StudentRow[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedRows.map(({ studentId, studentName, checkIn }) => (
+          {sortedRows.map(({ studentId, studentCode, studentName, checkIn }) => (
             <TableRow key={studentId} className="transition-colors hover:bg-muted/60">
-              <TableCell className="font-semibold text-foreground">{studentId}</TableCell>
+              <TableCell className="font-semibold text-foreground">{studentCode || `#${studentId}`}</TableCell>
               <TableCell className="font-medium">{studentName}</TableCell>
               <TableCell className="text-muted-foreground whitespace-nowrap">
                 {checkIn
@@ -144,6 +145,16 @@ export default function CheckInOverviewPage() {
     return map
   }, [students])
 
+  const studentCodeMap = React.useMemo(() => {
+    const map = new Map<number, string>()
+    if (students) {
+      for (const s of students) {
+        if (s.unique_code) map.set(Number(s.id), s.unique_code)
+      }
+    }
+    return map
+  }, [students])
+
   const todayCheckInMap = React.useMemo(() => {
     const map = new Map<number, CheckIn>()
     const d = new Date()
@@ -154,10 +165,16 @@ export default function CheckInOverviewPage() {
     
     for (const ci of checkIns) {
       if (ci.date === todayStr) {
-        const studentId = Number(ci.student)
-        const existing = map.get(studentId)
-        if (!existing || new Date(ci.timestamp) > new Date(existing.timestamp)) {
-          map.set(studentId, ci)
+        const sObj = ci.student as unknown
+        const studentId = typeof sObj === "object" && sObj !== null
+          ? Number((sObj as { id: number }).id)
+          : Number(sObj)
+        
+        if (!isNaN(studentId) && studentId > 0) {
+          const existing = map.get(studentId)
+          if (!existing || new Date(ci.timestamp) > new Date(existing.timestamp)) {
+            map.set(studentId, ci)
+          }
         }
       }
     }
@@ -184,13 +201,15 @@ export default function CheckInOverviewPage() {
         const query = searchQuery.toLowerCase().trim()
         const matchesName = name.toLowerCase().includes(query)
         const matchesId = String(studentId).includes(query)
+        const studentCode = studentCodeMap.get(studentId)
+        const matchesCode = studentCode ? studentCode.toLowerCase().includes(query) : false
         const matchesClass =
           cls.education_level.toLowerCase().includes(query) ||
           cls.cohort_identifier.toLowerCase().includes(query) ||
           (cls.cohort_sub_category && cls.cohort_sub_category.toLowerCase().includes(query)) ||
           `${cls.education_level} ${cls.cohort_identifier}`.toLowerCase().includes(query)
 
-        if (!matchesName && !matchesId && !matchesClass) continue
+        if (!matchesName && !matchesId && !matchesCode && !matchesClass) continue
       }
 
       const checkIn = todayCheckInMap.get(studentId) ?? null
@@ -198,7 +217,7 @@ export default function CheckInOverviewPage() {
       if (!groups.has(cls.id)) {
         groups.set(cls.id, [])
       }
-      groups.get(cls.id)!.push({ studentId, studentName: name, checkIn })
+      groups.get(cls.id)!.push({ studentId, studentCode: studentCodeMap.get(studentId), studentName: name, checkIn })
     }
 
     const result: { classObj: Class; label: string; rows: StudentRow[] }[] = []
@@ -243,7 +262,11 @@ export default function CheckInOverviewPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const todayStr = new Date().toISOString().split("T")[0]
+      const d = new Date()
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const todayStr = `${year}-${month}-${day}`
       const [studs, cis, cls, css] = await Promise.all([
         api.listStudents(),
         api.listCheckIns({ date: todayStr }),

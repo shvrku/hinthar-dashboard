@@ -85,7 +85,9 @@ export default function CheckInManagementPage() {
     return students.filter(
       (s) =>
         s.name.toLowerCase().includes(query) ||
-        String(s.id).includes(query)
+        String(s.id).includes(query) ||
+        (s.unique_code && s.unique_code.toLowerCase().includes(query)) ||
+        (s.school_code && s.school_code.toLowerCase().includes(query))
     )
   }, [students, searchQuery])
 

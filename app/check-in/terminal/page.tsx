@@ -216,18 +216,27 @@ export default function TerminalPage() {
   }, [students])
 
   const handleManualLookup = React.useCallback(() => {
-    const id = parseInt(manualId, 10)
-    if (isNaN(id)) {
-      setError("Please enter a valid student ID.")
+    const rawInput = manualId.trim()
+    if (!rawInput) {
+      setError("Please enter a valid student ID or Student Code.")
       return
     }
     setError(null)
     setSuccess(null)
     setScannedToken(null)
-    const match = students.find((s) => s.id === id)
+
+    const queryLower = rawInput.toLowerCase()
+    const numId = parseInt(rawInput, 10)
+
+    const match = students.find(
+      (s) =>
+        (!isNaN(numId) && s.id === numId) ||
+        (s.unique_code && s.unique_code.toLowerCase() === queryLower) ||
+        (s.unique_code && s.unique_code.toLowerCase().includes(queryLower))
+    )
     setMatchedStudent(match ?? null)
     if (!match) {
-      setError(`No student found with ID ${id}.`)
+      setError(`No student found matching "${rawInput}".`)
     }
     scannerRef.current?.resetScanLock()
   }, [manualId, students])
