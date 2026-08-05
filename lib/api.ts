@@ -73,16 +73,64 @@ async function request<T>(
 
   if (res.status === 204) return undefined as T
   const data = await res.json()
-  if (
-    data &&
+  return data as T
+}
+
+function isPaginatedEnvelope<T>(data: unknown): data is import("./types").Paginated<T> {
+  return (
+    !!data &&
     typeof data === "object" &&
     !Array.isArray(data) &&
     "results" in data &&
-    Array.isArray((data as { results: unknown }).results)
-  ) {
-    return (data as { results: unknown[] }).results as unknown as T
+    Array.isArray((data as { results: unknown }).results) &&
+    "count" in data
+  )
+}
+
+/** Walk DRF pages (page_size=200) until exhausted. Plain arrays pass through. */
+async function fetchAllPages<T>(
+  endpointPath: string,
+  token: string,
+  params?: Record<string, string | number | undefined | null>
+): Promise<T[]> {
+  const pageSize = 200
+  const base: Record<string, string | number | undefined | null> = {
+    ...params,
+    page_size: pageSize,
   }
-  return data as T
+  delete base.page
+
+  const all: T[] = []
+  let page = 1
+  for (;;) {
+    const data = await request<import("./types").Paginated<T> | T[]>(
+      `${endpointPath}${buildQueryString({ ...base, page })}`,
+      token
+    )
+    if (Array.isArray(data)) return data
+    if (!isPaginatedEnvelope<T>(data)) return all
+    all.push(...data.results)
+    if (!data.next || all.length >= data.count || data.results.length === 0) break
+    page += 1
+    if (page > 100) break
+  }
+  return all
+}
+
+async function fetchPage<T>(
+  endpointPath: string,
+  token: string,
+  params?: Record<string, string | number | undefined | null>
+): Promise<import("./types").Paginated<T>> {
+  const data = await request<import("./types").Paginated<T> | T[]>(
+    `${endpointPath}${buildQueryString(params)}`,
+    token
+  )
+  if (Array.isArray(data)) {
+    return { count: data.length, next: null, previous: null, results: data }
+  }
+  if (isPaginatedEnvelope<T>(data)) return data
+  return { count: 0, next: null, previous: null, results: [] }
 }
 
 function formatErrorDetail(data: unknown): string {
@@ -194,7 +242,10 @@ export function createApi(token: string) {
 
     // --- Students ---
     listStudents: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").Student[]>(`/students/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").Student>(`/students/`, token, params),
+
+    listStudentsPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").Student>(`/students/`, token, params),
 
     getStudent: (id: number) =>
       request<import("./types").Student>(`/students/${id}/`, token),
@@ -236,7 +287,10 @@ export function createApi(token: string) {
 
     // --- Check-Ins ---
     listCheckIns: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").CheckIn[]>(`/check-ins/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").CheckIn>(`/check-ins/`, token, params),
+
+    listCheckInsPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").CheckIn>(`/check-ins/`, token, params),
 
     createCheckInManual: (studentId: number) =>
       request<import("./types").CheckIn>(`/check-ins/manual/`, token, {
@@ -250,9 +304,18 @@ export function createApi(token: string) {
         body: JSON.stringify({ check_in_token: checkInToken }),
       }),
 
+    lookupCheckIn: (input: { check_in_token?: string; unique_code?: string }) =>
+      request<import("./types").CheckInLookup>(`/check-ins/lookup/`, token, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+
     // --- Class-Students ---
     listClassStudents: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").ClassStudent[]>(`/class-students/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").ClassStudent>(`/class-students/`, token, params),
+
+    listClassStudentsPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").ClassStudent>(`/class-students/`, token, params),
 
     createClassStudent: (classObjId: number, studentId: number) =>
       request<import("./types").ClassStudent>(`/class-students/`, token, {
@@ -341,8 +404,24 @@ export function createApi(token: string) {
     },
 
     // --- Teachers ---
-    listTeachers: (params?: Record<string, string | number | undefined | null>, forceRefresh = false) =>
-      cachedRequest<import("./types").Teacher[]>(`/teachers/${buildQueryString(params)}`, token, {}, DEFAULT_TTL_MS, forceRefresh),
+    listTeachers: async (
+      params?: Record<string, string | number | undefined | null>,
+      forceRefresh = false
+    ) => {
+      const cacheKey = `${token}:/teachers/:all:${buildQueryString(params)}`
+      if (!forceRefresh) {
+        const cached = apiCache.get(cacheKey)
+        if (cached && Date.now() - cached.timestamp < DEFAULT_TTL_MS) {
+          return cached.data as import("./types").Teacher[]
+        }
+      }
+      const data = await fetchAllPages<import("./types").Teacher>(`/teachers/`, token, params)
+      apiCache.set(cacheKey, { data, timestamp: Date.now() })
+      return data
+    },
+
+    listTeachersPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").Teacher>(`/teachers/`, token, params),
 
     getTeacher: (id: number) =>
       request<import("./types").Teacher>(`/teachers/${id}/`, token),
@@ -391,7 +470,10 @@ export function createApi(token: string) {
 
     // --- Sessions ---
     listSessions: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").Session[]>(`/sessions/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").Session>(`/sessions/`, token, params),
+
+    listSessionsPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").Session>(`/sessions/`, token, params),
 
     getSession: (id: number) =>
       request<import("./types").Session>(`/sessions/${id}/`, token),
@@ -429,7 +511,10 @@ export function createApi(token: string) {
 
     // --- Session Attendances ---
     listSessionAttendances: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").SessionAttendance[]>(`/session-attendances/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").SessionAttendance>(`/session-attendances/`, token, params),
+
+    listSessionAttendancesPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").SessionAttendance>(`/session-attendances/`, token, params),
 
     createSessionAttendance: (data: import("./types").SessionAttendancePayload) =>
       request<import("./types").SessionAttendance>(`/session-attendances/`, token, {
@@ -454,7 +539,10 @@ export function createApi(token: string) {
 
     // --- Ad-Hoc Sessions ---
     listAdHocSessions: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").AdHocSession[]>(`/adhoc-sessions/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").AdHocSession>(`/adhoc-sessions/`, token, params),
+
+    listAdHocSessionsPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").AdHocSession>(`/adhoc-sessions/`, token, params),
 
     getAdHocSession: (id: number) =>
       request<import("./types").AdHocSession>(`/adhoc-sessions/${id}/`, token),
@@ -488,7 +576,10 @@ export function createApi(token: string) {
 
     // --- Ad-Hoc Session Attendances ---
     listAdHocSessionAttendances: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").AdHocSessionAttendance[]>(`/adhoc-session-attendances/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").AdHocSessionAttendance>(`/adhoc-session-attendances/`, token, params),
+
+    listAdHocSessionAttendancesPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").AdHocSessionAttendance>(`/adhoc-session-attendances/`, token, params),
 
     createAdHocSessionAttendance: (data: import("./types").AdHocSessionAttendancePayload) =>
       request<import("./types").AdHocSessionAttendance>(`/adhoc-session-attendances/`, token, {
@@ -527,21 +618,35 @@ export function createApi(token: string) {
     getAttendanceMatrix: (params?: Record<string, string | number | undefined | null>) =>
       request<{
         class_id?: string
-        sessions: import("./types").Session[]
-        students: import("./types").Student[] & { records?: Record<string, string> }[]
+        sessions: import("./types").AttendanceMatrixSession[]
+        students: import("./types").AttendanceMatrixStudent[]
         attendances: import("./types").SessionAttendance[]
       }>(`/attendance/matrix/${buildQueryString(params)}`, token),
 
     getAdHocAttendanceMatrix: (params?: Record<string, string | number | undefined | null>) =>
       request<{
-        sessions: import("./types").AdHocSession[]
-        students: import("./types").Student[]
+        sessions: import("./types").AttendanceMatrixSession[]
+        students: import("./types").AttendanceMatrixStudent[]
         attendances: import("./types").AdHocSessionAttendance[]
       }>(`/adhoc-attendance/matrix/${buildQueryString(params)}`, token),
 
     // --- Users ---
     listUsers: (params?: Record<string, string | number | undefined | null>) =>
-      request<import("./types").User[]>(`/users/${buildQueryString(params)}`, token),
+      fetchAllPages<import("./types").User>(`/users/`, token, params),
+
+    listUsersPage: (params?: Record<string, string | number | undefined | null>) =>
+      fetchPage<import("./types").User>(`/users/`, token, params),
+
+    getMe: () => request<import("./types").User>(`/me/`, token),
+
+    updateUser: (
+      id: number,
+      data: Partial<Pick<import("./types").User, "role" | "is_active" | "email" | "username">>
+    ) =>
+      request<import("./types").User>(`/users/${id}/`, token, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
 
     // --- Stats ---
     getStats: () =>

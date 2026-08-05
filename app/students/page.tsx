@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { BulkImportModal } from "@/components/bulk-import-modal"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
-import { usePagination } from "@/components/use-pagination"
+import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
@@ -281,12 +281,21 @@ function StudentFormModal({
 export default function StudentsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
-  const [students, setStudents] = React.useState<Student[] | null>(null)
+  // Current server page of students — always driven by listStudentsPage.
+  const [pageStudents, setPageStudents] = React.useState<Student[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [debouncedQuery, setDebouncedQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+  const serverPg = useServerPagination(50)
+
+  // Debounce search input ~300ms before it drives a server refetch.
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300)
+    return () => clearTimeout(id)
+  }, [searchQuery])
 
   // Selection state
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
@@ -318,14 +327,26 @@ export default function StudentsPage() {
     return createApi(token)
   }, [getToken])
 
+  const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
+
+  const fetchPage = React.useCallback(async () => {
+    const api = await getApi()
+    const data = await api.listStudentsPage({
+      page: serverPg.page,
+      page_size: serverPg.pageSize,
+      q: debouncedQuery || undefined,
+      school_code: schoolFilter === "all" ? undefined : schoolFilter,
+    })
+    setPageStudents(data.results)
+    serverPg.setTotalItems(data.count)
+  }, [getApi, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, schoolFilter])
+
   const loadData = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     setSelectedIds([])
     try {
-      const api = await getApi()
-      const data = await api.listStudents()
-      setStudents(data)
+      await fetchPage()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
@@ -336,37 +357,46 @@ export default function StudentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [getApi])
+  }, [fetchPage])
 
-  const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
+  // Once data has been loaded at least once, keep the server page in sync:
+  // reset to page 1 when search/filter changes, and refetch whenever
+  // page/pageSize/search/filter change.
+  const filterKeyRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (lastLoaded === null) return
+    const filterKey = `${debouncedQuery}|${schoolFilter}`
+    const filterChanged = filterKeyRef.current !== null && filterKey !== filterKeyRef.current
+    filterKeyRef.current = filterKey
+    if (filterChanged && serverPg.page !== 1) {
+      serverPg.setPage(1)
+      return
+    }
+    void fetchPage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverPg.page, serverPg.pageSize, debouncedQuery, schoolFilter])
 
-  const filteredStudents = React.useMemo(() => {
-    if (!students) return []
-    return students.filter((s) => {
-      const matchesSchool = schoolFilter === "all" || s.school_code === schoolFilter
-      if (!matchesSchool) return false
-      if (searchQuery.trim() === "") return true
-      const query = searchQuery.toLowerCase().trim()
-      return (
-        s.name.toLowerCase().includes(query) ||
-        String(s.id).includes(query) ||
-        (s.unique_code && s.unique_code.toLowerCase().includes(query)) ||
-        (s.school_code && s.school_code.toLowerCase().includes(query)) ||
-        (s.contact && s.contact.toLowerCase().includes(query))
-      )
-    })
-  }, [students, schoolFilter, searchQuery])
+  // Sorting (client-side; only sorts the current server page)
+  const { items: sortedStudents, requestSort, sortConfig } = useSortableData(pageStudents, "id", "asc")
+  const displayedStudents = sortedStudents
 
-  // Sorting
-  const { items: sortedStudents, requestSort, sortConfig } = useSortableData(filteredStudents, "id", "asc")
+  const tablePagination = {
+    currentPage: serverPg.page,
+    totalPages: serverPg.totalPages,
+    totalItems: serverPg.totalItems,
+    startIndex: serverPg.startIndex,
+    endIndex: serverPg.endIndex,
+    pageSize: serverPg.pageSize,
+    onPageChange: serverPg.setPage,
+    onPageSizeChange: serverPg.setPageSize,
+  }
 
-  // Pagination
-  const pagination = usePagination(sortedStudents, 10)
+  const totalStudentsCount = serverPg.totalItems
 
   // Selection handlers
   const currentPageIds = React.useMemo(
-    () => pagination.paginatedItems.map((s) => s.id),
-    [pagination.paginatedItems]
+    () => displayedStudents.map((s) => s.id),
+    [displayedStudents]
   )
   const allCurrentPageSelected =
     currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
@@ -395,8 +425,7 @@ export default function StudentsPage() {
       setSuccess(`Successfully deleted ${res.deleted_count} student(s).`)
       setSelectedIds([])
       setBulkConfirmOpen(false)
-      const data = await api.listStudents()
-      setStudents(data)
+      await fetchPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -406,7 +435,7 @@ export default function StudentsPage() {
     } finally {
       setBulkDeleting(false)
     }
-  }, [getApi, selectedIds])
+  }, [getApi, selectedIds, fetchPage])
 
   const handleSave = React.useCallback(
     async (payload: StudentPayload) => {
@@ -423,8 +452,7 @@ export default function StudentsPage() {
         }
         setModalOpen(false)
         setEditingStudent(null)
-        const data = await api.listStudents()
-        setStudents(data)
+        await fetchPage()
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.userMessage)
@@ -435,7 +463,7 @@ export default function StudentsPage() {
         setSaving(false)
       }
     },
-    [getApi, editingStudent],
+    [getApi, editingStudent, fetchPage],
   )
 
   const handleDelete = React.useCallback(async () => {
@@ -448,8 +476,7 @@ export default function StudentsPage() {
       setSuccess("Student deleted successfully.")
       setDeletingId(null)
       setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
-      const data = await api.listStudents()
-      setStudents(data)
+      await fetchPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -459,7 +486,7 @@ export default function StudentsPage() {
     } finally {
       setDeleting(false)
     }
-  }, [getApi, deletingId])
+  }, [getApi, deletingId, fetchPage])
 
   const openCreateModal = () => {
     setEditingStudent(null)
@@ -544,7 +571,7 @@ export default function StudentsPage() {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">{students ? students.length : 0}</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{totalStudentsCount}</h2>
               {lastLoaded && (
                 <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
               )}
@@ -598,11 +625,11 @@ export default function StudentsPage() {
               </Button>
             )}
 
-            {lastLoaded && students && (
+            {lastLoaded && (
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="px-3 py-1 text-xs">
                   <UserCheck className="mr-1.5 size-3.5" />
-                  {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
+                  {`${totalStudentsCount} student${totalStudentsCount !== 1 ? "s" : ""}`}
                 </Badge>
               </div>
             )}
@@ -718,16 +745,16 @@ export default function StudentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading && !students ? (
+                {loading && lastLoaded === null ? (
                   Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-                ) : sortedStudents && sortedStudents.length === 0 ? (
+                ) : displayedStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                      {students === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
+                      {lastLoaded === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  pagination.paginatedItems.map((student) => {
+                  displayedStudents.map((student) => {
                     const isSelected = selectedIds.includes(student.id)
                     return (
                       <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
@@ -787,17 +814,17 @@ export default function StudentsPage() {
       </StaggerItem>
 
       {/* Standardized Table Pagination Footer */}
-      {sortedStudents && sortedStudents.length > 0 && (
+      {tablePagination.totalItems > 0 && (
         <StaggerItem>
           <StandardTablePagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            totalItems={pagination.totalItems}
-            startIndex={pagination.startIndex}
-            endIndex={pagination.endIndex}
-            pageSize={pagination.pageSize}
-            onPageChange={pagination.setCurrentPage}
-            onPageSizeChange={pagination.setPageSize}
+            currentPage={tablePagination.currentPage}
+            totalPages={tablePagination.totalPages}
+            totalItems={tablePagination.totalItems}
+            startIndex={tablePagination.startIndex}
+            endIndex={tablePagination.endIndex}
+            pageSize={tablePagination.pageSize}
+            onPageChange={tablePagination.onPageChange}
+            onPageSizeChange={tablePagination.onPageSizeChange}
           />
         </StaggerItem>
       )}

@@ -71,9 +71,7 @@ export interface Teacher {
   unique_code: string
   name: string
   employment_type: EmploymentType | null
-  default_rate: string | null
   contact: string | null
-  bank_details: string | null
   school_code: string
   join_date: string | null
   user_id: number
@@ -103,7 +101,30 @@ export interface Session {
   start_time: string
   end_time: string
   status: SessionStatus | null
-  paid: boolean | null
+}
+
+/** Flattened student row from /attendance/matrix/ and /adhoc-attendance/matrix/. */
+export interface AttendanceMatrixStudent {
+  id: number
+  name: string
+  unique_code: string | null
+  user_id: number | null
+  records?: Record<string, string>
+}
+
+/** Flattened session row from /attendance/matrix/ and /adhoc-attendance/matrix/. */
+export interface AttendanceMatrixSession {
+  id: number
+  start_time: string
+  end_time: string
+  subject: string | null
+  subject_id: number | null
+  teacher_id: number | null
+  teacher_name: string | null
+  status?: SessionStatus | string | null
+  date?: string
+  class_obj_id?: number | null
+  class_name?: string | null
 }
 
 // --- Create/Update payloads (only writable fields) ---
@@ -131,9 +152,7 @@ export interface TeacherPayload {
   name: string
   school_code: string
   employment_type?: EmploymentType | null
-  default_rate?: string | null
   contact?: string | null
-  bank_details?: string | null
   join_date?: string | null
 }
 
@@ -141,7 +160,6 @@ export interface SessionPayload {
   start_time: string
   end_time: string
   status?: SessionStatus | null
-  paid?: boolean | null
   teacher_id?: number | null
   class_obj_id?: number | null
   timetable_slot_id?: number | null
@@ -171,6 +189,16 @@ export interface CheckIn {
 export interface CheckInPayload {
   student: number
   check_in_type: "qr" | "manual"
+}
+
+// Safe student lookup for the terminal confirmation step (no QR token exposed).
+export interface CheckInLookup {
+  id: number
+  name: string
+  unique_code: string | null
+  class_name: string | null
+  checked_in_today: boolean
+  method: "qr" | "manual"
 }
 
 // --- ClassStudent ---
@@ -257,7 +285,7 @@ export interface User {
   id: number
   username: string
   email: string
-  role: "admin" | "staff" | "teacher" | "student" | "terminal"
+  role: "pending" | "admin" | "staff" | "teacher" | "student" | "terminal"
   clerk_id: string
   teacher_profile_id: number | null
   student_profile_id: number | null
@@ -278,4 +306,12 @@ export interface Stats {
   sessions: number
   session_attendances: number
   check_ins: number
+}
+
+/** DRF page envelope (default page_size 50, max 200). */
+export interface Paginated<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
 }

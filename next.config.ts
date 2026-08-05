@@ -15,15 +15,15 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: 1,
   },
-  // Framework-level CORS — applied to all /api/ responses.
+  // Same-origin /api proxy — no cross-origin CORS headers required.
   async headers() {
     return [
       {
-        source: "/api/:path*",
+        source: "/(.*)",
         headers: [
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "Access-Control-Allow-Methods", value: "GET, POST, PUT, DELETE, PATCH, OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization, X-Requested-With, Accept" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
         ],
       },
     ];

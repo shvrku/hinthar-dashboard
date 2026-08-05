@@ -21,8 +21,7 @@ import {
   LogOut,
   LogIn,
   School,
-  LifeBuoy,
-  Send,
+  Repeat2,
 } from "lucide-react"
 
 import {
@@ -59,6 +58,9 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useCurrentUser } from "@/components/current-user-provider"
+import { canCheckIn, isAdmin, isStaffOrAbove } from "@/lib/roles"
+import { Badge } from "@/components/ui/badge"
 
 const overviewItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -74,26 +76,35 @@ const managementItems = [
 const operationsItems = [
   { title: "Sessions", url: "/sessions", icon: Clock },
   { title: "Timetables", url: "/timetable", icon: Calendar },
-  { title: "Attendance Matrix", url: "/attendance", icon: ClipboardCheck },
+  { title: "Session Attendance", url: "/attendance", icon: ClipboardCheck },
 ]
 
-const checkInSubItems = [
+const adminItems = [
+  { title: "Users", url: "/users", icon: UserCog },
+]
+
+const checkInSubItemsStaff = [
   { title: "Overview", url: "/check-in/overview", icon: LayoutDashboard },
   { title: "Management", url: "/check-in/management", icon: QrCode },
   { title: "Terminal", url: "/check-in/terminal", icon: Monitor },
 ]
 
-const secondaryItems = [
-  { title: "Support", url: "/support", icon: LifeBuoy },
-  { title: "Feedback", url: "/feedback", icon: Send },
+const checkInSubItemsTerminal = [
+  { title: "Terminal", url: "/check-in/terminal", icon: Monitor },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, isSignedIn, isLoaded } = useUser()
   const { openUserProfile, signOut } = useClerk()
+  const { role } = useCurrentUser()
   const { isMobile, setOpenMobile } = useSidebar()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
+
+  const showStaffNav = isStaffOrAbove(role)
+  const showAdminNav = isAdmin(role)
+  const showTerminalNav = canCheckIn(role) && !showStaffNav
+  const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
 
   React.useEffect(() => {
     if (pathname.startsWith("/check-in")) {
@@ -117,6 +128,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const userEmail = user?.primaryEmailAddress?.emailAddress || ""
   const userAvatar = user?.imageUrl || ""
 
+  // Free-plan account switching: end this session and return to sign-in.
+  // True simultaneous account switching requires Clerk multi-session handling.
+  const handleSwitchAccount = React.useCallback(() => {
+    void signOut({ redirectUrl: "/sign-in/" })
+  }, [signOut])
+
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
       {/* Brand Header */}
@@ -138,104 +155,138 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       {/* Navigation Content */}
       <SidebarContent>
-        {/* Overview Group */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Overview</SidebarGroupLabel>
-          <SidebarMenu>
-            {overviewItems.map((item) => {
-              const isActive = pathname === item.url
-              return (
+        {showStaffNav ? (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Overview</SidebarGroupLabel>
+              <SidebarMenu>
+                {overviewItems.map((item) => {
+                  const isActive = pathname === item.url
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>Management</SidebarGroupLabel>
+              <SidebarMenu>
+                {managementItems.map((item) => {
+                  const isActive = pathname === item.url
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>Operations</SidebarGroupLabel>
+              <SidebarMenu>
+                {operationsItems.map((item) => {
+                  const isActive = pathname === item.url
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+
+                <Collapsible
+                  open={checkInOpen}
+                  onOpenChange={setCheckInOpen}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger
+                      render={
+                        <SidebarMenuButton tooltip="Check-In" isActive={pathname.startsWith("/check-in")}>
+                          <QrCode />
+                          <span>Check-In</span>
+                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      }
+                    />
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {checkInSubItems.map((sub) => (
+                          <SidebarMenuSubItem key={sub.title}>
+                            <SidebarMenuSubButton isActive={pathname === sub.url} render={<Link href={sub.url} onClick={handleNavClick} />}>
+                              <sub.icon className="size-3.5" />
+                              <span>{sub.title}</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            {showAdminNav ? (
+              <SidebarGroup>
+                <SidebarGroupLabel>Administration</SidebarGroupLabel>
+                <SidebarMenu>
+                  {adminItems.map((item) => {
+                    const isActive = pathname === item.url
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
+              </SidebarGroup>
+            ) : null}
+          </>
+        ) : showTerminalNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Check-In</SidebarGroupLabel>
+            <SidebarMenu>
+              {checkInSubItemsTerminal.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={pathname === item.url}
+                    render={<Link href={item.url} onClick={handleNavClick} />}
+                  >
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              )
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* Management Group */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Management</SidebarGroupLabel>
-          <SidebarMenu>
-            {managementItems.map((item) => {
-              const isActive = pathname === item.url
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* Operations Group */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Operations</SidebarGroupLabel>
-          <SidebarMenu>
-            {operationsItems.map((item) => {
-              const isActive = pathname === item.url
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-
-            {/* Check-In Collapsible Dropdown Group */}
-            <Collapsible
-              open={checkInOpen}
-              onOpenChange={setCheckInOpen}
-              className="group/collapsible"
-            >
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : role ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Account</SidebarGroupLabel>
+            <SidebarMenu>
               <SidebarMenuItem>
-                <CollapsibleTrigger
-                  render={
-                    <SidebarMenuButton tooltip="Check-In" isActive={pathname.startsWith("/check-in")}>
-                      <QrCode />
-                      <span>Check-In</span>
-                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  }
-                />
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {checkInSubItems.map((sub) => (
-                      <SidebarMenuSubItem key={sub.title}>
-                        <SidebarMenuSubButton isActive={pathname === sub.url} render={<Link href={sub.url} onClick={handleNavClick} />}>
-                          <sub.icon className="size-3.5" />
-                          <span>{sub.title}</span>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  Role: <Badge variant="outline" className="ml-1 capitalize">{role}</Badge>
+                </div>
               </SidebarMenuItem>
-            </Collapsible>
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* Secondary Links */}
-        <SidebarGroup className="mt-auto">
-          <SidebarMenu>
-            {secondaryItems.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton render={<Link href={item.url} onClick={handleNavClick} />} size="sm">
-                  <item.icon />
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : null}
       </SidebarContent>
 
       {/* User Footer */}
@@ -259,7 +310,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarMenuButton>
                   }
                 />
-                <DropdownMenuContent className="w-56" side="right" align="end" sideOffset={4}>
+                <DropdownMenuContent className="w-64" side="right" align="end" sideOffset={4}>
                   <DropdownMenuLabel className="p-0 font-normal">
                     <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                       <Avatar className="h-8 w-8 rounded-lg">
@@ -280,7 +331,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
+                  <DropdownMenuItem
+                    onClick={handleSwitchAccount}
+                    className="cursor-pointer"
+                  >
+                    <Repeat2 className="mr-2 size-4 text-primary" />
+                    <span>Switch account</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => signOut({ redirectUrl: "/sign-in/" })}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
                     <LogOut className="mr-2 size-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>

@@ -1,9 +1,7 @@
+import { auth } from "@clerk/nextjs/server"
 import { NextResponse, type NextRequest } from "next/server"
 
-// Proxies ALL /api/* requests to the Django backend (including /api/v1/*).
-// trailingSlash: true in next.config.ts prevents Next.js from redirecting slashed URLs.
-// Django uses APPEND_SLASH=True, so we always forward with trailing slash.
-// CORS handled by headers() in next.config.ts (framework-level).
+// Proxies /api/* to Django. Requires a Clerk session; injects a server-verified Bearer token.
 
 const API_ORIGIN = (
   process.env.BACKEND_API_ORIGIN ||
@@ -28,6 +26,16 @@ async function handleRequest(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string[] }> }
 ) {
+  const { userId, getToken } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const token = await getToken()
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { slug } = await params
   const cleanSlug = slug.filter(Boolean).join("/")
   const pathname = `/api/${cleanSlug}/`
@@ -35,12 +43,18 @@ async function handleRequest(
   const proxyUrl = `${API_ORIGIN}${pathname}${search}`
 
   const forwardHeaders = new Headers()
-  const ignoreRequestHeaders = new Set(["host", "connection", "content-length"])
+  const ignoreRequestHeaders = new Set([
+    "host",
+    "connection",
+    "content-length",
+    "authorization",
+  ])
   request.headers.forEach((value, key) => {
     if (!ignoreRequestHeaders.has(key.toLowerCase())) {
       forwardHeaders.set(key, value)
     }
   })
+  forwardHeaders.set("Authorization", `Bearer ${token}`)
 
   let requestBody: ArrayBuffer | undefined = undefined
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -68,17 +82,16 @@ async function handleRequest(
       }
     }
 
-    const hasNoBody = response.status === 204 || response.status === 205 || response.status === 304
+    const hasNoBody =
+      response.status === 204 || response.status === 205 || response.status === 304
     return new NextResponse(hasNoBody ? null : body, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,
     })
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "An unexpected error occurred"
+  } catch {
     return NextResponse.json(
-      { error: message },
+      { error: "Backend unavailable" },
       { status: 502 }
     )
   }

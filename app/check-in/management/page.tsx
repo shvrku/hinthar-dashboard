@@ -7,7 +7,7 @@ import { createApi, ApiError } from "@/lib/api"
 import type { Student } from "@/lib/types"
 import QRCode from "qrcode"
 import { useSortableData } from "@/lib/use-sortable-data"
-import { usePagination } from "@/components/use-pagination"
+import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,56 +49,45 @@ function RowSkeleton() {
   )
 }
 
-export function matchStudentQuery(s: Student, rawQuery: string): boolean {
-  if (!rawQuery.trim()) return true
-  const query = rawQuery.toLowerCase().trim()
-  if (s.name.toLowerCase().includes(query)) return true
-  if (String(s.id).includes(query)) return true
-  if (s.school_code && s.school_code.toLowerCase().includes(query)) return true
-  if (s.contact && s.contact.toLowerCase().includes(query)) return true
-  
-  if (s.unique_code) {
-    const codeLower = s.unique_code.toLowerCase()
-    if (codeLower.includes(query)) return true
-
-    const codeParts = codeLower.split("-")
-    const queryParts = query.split("-")
-    if (codeParts.length === 2 && queryParts.length === 2) {
-      const [codePrefix, codeNumStr] = codeParts
-      const [queryPrefix, queryNumStr] = queryParts
-      if (codePrefix.includes(queryPrefix) || queryPrefix.includes(codePrefix)) {
-        const codeNum = parseInt(codeNumStr, 10)
-        const queryNum = parseInt(queryNumStr, 10)
-        if (!isNaN(codeNum) && !isNaN(queryNum) && codeNum === queryNum) {
-          return true
-        }
-      }
-    }
-  }
-  return false
-}
-
 export default function CheckInManagementPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
-  const [students, setStudents] = React.useState<Student[]>([])
+  // Current server page of students — always driven by listStudentsPage.
+  const [pageStudents, setPageStudents] = React.useState<Student[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [selected, setSelected] = React.useState<Student | null>(null)
   const [regenerating, setRegenerating] = React.useState(false)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [debouncedQuery, setDebouncedQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+  const serverPg = useServerPagination(50)
+
+  // Debounce search input ~300ms before it drives a server refetch.
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300)
+    return () => clearTimeout(id)
+  }, [searchQuery])
+
+  const fetchPage = React.useCallback(async () => {
+    const token = await getToken()
+    if (!token) throw new Error("No auth token available")
+    const api = createApi(token)
+    const data = await api.listStudentsPage({
+      page: serverPg.page,
+      page_size: serverPg.pageSize,
+      q: debouncedQuery || undefined,
+    })
+    setPageStudents(data.results)
+    serverPg.setTotalItems(data.count)
+  }, [getToken, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery])
 
   const loadStudents = React.useCallback(async () => {
     if (!isSignedIn) return
     setLoading(true)
     setError(null)
     try {
-      const token = await getToken()
-      if (!token) throw new Error("No auth token available")
-      const api = createApi(token)
-      const data = await api.listStudents()
-      setStudents(data)
+      await fetchPage()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
@@ -106,18 +95,41 @@ export default function CheckInManagementPage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, isSignedIn])
+  }, [isSignedIn, fetchPage])
 
-  const filteredStudents = React.useMemo(() => {
-    if (searchQuery.trim() === "") return students
-    return students.filter((s) => matchStudentQuery(s, searchQuery))
-  }, [students, searchQuery])
+  // Once data has been loaded at least once, keep the server page in sync:
+  // reset to page 1 when the search changes, and refetch whenever
+  // page/pageSize/search change.
+  const filterKeyRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (lastLoaded === null) return
+    const filterKey = debouncedQuery
+    const filterChanged = filterKeyRef.current !== null && filterKey !== filterKeyRef.current
+    filterKeyRef.current = filterKey
+    if (filterChanged && serverPg.page !== 1) {
+      serverPg.setPage(1)
+      return
+    }
+    void fetchPage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverPg.page, serverPg.pageSize, debouncedQuery])
 
-  // Sorting
-  const { items: sortedStudents, requestSort, sortConfig } = useSortableData(filteredStudents, "id", "asc")
+  // Sorting (client-side; only sorts the current server page)
+  const { items: sortedStudents, requestSort, sortConfig } = useSortableData(pageStudents, "id", "asc")
+  const displayedStudents = sortedStudents
 
-  // Pagination
-  const pagination = usePagination(sortedStudents, 10)
+  const tablePagination = {
+    currentPage: serverPg.page,
+    totalPages: serverPg.totalPages,
+    totalItems: serverPg.totalItems,
+    startIndex: serverPg.startIndex,
+    endIndex: serverPg.endIndex,
+    pageSize: serverPg.pageSize,
+    onPageChange: serverPg.setPage,
+    onPageSizeChange: serverPg.setPageSize,
+  }
+
+  const totalStudentsCount = serverPg.totalItems
 
   const selectStudent = React.useCallback(async (student: Student) => {
     setSelected(student)
@@ -138,7 +150,7 @@ export default function CheckInManagementPage() {
       
       setSelected((prev) => (prev ? { ...prev, check_in_token: updatedToken } : null))
       const studentId = selected.id
-      setStudents((prev) =>
+      setPageStudents((prev) =>
         prev.map((s) => (s.id === studentId ? { ...s, check_in_token: updatedToken } : s))
       )
       setSuccess("Check-in token regenerated successfully.")
@@ -215,7 +227,7 @@ export default function CheckInManagementPage() {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">{students ? students.length : 0}</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{totalStudentsCount}</h2>
               {lastLoaded && (
                 <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
               )}
@@ -238,11 +250,11 @@ export default function CheckInManagementPage() {
             />
           </div>
 
-          {lastLoaded && students && (
+          {lastLoaded && (
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="px-3 py-1 text-xs">
                 <UserCheck className="mr-1.5 size-3.5" />
-                {filteredStudents.length} of {students.length} student{students.length !== 1 ? "s" : ""}
+                {`${totalStudentsCount} student${totalStudentsCount !== 1 ? "s" : ""}`}
               </Badge>
               <span className="text-xs text-muted-foreground">
                 Loaded {lastLoaded}
@@ -311,16 +323,16 @@ export default function CheckInManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading && students.length === 0 ? (
+                  {loading && lastLoaded === null ? (
                     Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-                  ) : sortedStudents.length === 0 ? (
+                  ) : displayedStudents.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                         No students found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    pagination.paginatedItems.map((s) => (
+                    displayedStudents.map((s) => (
                       <TableRow
                         key={s.id}
                         className="cursor-pointer"
@@ -352,16 +364,16 @@ export default function CheckInManagementPage() {
               </Table>
             </Card>
 
-            {sortedStudents.length > 0 && (
+            {tablePagination.totalItems > 0 && (
               <StandardTablePagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.totalItems}
-                startIndex={pagination.startIndex}
-                endIndex={pagination.endIndex}
-                pageSize={pagination.pageSize}
-                onPageChange={pagination.setCurrentPage}
-                onPageSizeChange={pagination.setPageSize}
+                currentPage={tablePagination.currentPage}
+                totalPages={tablePagination.totalPages}
+                totalItems={tablePagination.totalItems}
+                startIndex={tablePagination.startIndex}
+                endIndex={tablePagination.endIndex}
+                pageSize={tablePagination.pageSize}
+                onPageChange={tablePagination.onPageChange}
+                onPageSizeChange={tablePagination.onPageSizeChange}
               />
             )}
           </StaggerItem>

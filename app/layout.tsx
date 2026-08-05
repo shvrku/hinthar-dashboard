@@ -4,11 +4,12 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
 import { FocusProvider } from "@/components/focus-context";
+import { CurrentUserProvider } from "@/components/current-user-provider";
+import { AppAccessGate } from "@/components/app-access-gate";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
-import { PageTransition } from "@/components/page-transition";
 import { cn } from "@/lib/utils";
 
 import Script from "next/script";
@@ -27,7 +28,7 @@ const geistMono = Geist_Mono({
 
 const title = "Hinthar — School Management Dashboard"
 const description =
-  "Manage classes, students, teachers, sessions, attendance, and payroll all in one place. Built for schools and education centres."
+  "Manage classes, students, teachers, sessions, and attendance in one place. Built for schools and education centres."
 const ogImage = "/opengraph-image"
 const siteUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
@@ -98,17 +99,19 @@ export default function RootLayout({
         <FocusProvider>
           <ThemeProvider>
             <ClerkThemeProvider>
-              <TooltipProvider>
-                <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
-                  <AppSidebar />
-                  <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                    <SiteHeader />
-                    <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
-                      {children}
-                    </main>
-                  </SidebarInset>
-                </SidebarProvider>
-              </TooltipProvider>
+              <CurrentUserProvider>
+                <TooltipProvider>
+                  <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
+                    <AppSidebar />
+                    <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                      <SiteHeader />
+                      <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
+                        <AppAccessGate>{children}</AppAccessGate>
+                      </main>
+                    </SidebarInset>
+                  </SidebarProvider>
+                </TooltipProvider>
+              </CurrentUserProvider>
             </ClerkThemeProvider>
           </ThemeProvider>
         </FocusProvider>

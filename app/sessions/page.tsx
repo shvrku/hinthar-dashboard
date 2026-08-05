@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Minus, Search, CalendarCheck, Sparkles, BookOpen } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Search, CalendarCheck, Sparkles, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot, type AdHocSession, type AdHocSessionPayload, type Subject } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
@@ -15,7 +15,7 @@ import { StandardPageHeader } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { usePagination } from "@/components/use-pagination"
+import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
@@ -111,7 +111,7 @@ function formatDateTime(iso: string): string {
 function RowSkeleton() {
   return (
     <TableRow>
-      {Array.from({ length: 9 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -123,7 +123,9 @@ function RowSkeleton() {
 export default function SessionsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
-  const [sessions, setSessions] = React.useState<Session[] | null>(null)
+  // Current server page of regular sessions — always driven by listSessionsPage.
+  const [pageSessions, setPageSessions] = React.useState<Session[]>([])
+  // Ad-hoc sessions have no filters, so this always holds the current server page.
   const [adhocSessions, setAdHocSessions] = React.useState<AdHocSession[] | null>(null)
   const [teachers, setTeachers] = React.useState<Teacher[]>([])
   const [classes, setClasses] = React.useState<Class[]>([])
@@ -133,7 +135,16 @@ export default function SessionsPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [debouncedQuery, setDebouncedQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+  const serverPg = useServerPagination(50)
+  const adhocServerPg = useServerPagination(50)
+
+  // Debounce search input ~300ms before it drives a server refetch.
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300)
+    return () => clearTimeout(id)
+  }, [searchQuery])
 
   // Selection state
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
@@ -169,7 +180,6 @@ export default function SessionsPage() {
   const [formDuration, setFormDuration] = React.useState("60")
   const [formCustomEndTime, setFormCustomEndTime] = React.useState("")
   const [formStatus, setFormStatus] = React.useState<string>("")
-  const [formPaid, setFormPaid] = React.useState(false)
   const [formTeacherId, setFormTeacherId] = React.useState<string>("")
   const [formClassId, setFormClassId] = React.useState<string>("")
   const [formTimetableSlotId, setFormTimetableSlotId] = React.useState<string>("")
@@ -212,6 +222,31 @@ export default function SessionsPage() {
     }
   }, [getToken, isSignedIn])
 
+  const [statusFilter, setStatusFilter] = React.useState<string>("all")
+
+  const fetchSessionsPage = React.useCallback(async () => {
+    const token = await getToken()
+    if (!token) throw new Error("No auth token available")
+    const api = createApi(token)
+    const data = await api.listSessionsPage({
+      page: serverPg.page,
+      page_size: serverPg.pageSize,
+      q: debouncedQuery || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
+    })
+    setPageSessions(data.results)
+    serverPg.setTotalItems(data.count)
+  }, [getToken, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, statusFilter])
+
+  const fetchAdhocPage = React.useCallback(async () => {
+    const token = await getToken()
+    if (!token) throw new Error("No auth token available")
+    const api = createApi(token)
+    const data = await api.listAdHocSessionsPage({ page: adhocServerPg.page, page_size: adhocServerPg.pageSize })
+    setAdHocSessions(data.results)
+    adhocServerPg.setTotalItems(data.count)
+  }, [getToken, adhocServerPg.page, adhocServerPg.pageSize, adhocServerPg.setTotalItems])
+
   const handleBatchGenerateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!genClassId) return
@@ -228,8 +263,7 @@ export default function SessionsPage() {
       })
       showSuccess(`Successfully generated ${res.total_created} session(s) from timetable slots.`)
       setGenerateModalOpen(false)
-      const data = await api.listSessions()
-      setSessions(data)
+      await fetchSessionsPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -263,9 +297,7 @@ export default function SessionsPage() {
       })
       setAdhocModalOpen(false)
       showSuccess("Ad-hoc session created successfully.")
-      // Reload adhoc sessions
-      const data = await api.listAdHocSessions()
-      setAdHocSessions(data)
+      await fetchAdhocPage()
     } catch (err) {
       setError(err instanceof ApiError ? err.userMessage : "Failed to create ad-hoc session")
     } finally {
@@ -279,15 +311,10 @@ export default function SessionsPage() {
     setError(null)
     setSelectedIds([])
     try {
-      const token = await getToken()
-      if (!token) throw new Error("No auth token available")
-      const api = createApi(token)
       if (sessionMode === "adhoc") {
-        const data = await api.listAdHocSessions()
-        setAdHocSessions(data)
+        await fetchAdhocPage()
       } else {
-        const data = await api.listSessions()
-        setSessions(data)
+        await fetchSessionsPage()
       }
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
@@ -299,7 +326,7 @@ export default function SessionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, isSignedIn, sessionMode])
+  }, [isSignedIn, sessionMode, fetchAdhocPage, fetchSessionsPage])
 
   React.useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -307,36 +334,61 @@ export default function SessionsPage() {
     }
   }, [isLoaded, isSignedIn, loadInitialData])
 
-  const [statusFilter, setStatusFilter] = React.useState<string>("all")
+  // Once data has been loaded at least once, keep the regular-session server
+  // page in sync: reset to page 1 when search/filter changes, and refetch
+  // whenever page/pageSize/search/filter/mode change.
+  const filterKeyRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (lastLoaded === null || sessionMode !== "regular") return
+    const filterKey = `${debouncedQuery}|${statusFilter}`
+    const filterChanged = filterKeyRef.current !== null && filterKey !== filterKeyRef.current
+    filterKeyRef.current = filterKey
+    if (filterChanged && serverPg.page !== 1) {
+      serverPg.setPage(1)
+      return
+    }
+    void fetchSessionsPage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverPg.page, serverPg.pageSize, debouncedQuery, statusFilter, sessionMode])
 
-  const filteredSessions = React.useMemo(() => {
-    if (!sessions) return []
-    return sessions.filter((s) => {
-      const matchesStatus = statusFilter === "all" || s.status === statusFilter
-      if (!matchesStatus) return false
-      if (!searchQuery.trim()) return true
-      const query = searchQuery.toLowerCase().trim()
-      return (
-        (s.teacher && s.teacher.name.toLowerCase().includes(query)) ||
-        (s.class_obj &&
-          (`${s.class_obj.education_level} ${s.class_obj.cohort_identifier}`)
-            .toLowerCase()
-            .includes(query)) ||
-        (s.status && s.status.toLowerCase().includes(query))
-      )
-    })
-  }, [sessions, statusFilter, searchQuery])
+  React.useEffect(() => {
+    if (lastLoaded === null || sessionMode !== "adhoc") return
+    void fetchAdhocPage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adhocServerPg.page, adhocServerPg.pageSize, sessionMode])
 
-  // Sorting
-  const { items: sortedSessions, requestSort, sortConfig } = useSortableData(filteredSessions, "id", "asc")
+  // Sorting (client-side; only sorts the current server page)
+  const { items: sortedSessions, requestSort, sortConfig } = useSortableData(pageSessions, "id", "asc")
+  const displayedSessions = sortedSessions
 
-  // Pagination
-  const pagination = usePagination(sortedSessions, 10)
+  const tablePagination = {
+    currentPage: serverPg.page,
+    totalPages: serverPg.totalPages,
+    totalItems: serverPg.totalItems,
+    startIndex: serverPg.startIndex,
+    endIndex: serverPg.endIndex,
+    pageSize: serverPg.pageSize,
+    onPageChange: serverPg.setPage,
+    onPageSizeChange: serverPg.setPageSize,
+  }
+
+  const totalSessionsCount = serverPg.totalItems
+
+  const adhocTablePagination = {
+    currentPage: adhocServerPg.page,
+    totalPages: adhocServerPg.totalPages,
+    totalItems: adhocServerPg.totalItems,
+    startIndex: adhocServerPg.startIndex,
+    endIndex: adhocServerPg.endIndex,
+    pageSize: adhocServerPg.pageSize,
+    onPageChange: adhocServerPg.setPage,
+    onPageSizeChange: adhocServerPg.setPageSize,
+  }
 
   // Selection helpers
   const currentPageIds = React.useMemo(
-    () => pagination.paginatedItems.map((s) => s.id),
-    [pagination.paginatedItems]
+    () => displayedSessions.map((s) => s.id),
+    [displayedSessions]
   )
   const allCurrentPageSelected =
     currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
@@ -366,13 +418,11 @@ export default function SessionsPage() {
       if (sessionMode === "adhoc") {
         const res = await api.bulkDeleteAdHocSessions(selectedIds)
         showSuccess(`Successfully deleted ${res.deleted_count} ad-hoc session(s).`)
-        const data = await api.listAdHocSessions()
-        setAdHocSessions(data)
+        await fetchAdhocPage()
       } else {
         const res = await api.bulkDeleteSessions(selectedIds)
         showSuccess(`Successfully deleted ${res.deleted_count} session(s).`)
-        const data = await api.listSessions()
-        setSessions(data)
+        await fetchSessionsPage()
       }
       setSelectedIds([])
       setBulkConfirmOpen(false)
@@ -385,7 +435,7 @@ export default function SessionsPage() {
     } finally {
       setBulkDeleting(false)
     }
-  }, [getToken, selectedIds, sessionMode, showSuccess])
+  }, [getToken, selectedIds, sessionMode, showSuccess, fetchAdhocPage, fetchSessionsPage])
 
   const filteredSlots = React.useMemo(() => {
     if (!formClassId) return []
@@ -431,7 +481,6 @@ export default function SessionsPage() {
     setFormDuration("60")
     setFormCustomEndTime("")
     setFormStatus("scheduled")
-    setFormPaid(false)
     setFormTeacherId("")
     setFormClassId("")
     setFormTimetableSlotId("")
@@ -475,7 +524,6 @@ export default function SessionsPage() {
     setFormCustomEndTime(customEnd)
 
     setFormStatus(session.status ?? "")
-    setFormPaid(session.paid ?? false)
     setFormTeacherId(session.teacher ? session.teacher.id.toString() : "")
     setFormClassId(session.class_obj ? session.class_obj.id.toString() : "")
     setFormTimetableSlotId(session.timetable_slot ? session.timetable_slot.id.toString() : "")
@@ -515,7 +563,6 @@ export default function SessionsPage() {
         start_time: startD.toISOString(),
         end_time: endD.toISOString(),
         status: formStatus === "" ? null : (formStatus as SessionStatus),
-        paid: formPaid,
         teacher_id: formTeacherId ? parseInt(formTeacherId, 10) : null,
         class_obj_id: formClassId ? parseInt(formClassId, 10) : null,
         timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
@@ -530,8 +577,7 @@ export default function SessionsPage() {
       }
 
       closeModal()
-      const data = await api.listSessions()
-      setSessions(data)
+      await fetchSessionsPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -554,13 +600,11 @@ export default function SessionsPage() {
       if (sessionMode === "adhoc") {
         await api.deleteAdHocSession(deletingId)
         showSuccess("Ad-hoc session deleted successfully.")
-        const data = await api.listAdHocSessions()
-        setAdHocSessions(data)
+        await fetchAdhocPage()
       } else {
         await api.deleteSession(deletingId)
         showSuccess("Session deleted successfully.")
-        const data = await api.listSessions()
-        setSessions(data)
+        await fetchSessionsPage()
       }
       setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
       setDeletingId(null)
@@ -635,7 +679,7 @@ export default function SessionsPage() {
             </div>
             <div className="mt-2 flex items-baseline justify-between">
               <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                {sessionMode === "regular" ? (sessions?.length ?? 0) : (adhocSessions?.length ?? 0)}
+                {sessionMode === "regular" ? totalSessionsCount : adhocServerPg.totalItems}
               </h2>
               {lastLoaded && (
                 <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
@@ -740,12 +784,12 @@ export default function SessionsPage() {
                   {sessionMode === "adhoc" ? (
                     <>
                       <BookOpen className="mr-1.5 size-3.5" />
-                      {adhocSessions?.length ?? 0} ad-hoc session{(adhocSessions?.length ?? 0) !== 1 ? "s" : ""}
+                      {adhocServerPg.totalItems} ad-hoc session{adhocServerPg.totalItems !== 1 ? "s" : ""}
                     </>
                   ) : (
                     <>
                       <CalendarCheck className="mr-1.5 size-3.5" />
-                      {filteredSessions.length} of {sessions?.length ?? 0} session{(sessions?.length ?? 0) !== 1 ? "s" : ""}
+                      {`${totalSessionsCount} session${totalSessionsCount !== 1 ? "s" : ""}`}
                     </>
                   )}
                 </Badge>
@@ -797,19 +841,18 @@ export default function SessionsPage() {
                   <TableHeadSortable sortKey="start_time" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>Start Time</TableHeadSortable>
                   <TableHeadSortable sortKey="end_time" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort}>End Time</TableHeadSortable>
                   <TableHeadSortable sortKey="status" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort} align="center">Status</TableHeadSortable>
-                  <TableHeadSortable sortKey="paid" currentSortKey={sortConfig.key} currentSortOrder={sortConfig.order} onSort={requestSort} align="center">Paid</TableHeadSortable>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
+                {loading && lastLoaded === null ? (
                   Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-                ) : sessions === null ? (
-                  <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch sessions.</TableCell></TableRow>
-                ) : sortedSessions.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">No sessions found.</TableCell></TableRow>
+                ) : lastLoaded === null ? (
+                  <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch sessions.</TableCell></TableRow>
+                ) : displayedSessions.length === 0 ? (
+                  <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No sessions found.</TableCell></TableRow>
                 ) : (
-                  pagination.paginatedItems.map((session) => {
+                  displayedSessions.map((session) => {
                     const isSelected = selectedIds.includes(session.id)
                     return (
                       <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
@@ -826,9 +869,6 @@ export default function SessionsPage() {
                         <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(session.start_time)}</TableCell>
                         <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(session.end_time)}</TableCell>
                         <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
-                        <TableCell className="text-center">
-                          {session.paid === true ? <Check className="size-4 text-primary" /> : <Minus className="size-4 text-muted-foreground" />}
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon-sm" onClick={() => openEditModal(session)} title="Edit"><Pencil className="size-4" /></Button>
@@ -842,12 +882,12 @@ export default function SessionsPage() {
               </TableBody>
             </Table>
           </Card>
-          {sortedSessions.length > 0 && (
+          {tablePagination.totalItems > 0 && (
             <StandardTablePagination
-              currentPage={pagination.currentPage} totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems} startIndex={pagination.startIndex}
-              endIndex={pagination.endIndex} pageSize={pagination.pageSize}
-              onPageChange={pagination.setCurrentPage} onPageSizeChange={pagination.setPageSize}
+              currentPage={tablePagination.currentPage} totalPages={tablePagination.totalPages}
+              totalItems={tablePagination.totalItems} startIndex={tablePagination.startIndex}
+              endIndex={tablePagination.endIndex} pageSize={tablePagination.pageSize}
+              onPageChange={tablePagination.onPageChange} onPageSizeChange={tablePagination.onPageSizeChange}
             />
           )}
         </>
@@ -878,7 +918,7 @@ export default function SessionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
+                {loading && lastLoaded === null ? (
                   Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
                 ) : adhocSessions === null ? (
                   <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch ad-hoc sessions.</TableCell></TableRow>
@@ -912,6 +952,14 @@ export default function SessionsPage() {
               </TableBody>
             </Table>
           </Card>
+          {adhocTablePagination.totalItems > 0 && (
+            <StandardTablePagination
+              currentPage={adhocTablePagination.currentPage} totalPages={adhocTablePagination.totalPages}
+              totalItems={adhocTablePagination.totalItems} startIndex={adhocTablePagination.startIndex}
+              endIndex={adhocTablePagination.endIndex} pageSize={adhocTablePagination.pageSize}
+              onPageChange={adhocTablePagination.onPageChange} onPageSizeChange={adhocTablePagination.onPageSizeChange}
+            />
+          )}
         </>
       )}
 
@@ -1113,7 +1161,7 @@ export default function SessionsPage() {
           <DialogHeader>
             <DialogTitle>Delete Multiple Sessions</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedIds.length} selected session(s)? Paid sessions cannot be deleted.
+              Are you sure you want to delete {selectedIds.length} selected session(s)? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

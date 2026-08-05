@@ -21,7 +21,7 @@ import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { usePagination } from "@/components/use-pagination"
+import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils"
 function TableSkeletonRow() {
   return (
     <TableRow>
-      {Array.from({ length: 9 }).map((_, i) => (
+      {Array.from({ length: 7 }).map((_, i) => (
         <TableCell key={i}>
           <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
         </TableCell>
@@ -125,19 +125,15 @@ function DeleteDialog({
 interface FormData {
   name: string
   employment_type: string
-  default_rate: string
   join_date: string
   contact: string
-  bank_details: string
 }
 
 const EMPTY_FORM: FormData = {
   name: "",
   employment_type: "",
-  default_rate: "",
   join_date: "",
   contact: "",
-  bank_details: "",
 }
 
 function TeacherFormModal({
@@ -168,18 +164,14 @@ function TeacherFormModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
-    if (!form.default_rate.trim()) return
 
     const payload: TeacherPayload = {
       name: form.name.trim(),
       school_code: schoolCode,
       employment_type:
         form.employment_type === "" ? null : (form.employment_type as TeacherPayload["employment_type"]),
-      default_rate: form.default_rate.trim(),
       join_date: form.join_date || null,
       contact: form.contact.trim() === "" ? null : form.contact.trim(),
-      bank_details:
-        form.bank_details.trim() === "" ? null : form.bank_details.trim(),
     }
     onSave(payload)
   }
@@ -261,20 +253,6 @@ function TeacherFormModal({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Default Rate <span className="text-destructive">*</span>
-            </label>
-            <Input
-              type="text"
-              name="default_rate"
-              value={form.default_rate}
-              onChange={handleChange}
-              required
-              placeholder="e.g. 50000"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
               Join Date
             </label>
             <Input
@@ -296,22 +274,11 @@ function TeacherFormModal({
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Bank Details</label>
-            <Input
-              type="text"
-              name="bank_details"
-              value={form.bank_details}
-              onChange={handleChange}
-              placeholder="Bank account or payment info"
-            />
-          </div>
-
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || !form.name.trim() || !form.default_rate.trim()}>
+            <Button type="submit" disabled={saving || !form.name.trim()}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {editing ? "Save Changes" : "Create Teacher"}
             </Button>
@@ -325,12 +292,21 @@ function TeacherFormModal({
 export default function TeachersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
-  const [teachers, setTeachers] = React.useState<Teacher[]>([])
+  // Current server page of teachers — always driven by listTeachersPage.
+  const [pageTeachers, setPageTeachers] = React.useState<Teacher[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [debouncedQuery, setDebouncedQuery] = React.useState("")
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
+  const serverPg = useServerPagination(50)
+
+  // Debounce search input ~300ms before it drives a server refetch.
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300)
+    return () => clearTimeout(id)
+  }, [searchQuery])
 
   // Selection state
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
@@ -360,14 +336,28 @@ export default function TeachersPage() {
     return createApi(token)
   }, [getToken])
 
+  const [typeFilter, setTypeFilter] = React.useState<string>("all")
+  const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
+
+  const fetchPage = React.useCallback(async () => {
+    const api = await getApi()
+    const data = await api.listTeachersPage({
+      page: serverPg.page,
+      page_size: serverPg.pageSize,
+      q: debouncedQuery || undefined,
+      school_code: schoolFilter === "all" ? undefined : schoolFilter,
+      employment_type: typeFilter === "all" ? undefined : typeFilter,
+    })
+    setPageTeachers(data.results)
+    serverPg.setTotalItems(data.count)
+  }, [getApi, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, schoolFilter, typeFilter])
+
   const loadTeachers = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     setSelectedIds([])
     try {
-      const api = await getApi()
-      const data = await api.listTeachers()
-      setTeachers(data)
+      await fetchPage()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
@@ -378,39 +368,46 @@ export default function TeachersPage() {
     } finally {
       setLoading(false)
     }
-  }, [getApi])
+  }, [fetchPage])
 
-  const [typeFilter, setTypeFilter] = React.useState<string>("all")
-  const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
+  // Once data has been loaded at least once, keep the server page in sync:
+  // reset to page 1 when search/filter changes, and refetch whenever
+  // page/pageSize/search/filter change.
+  const filterKeyRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (lastLoaded === null) return
+    const filterKey = `${debouncedQuery}|${schoolFilter}|${typeFilter}`
+    const filterChanged = filterKeyRef.current !== null && filterKey !== filterKeyRef.current
+    filterKeyRef.current = filterKey
+    if (filterChanged && serverPg.page !== 1) {
+      serverPg.setPage(1)
+      return
+    }
+    void fetchPage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverPg.page, serverPg.pageSize, debouncedQuery, schoolFilter, typeFilter])
 
-  const filteredTeachers = React.useMemo(() => {
-    return teachers.filter((t) => {
-      const matchesType = typeFilter === "all" || t.employment_type === typeFilter
-      const matchesSchool = schoolFilter === "all" || t.school_code === schoolFilter
-      if (!matchesType || !matchesSchool) return false
-      if (!searchQuery.trim()) return true
-      const q = searchQuery.toLowerCase().trim()
-      return (
-        t.name.toLowerCase().includes(q) ||
-        String(t.id).includes(q) ||
-        (t.unique_code && t.unique_code.toLowerCase().includes(q)) ||
-        (t.school_code && t.school_code.toLowerCase().includes(q)) ||
-        (t.contact && t.contact.toLowerCase().includes(q)) ||
-        (t.employment_type && t.employment_type.toLowerCase().includes(q))
-      )
-    })
-  }, [teachers, typeFilter, schoolFilter, searchQuery])
+  // Sorting (client-side; only sorts the current server page)
+  const { items: sortedTeachers, requestSort, sortConfig } = useSortableData(pageTeachers, "id", "asc")
+  const displayedTeachers = sortedTeachers
 
-  // Sorting
-  const { items: sortedTeachers, requestSort, sortConfig } = useSortableData(filteredTeachers, "id", "asc")
+  const tablePagination = {
+    currentPage: serverPg.page,
+    totalPages: serverPg.totalPages,
+    totalItems: serverPg.totalItems,
+    startIndex: serverPg.startIndex,
+    endIndex: serverPg.endIndex,
+    pageSize: serverPg.pageSize,
+    onPageChange: serverPg.setPage,
+    onPageSizeChange: serverPg.setPageSize,
+  }
 
-  // Pagination
-  const pagination = usePagination(sortedTeachers, 10)
+  const totalTeachersCount = serverPg.totalItems
 
   // Selection handlers
   const currentPageIds = React.useMemo(
-    () => pagination.paginatedItems.map((t) => t.id),
-    [pagination.paginatedItems]
+    () => displayedTeachers.map((t) => t.id),
+    [displayedTeachers]
   )
   const allCurrentPageSelected =
     currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.includes(id))
@@ -439,8 +436,7 @@ export default function TeachersPage() {
       setSuccess(`Successfully deleted ${res.deleted_count} teacher(s).`)
       setSelectedIds([])
       setBulkConfirmOpen(false)
-      const data = await api.listTeachers()
-      setTeachers(data)
+      await fetchPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -450,7 +446,7 @@ export default function TeachersPage() {
     } finally {
       setBulkDeleting(false)
     }
-  }, [getApi, selectedIds])
+  }, [getApi, selectedIds, fetchPage])
 
   const openAddModal = () => {
     setEditing(null)
@@ -464,10 +460,8 @@ export default function TeachersPage() {
     setFormInitial({
       name: teacher.name,
       employment_type: teacher.employment_type ?? "",
-      default_rate: teacher.default_rate ?? "",
       join_date: teacher.join_date ? teacher.join_date.slice(0, 10) : "",
       contact: teacher.contact ?? "",
-      bank_details: teacher.bank_details ?? "",
     })
     setSchoolCode(teacher.school_code)
     setShowForm(true)
@@ -491,8 +485,7 @@ export default function TeachersPage() {
         setSuccess(`Teacher "${payload.name}" created successfully.`)
       }
       closeFormModal()
-      const data = await api.listTeachers()
-      setTeachers(data)
+      await fetchPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -514,8 +507,7 @@ export default function TeachersPage() {
       setSuccess(`Teacher "${deleting.name}" deleted.`)
       setSelectedIds((prev) => prev.filter((id) => id !== deleting.id))
       setDeleting(null)
-      const data = await api.listTeachers()
-      setTeachers(data)
+      await fetchPage()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -555,7 +547,7 @@ export default function TeachersPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Teachers"
-          description="Manage teacher profiles, employment types, rates, and contact information."
+          description="Manage teacher profiles, employment types, and contact information."
           primaryAction={{
             label: "Add Teacher",
             onClick: openAddModal,
@@ -590,7 +582,7 @@ export default function TeachersPage() {
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">{teachers.length}</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">{totalTeachersCount}</h2>
               {lastLoaded && (
                 <span className="text-[11px] text-muted-foreground">Updated {lastLoaded}</span>
               )}
@@ -661,11 +653,11 @@ export default function TeachersPage() {
                 </Button>
               )}
 
-              {lastLoaded && teachers && (
+              {lastLoaded && (
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="px-3 py-1 text-xs">
                     <UserCheck className="mr-1.5 size-3.5" />
-                    {filteredTeachers.length} of {teachers.length} teacher{teachers.length !== 1 ? "s" : ""}
+                    {`${totalTeachersCount} teacher${totalTeachersCount !== 1 ? "s" : ""}`}
                   </Badge>
                 </div>
               )}
@@ -749,16 +741,6 @@ export default function TeachersPage() {
                   </TableHeadSortable>
 
                   <TableHeadSortable
-                    className="min-w-[100px]"
-                    sortKey="default_rate"
-                    currentSortKey={sortConfig.key}
-                    currentSortOrder={sortConfig.order}
-                    onSort={requestSort}
-                  >
-                    Rate
-                  </TableHeadSortable>
-
-                  <TableHeadSortable
                     className="min-w-[130px]"
                     sortKey="contact"
                     currentSortKey={sortConfig.key}
@@ -768,30 +750,20 @@ export default function TeachersPage() {
                     Contact
                   </TableHeadSortable>
 
-                  <TableHeadSortable
-                    className="min-w-[130px]"
-                    sortKey="bank_details"
-                    currentSortKey={sortConfig.key}
-                    currentSortOrder={sortConfig.order}
-                    onSort={requestSort}
-                  >
-                    Bank
-                  </TableHeadSortable>
-
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading && teachers.length === 0 ? (
+                {loading && lastLoaded === null ? (
                   Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-                ) : sortedTeachers.length === 0 ? (
+                ) : displayedTeachers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                       No teachers found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  pagination.paginatedItems.map((t) => {
+                  displayedTeachers.map((t) => {
                     const isSelected = selectedIds.includes(t.id)
                     return (
                       <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
@@ -814,12 +786,8 @@ export default function TeachersPage() {
                             {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-muted-foreground">{t.default_rate}</TableCell>
                         <TableCell className="max-w-[140px]">
                           <TruncatedContent value={t.contact} />
-                        </TableCell>
-                        <TableCell className="max-w-[140px]">
-                          <TruncatedContent value={t.bank_details} />
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -853,17 +821,17 @@ export default function TeachersPage() {
       </StaggerItem>
 
       {/* Standardized Table Pagination Footer */}
-      {sortedTeachers.length > 0 && (
+      {tablePagination.totalItems > 0 && (
         <StaggerItem>
           <StandardTablePagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            totalItems={pagination.totalItems}
-            startIndex={pagination.startIndex}
-            endIndex={pagination.endIndex}
-            pageSize={pagination.pageSize}
-            onPageChange={pagination.setCurrentPage}
-            onPageSizeChange={pagination.setPageSize}
+            currentPage={tablePagination.currentPage}
+            totalPages={tablePagination.totalPages}
+            totalItems={tablePagination.totalItems}
+            startIndex={tablePagination.startIndex}
+            endIndex={tablePagination.endIndex}
+            pageSize={tablePagination.pageSize}
+            onPageChange={tablePagination.onPageChange}
+            onPageSizeChange={tablePagination.onPageSizeChange}
           />
         </StaggerItem>
       )}

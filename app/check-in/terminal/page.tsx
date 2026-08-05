@@ -3,13 +3,12 @@
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { motion, AnimatePresence } from "motion/react"
-import { User, Check, X, Camera, Loader2, Search, Maximize2, Minimize2 } from "lucide-react"
+import { Check, X, Camera, Loader2, Search, User as UserIcon } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import type { Student, Class, ClassStudent } from "@/lib/types"
+import type { CheckInLookup } from "@/lib/types"
 import jsQR from "jsqr"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useFocusMode } from "@/components/focus-context"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
@@ -142,157 +141,113 @@ QrScanner.displayName = "QrScanner"
 
 export default function TerminalPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
-  const { isFocused, setIsFocused } = useFocusMode()
-  const [students, setStudents] = React.useState<Student[]>([])
-  const [classes, setClasses] = React.useState<Class[]>([])
-  const [classStudents, setClassStudents] = React.useState<ClassStudent[]>([])
-  const [dataLoaded, setDataLoaded] = React.useState(false)
 
   const scannerRef = React.useRef<{ resetScanLock: () => void }>(null)
-  const [scannedToken, setScannedToken] = React.useState<string | null>(null)
-  const [matchedStudent, setMatchedStudent] = React.useState<Student | null>(null)
-  const [manualId, setManualId] = React.useState("")
+  const [manualCode, setManualCode] = React.useState("")
+  const [looking, setLooking] = React.useState(false)
   const [checkingIn, setCheckingIn] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
+  // Student awaiting staff confirmation. pendingToken is the scanned QR (kept only
+  // for the single student being confirmed — never the whole roster).
+  const [pending, setPending] = React.useState<CheckInLookup | null>(null)
+  const [pendingToken, setPendingToken] = React.useState<string | null>(null)
 
-  // Reset focus mode state when unmounting
-  React.useEffect(() => {
-    return () => {
-      setIsFocused(false)
-    }
-  }, [setIsFocused])
+  const resetPending = React.useCallback(() => {
+    setPending(null)
+    setPendingToken(null)
+    scannerRef.current?.resetScanLock()
+  }, [])
 
-  // Load students, classes, and mappings for matching
-  React.useEffect(() => {
-    if (!isSignedIn || dataLoaded) return
-    ;(async () => {
+  const finishWithMessage = React.useCallback((message: string) => {
+    setSuccess(message)
+    setError(null)
+    setManualCode("")
+    setPending(null)
+    setPendingToken(null)
+    scannerRef.current?.resetScanLock()
+    setTimeout(() => setSuccess(null), 4000)
+  }, [])
+
+  // QR scanned → look up (no check-in yet) → show confirmation card.
+  const handleScan = React.useCallback(
+    async (checkInToken: string) => {
+      if (!isSignedIn || looking || checkingIn || pending) return
+      setLooking(true)
+      setError(null)
+      setSuccess(null)
       try {
         const token = await getToken()
-        if (!token) return
-        const api = createApi(token)
-        const [studentsData, classesData, classStudentsData] = await Promise.all([
-          api.listStudents(),
-          api.listClasses(),
-          api.listClassStudents(),
-        ])
-        setStudents(studentsData)
-        setClasses(classesData)
-        setClassStudents(classStudentsData)
-        setDataLoaded(true)
+        if (!token) throw new Error("No auth token available")
+        const match = await createApi(token).lookupCheckIn({ check_in_token: checkInToken })
+        setPending(match)
+        setPendingToken(checkInToken)
       } catch (err) {
-        console.error("Failed to load terminal initialization data", err)
+        if (err instanceof ApiError) setError(err.userMessage)
+        else setError(err instanceof Error ? err.message : "Lookup failed")
+        scannerRef.current?.resetScanLock()
+      } finally {
+        setLooking(false)
       }
-    })()
-  }, [isSignedIn, getToken, dataLoaded])
+    },
+    [isSignedIn, looking, checkingIn, pending, getToken]
+  )
 
-  const getStudentClassName = React.useCallback((studentId: number) => {
-    const mapping = classStudents.find((cs) => {
-      const sId = typeof cs.student === "object" ? cs.student.id : cs.student
-      return sId === studentId
-    })
-    if (!mapping) return "No Class Assigned"
-
-    let classObj: Class | undefined
-    if (typeof mapping.class_obj === "object") {
-      classObj = mapping.class_obj
-    } else {
-      classObj = classes.find((c) => c.id === mapping.class_obj)
-    }
-
-    if (!classObj) return "No Class Assigned"
-    return `${classObj.education_level} - ${classObj.cohort_identifier} ${classObj.cohort_sub_category ? `(${classObj.cohort_sub_category})` : ""}`.trim()
-  }, [classes, classStudents])
-
-  const handleScan = React.useCallback((token: string) => {
-    setScannedToken(token)
-    setError(null)
-    setSuccess(null)
-    const match = students.find((s) => s.check_in_token === token)
-    setMatchedStudent(match ?? null)
-    if (!match) {
-      setError(`No student found with this check-in token.`)
-    }
-  }, [students])
-
-  const handleManualLookup = React.useCallback(() => {
-    const rawInput = manualId.trim()
-    if (!rawInput) {
-      setError("Please enter a valid student ID or Student Code.")
+  // Manual code entered → look up by unique_code → show confirmation card.
+  const handleManualLookup = React.useCallback(async () => {
+    const code = manualCode.trim()
+    if (!code) {
+      setError("Enter a student code (e.g. HIS26-00001).")
       return
     }
-    setError(null)
-    setSuccess(null)
-    setScannedToken(null)
-
-    const queryLower = rawInput.toLowerCase()
-    const numId = parseInt(rawInput, 10)
-
-    const match = students.find((s) => {
-      if (!isNaN(numId) && s.id === numId) return true
-      if (!s.unique_code) return false
-      const codeLower = s.unique_code.toLowerCase()
-      if (codeLower === queryLower || codeLower.includes(queryLower)) return true
-      
-      const codeParts = codeLower.split("-")
-      const queryParts = queryLower.split("-")
-      if (codeParts.length === 2 && queryParts.length === 2) {
-        const [codePrefix, codeNumStr] = codeParts
-        const [queryPrefix, queryNumStr] = queryParts
-        if (codePrefix.includes(queryPrefix) || queryPrefix.includes(codePrefix)) {
-          const codeNum = parseInt(codeNumStr, 10)
-          const queryNum = parseInt(queryNumStr, 10)
-          if (!isNaN(codeNum) && !isNaN(queryNum) && codeNum === queryNum) {
-            return true
-          }
-        }
-      }
-      return false
-    })
-    setMatchedStudent(match ?? null)
-    if (!match) {
-      setError(`No student found matching "${rawInput}".`)
-    }
-    scannerRef.current?.resetScanLock()
-  }, [manualId, students])
-
-  const handleConfirm = React.useCallback(async (confirmed: boolean) => {
-    if (!matchedStudent || !isSignedIn) return
-
-    if (!confirmed) {
-      setMatchedStudent(null)
-      setScannedToken(null)
-      setManualId("")
-      scannerRef.current?.resetScanLock()
-      return
-    }
-
-    setCheckingIn(true)
+    if (!isSignedIn || looking || checkingIn) return
+    setLooking(true)
     setError(null)
     setSuccess(null)
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
-      const api = createApi(token)
-      if (scannedToken) {
-        await api.createCheckInByQr(scannedToken)
-      } else {
-        await api.createCheckInManual(matchedStudent.id)
-      }
-      setSuccess(`${matchedStudent.name} checked in successfully.`)
-      setMatchedStudent(null)
-      setScannedToken(null)
-      setManualId("")
-      scannerRef.current?.resetScanLock()
-      setTimeout(() => setSuccess(null), 4000)
+      const match = await createApi(token).lookupCheckIn({ unique_code: code })
+      setPending(match)
+      setPendingToken(null)
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
-      else setError(err instanceof Error ? err.message : "Failed to check in")
-      scannerRef.current?.resetScanLock()
+      else setError(err instanceof Error ? err.message : "Lookup failed")
     } finally {
-      setCheckingIn(false)
+      setLooking(false)
     }
-  }, [matchedStudent, isSignedIn, getToken, scannedToken])
+  }, [manualCode, isSignedIn, looking, checkingIn, getToken])
+
+  // Staff confirmed → commit the check-in (QR by token, otherwise by student id).
+  const handleConfirm = React.useCallback(
+    async (confirmed: boolean) => {
+      if (!pending) return
+      if (!confirmed) {
+        resetPending()
+        return
+      }
+      setCheckingIn(true)
+      setError(null)
+      setSuccess(null)
+      try {
+        const token = await getToken()
+        if (!token) throw new Error("No auth token available")
+        const api = createApi(token)
+        const result = pendingToken
+          ? await api.createCheckInByQr(pendingToken)
+          : await api.createCheckInManual(pending.id)
+        const name = result.student_name || pending.name || "Student"
+        finishWithMessage(`${name} checked in successfully.`)
+      } catch (err) {
+        if (err instanceof ApiError) setError(err.userMessage)
+        else setError(err instanceof Error ? err.message : "Failed to check in")
+        resetPending()
+      } finally {
+        setCheckingIn(false)
+      }
+    },
+    [pending, pendingToken, getToken, finishWithMessage, resetPending]
+  )
 
   if (!isLoaded) {
     return (
@@ -312,17 +267,15 @@ export default function TerminalPage() {
 
   return (
     <StaggerContainer className="space-y-6">
-      {/* Standardized Header */}
       <StaggerItem>
         <StandardPageHeader
           title="Check-In Terminal"
-          description="Scan student QR codes or look up ID manually for real-time attendance verification."
+          description="Scan a QR code or enter a student code, confirm the student, then check them in. Lookups are validated on the server"
         >
           <Clock />
         </StandardPageHeader>
       </StaggerItem>
 
-      {/* Notifications */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -361,129 +314,137 @@ export default function TerminalPage() {
 
       <StaggerItem>
         <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Left: QR Scanner */}
-        <div className="min-w-0 flex-1">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Scan QR Code</h2>
-          <QrScanner ref={scannerRef} onScan={handleScan} />
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            Point camera at a student&apos;s QR code to record attendance automatically
-          </p>
-        </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight">Scan QR Code</h2>
+            <QrScanner ref={scannerRef} onScan={(token) => void handleScan(token)} />
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              {looking
+                ? "Looking up student…"
+                : pending
+                  ? "Confirm the student on the right"
+                  : "Point camera at a student QR code"}
+            </p>
+          </div>
 
-        {/* Right: Confirmation */}
-        <div className="w-full lg:w-96">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Confirmation</h2>
-
-          <AnimatePresence mode="wait">
-            {matchedStudent ? (
-              <motion.div
-                key={matchedStudent.id}
-                initial={{ opacity: 0, scale: 0.93, y: 14 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.93, y: -10 }}
-                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                className="rounded-xl border border-primary/30 bg-card p-6 shadow-md"
-              >
-                {/* Student icon + info */}
-                <div className="mb-6 flex items-center gap-4">
+          <div className="w-full lg:w-96 space-y-6">
+            <div>
+              <h2 className="mb-4 text-lg font-semibold tracking-tight">Confirmation</h2>
+              <AnimatePresence mode="wait">
+                {pending ? (
                   <motion.div
-                    initial={{ scale: 0.7 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="flex size-16 items-center justify-center rounded-full border bg-primary/10 border-primary/20"
+                    key={`${pending.id}-${pendingToken ?? "manual"}`}
+                    initial={{ opacity: 0, scale: 0.93, y: 14 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.93, y: -10 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="rounded-xl border border-primary/30 bg-card p-6 shadow-md"
                   >
-                    <User className="size-8 text-primary" />
+                    <div className="mb-6 flex items-center gap-4">
+                      <div className="flex size-16 items-center justify-center rounded-full border bg-primary/10 border-primary/20">
+                        <UserIcon className="size-8 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium">
+                          Code: {pending.unique_code || `#${pending.id}`}
+                        </p>
+                        <p className="text-xl font-bold tracking-tight text-foreground">
+                          {pending.name}
+                        </p>
+                        <p className="text-xs font-semibold text-primary mt-0.5">
+                          {pending.class_name || "No Class Assigned"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {pending.checked_in_today ? (
+                      <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        Already checked in today — confirming again will be rejected.
+                      </div>
+                    ) : null}
+
+                    <div className="mb-6 rounded-lg bg-muted/50 px-4 py-3 border border-border/50">
+                      <p className="text-xs text-muted-foreground">Checking in via</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {pendingToken ? "QR scan" : "Manual code"}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => void handleConfirm(true)}
+                        disabled={checkingIn}
+                        className="flex-1 gap-2"
+                      >
+                        {checkingIn ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Check className="size-4" />
+                        )}
+                        Confirm
+                      </Button>
+                      <Button
+                        onClick={() => void handleConfirm(false)}
+                        disabled={checkingIn}
+                        variant="outline"
+                        className="flex-1 gap-2"
+                      >
+                        <X className="size-4" />
+                        Cancel
+                      </Button>
+                    </div>
                   </motion.div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Code: {matchedStudent.unique_code || `#${matchedStudent.id}`}
-                    </p>
-                    <p className="text-xl font-bold tracking-tight text-foreground">{matchedStudent.name}</p>
-                    <p className="text-xs font-semibold text-primary mt-0.5">
-                      {getStudentClassName(matchedStudent.id)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Check-in time */}
-                <div className="mb-6 rounded-lg bg-muted/50 px-4 py-3 border border-border/50">
-                  <p className="text-xs text-muted-foreground">Checking in at</p>
-                  <p className="text-lg font-semibold tabular-nums text-foreground">
-                    {new Date().toLocaleTimeString("en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                      hour12: false,
-                    })}
-                  </p>
-                </div>
-
-                {/* Confirm / Reject */}
-                <div className="flex gap-3">
-                  <motion.button
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => handleConfirm(true)}
-                    disabled={checkingIn}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                ) : (
+                  <motion.div
+                    key="empty-match"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex h-56 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"
                   >
-                    {checkingIn ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                    Confirm
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => handleConfirm(false)}
-                    disabled={checkingIn}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-lg border bg-background px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
-                  >
-                    <X className="size-4" />
-                    Cancel
-                  </motion.button>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="empty-match"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"
-              >
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted/50 mb-3">
-                  <Search className="size-5 text-muted-foreground/60" />
-                </div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Ready to scan
-                </p>
-                <p className="text-xs text-muted-foreground/70 mt-1">
-                  Point QR code at camera or type student Code
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                    <div className="flex size-12 items-center justify-center rounded-full bg-muted/50 mb-3">
+                      <Search className="size-5 text-muted-foreground/60" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground">Ready to scan</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Scan a QR code or enter a student code below
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {/* Manual Lookup Form with Top Spacing */}
-            <div className="mt-6 rounded-xl border border-border/80 bg-card p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Manual Search</h3>
-              <p className="text-xs text-muted-foreground">
-                Search by typing the student Code or ID manually
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={manualId}
-                  onChange={(e) => setManualId(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleManualLookup() }}
-                  placeholder="Student Code or ID (e.g. HIS26-00001)"
-                  className="min-w-0 flex-1 bg-background text-foreground placeholder:text-muted-foreground"
-                />
-                <Button
-                  onClick={handleManualLookup}
-                  variant="outline"
-                  className="shadow-xs gap-1.5"
-                >
-                  <Search className="size-4" />
-                  Look Up
-                </Button>
+            <div>
+              <h2 className="mb-4 text-lg font-semibold tracking-tight">Manual lookup</h2>
+              <div className="rounded-xl border border-border/80 bg-card p-6 shadow-2xs space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Enter the student code printed on their card (e.g. HIS26-00001).
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleManualLookup()
+                    }}
+                    placeholder="Student Code (e.g. HIS26-00001)"
+                    className="min-w-0 flex-1 bg-background"
+                    disabled={looking || checkingIn}
+                  />
+                  <Button
+                    onClick={() => void handleManualLookup()}
+                    variant="outline"
+                    disabled={looking || checkingIn}
+                    className="shadow-xs gap-1.5"
+                  >
+                    {looking ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Search className="size-4" />
+                    )}
+                    Look Up
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

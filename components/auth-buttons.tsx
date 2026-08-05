@@ -18,7 +18,7 @@ export function AuthButtons() {
   if (isSignedIn) {
     return (
       <Link
-        href="/dashboard"
+        href="/"
         className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
       >
         Go to Dashboard

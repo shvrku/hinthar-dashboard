@@ -192,19 +192,15 @@ function normalizeRow(
       else if (lower.includes("tutor") || lower.includes("part")) employment_type = "tutor"
     }
 
-    const defaultRate = getKey("default_rate", "rate", "hourly_rate")
     const joinDate = normalizeDate(getKey("join_date", "join", "start_date"))
     const contact = getKey("contact", "phone", "email")
-    const bankDetails = getKey("bank_details", "bank", "account")
 
     const payload: TeacherPayload = {
       name,
       school_code: schoolCode,
       employment_type,
-      default_rate: defaultRate || null,
       join_date: joinDate || null,
       contact: contact || null,
-      bank_details: bankDetails || null,
     }
 
     return { payload, errors, fieldErrors }
@@ -249,11 +245,11 @@ export function BulkImportModal({
       ]
     } else {
       csvRows = [
-        ["name", "school_code", "employment_type", "default_rate", "join_date", "contact", "bank_details"],
-        ["Jane Smith", "HIS", "full_time", "50000", "2023-01-15", "jane@example.com", "KBZ 123456789"],
-        ["Aung Kyaw", "SPD", "tutor", "40000", "2023-03-10", "aung@example.com", "AYA 987654321"],
-        ["Su Su", "SPN", "full_time", "55000", "2023-05-01", "susu@example.com", "CB 112233445"],
-        ["Mya Mya", "YWM", "tutor", "35000", "2023-07-20", "mya@example.com", "UAB 556677889"],
+        ["name", "school_code", "employment_type", "join_date", "contact"],
+        ["Jane Smith", "HIS", "full_time", "2023-01-15", "jane@example.com"],
+        ["Aung Kyaw", "SPD", "tutor", "2023-03-10", "aung@example.com"],
+        ["Su Su", "SPN", "full_time", "2023-05-01", "susu@example.com"],
+        ["Mya Mya", "YWM", "tutor", "2023-07-20", "mya@example.com"],
       ]
     }
 
@@ -484,7 +480,6 @@ export function BulkImportModal({
                           ) : (
                             <>
                               <TableHead>Type</TableHead>
-                              <TableHead>Default Rate</TableHead>
                               <TableHead>Contact</TableHead>
                             </>
                           )}
@@ -579,7 +574,6 @@ export function BulkImportModal({
                             ) : (
                               <>
                                 <TableCell className="text-muted-foreground">{item.data.employment_type || "—"}</TableCell>
-                                <TableCell className="font-mono text-muted-foreground">{item.data.default_rate}</TableCell>
                                 <TableCell className="text-muted-foreground">{item.data.contact || "—"}</TableCell>
                               </>
                             )}

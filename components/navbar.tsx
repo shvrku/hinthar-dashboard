@@ -189,9 +189,9 @@ export function Navbar() {
                 </Link>
                 <span className="text-muted-foreground/40 font-light select-none">/</span>
                 <Link
-                  href="/dashboard"
+                  href="/"
                   className={`text-lg font-medium tracking-tight transition-colors hover:text-foreground ${
-                    pathname === "/dashboard" ? "text-foreground font-semibold" : "text-muted-foreground"
+                    pathname === "/" ? "text-foreground font-semibold" : "text-muted-foreground"
                   }`}
                   title="Go to Dashboard Stats"
                 >
@@ -284,7 +284,7 @@ export function Navbar() {
                     </Link>
                     <span className="text-muted-foreground/40 font-light select-none">/</span>
                     <Link
-                      href="/dashboard"
+                      href="/"
                       onClick={() => setMobileOpen(false)}
                       className="text-sm font-medium text-muted-foreground hover:text-foreground"
                     >
