@@ -1,19 +1,20 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Search, CalendarCheck, Sparkles, BookOpen } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Loader2, Check, Search, CalendarCheck, Sparkles, BookOpen, ClipboardList } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot, type AdHocSession, type AdHocSessionPayload, type Subject } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
-import { cn } from "@/lib/utils"
+import { cn, toLocalDateString } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -79,6 +80,37 @@ function parseBackendDateTime(str: string): Date {
     }
   }
   return new Date(str)
+}
+
+/** Deep-link to class session attendance (roster for this session's date). */
+function takeRollHrefForSession(session: Session): string | null {
+  if (!session.class_obj?.id || !session.start_time) return null
+  const d = parseBackendDateTime(session.start_time)
+  if (isNaN(d.getTime())) return null
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  const qs = new URLSearchParams({
+    date: `${yyyy}-${mm}-${dd}`,
+    layout: "roster",
+    session_id: String(session.id),
+  })
+  return `/attendance/class/${session.class_obj.id}/?${qs.toString()}`
+}
+
+/** Deep-link to ad-hoc attendance for the session's day / id. */
+function takeRollHrefForAdHoc(session: AdHocSession): string {
+  const date =
+    session.date ||
+    (session.start_time ? session.start_time.slice(0, 10) : toLocalDateString())
+  const qs = new URLSearchParams({
+    date,
+    layout: "roster",
+    session_id: String(session.id),
+  })
+  if (session.subject?.id) qs.set("subject_id", String(session.subject.id))
+  if (session.teacher?.id) qs.set("teacher_id", String(session.teacher.id))
+  return `/attendance/adhoc/?${qs.toString()}`
 }
 
 function statusLabel(value: SessionStatus | null): string {
@@ -162,11 +194,10 @@ export default function SessionsPage() {
   // Batch Session Generator Modal state
   const [generateModalOpen, setGenerateModalOpen] = React.useState(false)
   const [genClassId, setGenClassId] = React.useState<string>("")
-  const [genStartDate, setGenStartDate] = React.useState<string>(new Date().toISOString().split("T")[0])
+  const [genStartDate, setGenStartDate] = React.useState<string>(toLocalDateString())
   const [genEndDate, setGenEndDate] = React.useState<string>(() => {
     const d = new Date()
-    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-    return lastDay.toISOString().split("T")[0]
+    return toLocalDateString(new Date(d.getFullYear(), d.getMonth() + 1, 0))
   })
   const [isGenerating, setIsGenerating] = React.useState(false)
 
@@ -189,7 +220,7 @@ export default function SessionsPage() {
   const [adhocSaving, setAdhocSaving] = React.useState(false)
   const [adhocSubjectId, setAdhocSubjectId] = React.useState<string>("")
   const [adhocTeacherId, setAdhocTeacherId] = React.useState<string>("")
-  const [adhocDate, setAdhocDate] = React.useState<string>(new Date().toISOString().split("T")[0])
+  const [adhocDate, setAdhocDate] = React.useState<string>(toLocalDateString())
   const [adhocStartTime, setAdhocStartTime] = React.useState<string>("09:00")
   const [adhocEndTime, setAdhocEndTime] = React.useState<string>("10:00")
 
@@ -475,8 +506,7 @@ export default function SessionsPage() {
 
   const openAddModal = () => {
     setEditingSession(null)
-    const today = new Date().toISOString().split("T")[0]
-    setFormDate(today)
+    setFormDate(toLocalDateString())
     setFormStartTime("09:00:00")
     setFormDuration("60")
     setFormCustomEndTime("")
@@ -495,7 +525,7 @@ export default function SessionsPage() {
     if (session.start_time) {
       const d = parseBackendDateTime(session.start_time)
       if (!isNaN(d.getTime())) {
-        dateStr = d.toISOString().split("T")[0]
+        dateStr = toLocalDateString(d)
         const hh = d.getHours().toString().padStart(2, "0")
         const mm = d.getMinutes().toString().padStart(2, "0")
         startTimeStr = `${hh}:${mm}:00`
@@ -871,6 +901,19 @@ export default function SessionsPage() {
                         <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {(() => {
+                              const href = takeRollHrefForSession(session)
+                              if (!href) return null
+                              return (
+                                <Link
+                                  href={href}
+                                  title="Take roll"
+                                  className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                                >
+                                  <ClipboardList className="size-4" />
+                                </Link>
+                              )
+                            })()}
                             <Button variant="ghost" size="icon-sm" onClick={() => openEditModal(session)} title="Edit"><Pencil className="size-4" /></Button>
                             <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
                           </div>
@@ -941,6 +984,13 @@ export default function SessionsPage() {
                         <TableCell className="text-center">{renderStatusBadge(session.status as SessionStatus | null)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Link
+                              href={takeRollHrefForAdHoc(session)}
+                              title="Take roll"
+                              className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                            >
+                              <ClipboardList className="size-4" />
+                            </Link>
                             <Button variant="ghost" size="icon-sm" title="Edit"><Pencil className="size-4" /></Button>
                             <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
                           </div>

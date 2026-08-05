@@ -8,6 +8,7 @@ export interface PageHeaderAction {
   onClick: () => void
   icon?: React.ReactNode
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  disabled?: boolean
 }
 
 interface StandardPageHeaderProps {
@@ -41,6 +42,7 @@ export function StandardPageHeader({
             variant={secondaryAction.variant || "outline"}
             size="sm"
             onClick={secondaryAction.onClick}
+            disabled={secondaryAction.disabled}
             className="gap-1.5"
           >
             {secondaryAction.icon}
@@ -52,6 +54,7 @@ export function StandardPageHeader({
             variant={primaryAction.variant || "default"}
             size="sm"
             onClick={primaryAction.onClick}
+            disabled={primaryAction.disabled}
             className="gap-1.5"
           >
             {primaryAction.icon}

@@ -22,6 +22,7 @@ import {
   LogIn,
   School,
   Repeat2,
+  Undo2,
 } from "lucide-react"
 
 import {
@@ -86,6 +87,7 @@ const adminItems = [
 const checkInSubItemsStaff = [
   { title: "Overview", url: "/check-in/overview", icon: LayoutDashboard },
   { title: "Management", url: "/check-in/management", icon: QrCode },
+  { title: "Corrections", url: "/check-in/corrections", icon: Undo2 },
   { title: "Terminal", url: "/check-in/terminal", icon: Monitor },
 ]
 

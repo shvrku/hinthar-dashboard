@@ -310,6 +310,20 @@ export function createApi(token: string) {
         body: JSON.stringify(input),
       }),
 
+    deleteCheckIn: (id: number) =>
+      request<void>(`/check-ins/${id}/`, token, { method: "DELETE" }),
+
+    bulkDeleteCheckIns: (ids: number[]) =>
+      request<{
+        deleted_count: number
+        deleted_ids: number[]
+        reverted_session_attendances?: number
+        reverted_adhoc_attendances?: number
+      }>(`/check-ins/bulk_delete/`, token, {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
+
     // --- Class-Students ---
     listClassStudents: (params?: Record<string, string | number | undefined | null>) =>
       fetchAllPages<import("./types").ClassStudent>(`/class-students/`, token, params),

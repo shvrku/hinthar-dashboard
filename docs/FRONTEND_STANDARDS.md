@@ -14,14 +14,13 @@ Keep these **visually and verbally separate** in nav and page titles:
 |--------|---------------|----------------|
 | **People & classes** | Students, teachers, subjects, class cohorts, enrollment | `/students`, `/teachers`, `/subjects`, `/classes` |
 | **Schedule** | Weekly slots → generated dated sessions; ad-hoc tutoring | `/timetable`, `/sessions` |
-| **Lesson attendance** | Present / late / absent **per class session** | `/attendance` (+ future scoped routes) |
+| **Lesson attendance** | Present / late / absent / excused **per class or ad-hoc session** | `/attendance/`, `/attendance/class/[classId]/`, `/attendance/adhoc/` |
 | **Campus check-in** | Daily building presence via QR / terminal | `/check-in/overview`, `/management`, `/terminal` |
-| **Payroll / finance** | **Out of scope** — remove UI residue | none |
+| **Payroll / finance** | **Out of scope** — residue removed from live UI/API | none |
 
-Staff confusion risk today: sidebar label **“Attendance Matrix”** vs **“Check-In”**. Prefer:
+Staff confusion risk: keep **Session Attendance** vs **Check-In** verbally separate (campus presence ≠ lesson roll).
 
-- Operations → **Session Attendance**
-- Check-In → keep as campus gate
+Scaling status / next work: `docs/SCALING_IMPLEMENTATION_PLAN.md`.
 
 ---
 
@@ -31,50 +30,40 @@ Verdicts are for **front-office / academic staff**, not developers.
 
 ### Strengths
 
-- Management pages (`/classes`, `/teachers`, `/students`, `/subjects`) share a recognizable pattern: header → KPIs → search → table → dialogs → client pagination.
-- Session attendance already uses the **matrix API** (correct aggregate choice) with Matrix vs Roster modes.
-- Check-in terminal is a clear single-purpose kiosk surface.
-- Sidebar groups Management vs Operations vs Check-In is a good start.
+- Management list pages share header → KPIs → search → table → dialogs → **server** pagination (`page` / `page_size` + `q`).
+- Session attendance uses matrix aggregates with Matrix vs Roster; routes split by class vs ad-hoc.
+- Check-in terminal is lookup → confirm → commit (no token leakage in UI).
+- Role gates via `RequireRole` / sidebar filtering; Clerk is identity, Django owns role.
 
-### Issues by page
+### Issues by page (as of 2026-08-06)
 
 | Page | Graspability | Notes |
 |------|--------------|-------|
-| `/` (Overview) | Weak | Static “module launcher”; live KPIs live on orphan `/dashboard`. Staff open “Dashboard” and do not see live counts. |
-| `/dashboard` | Good data, bad discovery | Not in sidebar. Merge into `/` or link it. |
+| `/` (Overview) | Medium | Prefer live KPIs here (Phase 6); `/dashboard` redirects to `/`. |
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
-| `/teachers` | Mixed | **Default rate / bank details** look like required HR/payroll — scrap for now. |
-| `/students` | Good | Bulk import helps scale. |
+| `/teachers` | Good | Payroll rate/bank fields removed. |
+| `/students` | Good | Server search + pagination; bulk import helps scale. |
 | `/subjects` | Good | Simple catalog. |
-| `/timetable` | Medium | Custom week grid is powerful; empty states and “which class?” must be obvious. New staff need a short legend (slot = recurring; sessions generated from slots). |
-| `/sessions` | Medium | Timetabled vs ad-hoc toggle is easy to miss. **Paid** column is payroll residue — remove. Delete messaging about paid sessions confuses. |
-| `/attendance` | Hard for new staff | Very dense control bar (mode + range + layout + filters). Subject/teacher filters are **client-only** (not sent to API) → slow monthly grids. Present vs late colors too similar. Column headers lack subject names at a glance. Auto-selects first class (wrong-class risk). Dual search fields (matrix vs roster). ~1.4k-line mega-page. |
-| `/check-in` root | Bad | Dead-end / easter-egg — remove or redirect to overview. |
-| `/check-in/overview` | Medium–good | Cohort tables for a date are understandable once “campus presence ≠ lesson roll” is clear. |
-| `/check-in/management` | Good for admins | QR token ops; not for every staff role. |
+| `/users` | Good | Server `q` + role filter. |
+| `/timetable` | Medium | Empty states / legend still thin. |
+| `/sessions` | Medium | Timetabled vs ad-hoc toggle easy to miss; Paid residue gone. |
+| `/attendance/` | Better | Landing → class or ad-hoc. Remaining: deep links from Sessions; optional density polish. |
+| `/attendance/class/[classId]/` | Good | Server subject/teacher filters; headers show subject · teacher; identifiers under names; excused supported. |
+| `/attendance/adhoc/` | Good | Add Session + **Add Students** (server search, load-more). Empty grid until students added. |
+| `/check-in/overview` | Medium–good | Needs redesign: class-first picker; group **Checked in** vs **Missing** (see scaling plan Phase 6). |
+| `/check-in/management` | Good | QR view + regenerate. Todo: activate/deactivate tokens. |
+| `/check-in/corrections` | Good | Undo mis-tap campus check-ins; auto-reverts lesson marks attributed to that check-in. |
 | `/check-in/terminal` | Good | Purpose-built. |
-| `/support`, `/feedback` | Placeholder | Fine as stubs; hide until real. |
-| Auth / roles | Critical gap | Any signed-in Clerk user sees full nav and all actions. No role-based hiding. Teachers/students would see admin tooling if given login. |
+| `/support`, `/feedback` | Placeholder | Hide until real. |
+| Auth / roles | Addressed | Gates exist; still enforce API scoping for teachers/students. |
 
-### Attendance UX recommendations
+### Attendance UX — current contract
 
-1. **Split information architecture** (recommended):
-   - `/attendance` — landing: pick class + date mode, then open matrix or roster.
-   - `/attendance/class/[classId]` — class matrix with query string scopes:
-     - `?month=8&year=2026`
-     - `?date_from=2026-08-01&date_to=2026-08-31`
-     - `?subject_id=` / `?teacher_id=` (must be passed to API once backend honors them)
-     - `?layout=matrix|roster`
-     - `?session_id=` when layout=roster
-   - Optional later: `/attendance/sessions/[sessionId]` — single-session roster (deep link from Sessions table).
-
-2. **Keep matrix as its own API-backed view** — do not rebuild from paginated `/session-attendances/` lists.
-
-3. **Visual hierarchy**: sticky student column + subject short code in column headers; distinct colors for present / late / absent / unmarked; “unmarked” ≠ “absent” if records missing.
-
-4. **Reduce control density**: primary = Class + Date range; secondary (collapsed) = Subject, Teacher, Layout.
-
-5. **Remove auto-select first class** — require explicit class choice (or remember last class in `localStorage`).
+1. Routes: `/attendance/` landing; `/attendance/class/[classId]?…`; `/attendance/adhoc/?…`.
+2. Matrix APIs remain the only way to load grids — do not rebuild from paginated attendance lists.
+3. Column headers: subject, teacher, date, time. Student secondary line: `unique_code`.
+4. Ad-hoc participants = attendance rows created via Add Students (start **absent**).
+5. Sessions **Take roll** deep-links into class/ad-hoc roster with `session_id` (+ date filters).
 
 ---
 
@@ -111,7 +100,7 @@ Terminal UI: only check-in routes (+ read-only views if product wants). Teachers
 | Rule | Detail |
 |------|--------|
 | Client | `createApi(token)` from `lib/api.ts` remains the single HTTP surface |
-| Lists | Prefer **server pagination** params `page`, `page_size` once backend enables them |
+| Lists | Use **server pagination** (`page`, `page_size`) + server `q`/filters — never fetch-all then slice |
 | Aggregates | Matrix / stats only via dedicated helpers (`getAttendanceMatrix`, …) |
 | Cache | Keep short TTL GET cache for catalogs; invalidate on mutation |
 | Avoid | Fetch-all + `usePagination` slice for unbounded resources |
@@ -133,13 +122,15 @@ When adding a paginated list page:
 
 ### Payroll UI scrap list
 
+**Done** — do not reintroduce rate / bank / paid fields. Historical checklist (completed):
+
 | Location | Action |
 |----------|--------|
-| `app/teachers/page.tsx` | Remove rate / bank fields & columns |
-| `components/bulk-import-modal.tsx` | Remove teacher CSV rate/bank columns |
-| `app/sessions/page.tsx` | Remove Paid column / form / paid-delete copy |
-| `lib/types.ts` | Drop or deprecate `default_rate`, `bank_details`, `paid` |
-| `app/layout.tsx` metadata | Remove “payroll” from description |
+| `app/teachers/page.tsx` | Rate / bank removed |
+| `components/bulk-import-modal.tsx` | Teacher CSV rate/bank columns removed |
+| `app/sessions/page.tsx` | Paid column / form / paid-delete copy removed |
+| `lib/types.ts` | Payroll fields dropped |
+| `app/layout.tsx` metadata | Payroll wording removed |
 
 ---
 
@@ -186,7 +177,7 @@ When a new overview is needed (e.g. class attendance for a term):
 | Default rate | (remove until payroll) |
 | Dashboard (static home) | Overview **or** live Stats dashboard |
 
-Status labels: **Present**, **Late**, **Absent** (Title Case in UI). If `excused` is supported in types, either implement it in the picker or remove from types.
+Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI).
 
 ---
 

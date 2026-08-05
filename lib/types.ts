@@ -178,7 +178,9 @@ export interface TimetableSlotPayload {
 
 export interface CheckIn {
   id: number
-  student: number
+  /** Nested student object from list/retrieve, or bare id in older payloads. */
+  student: number | { id: number; name?: string; unique_code?: string | null }
+  student_id?: number
   student_name: string
   date: string
   timestamp: string

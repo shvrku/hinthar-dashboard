@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs"
 import { motion, AnimatePresence } from "motion/react"
 import { Check, X, RotateCcw, Loader2, Search, QrCode } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
+import { toLocalDateString } from "@/lib/utils"
 import { EDUCATION_LEVELS, type Student, type CheckIn, type Class, type ClassStudent } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
@@ -157,21 +158,14 @@ export default function CheckInOverviewPage() {
 
   const todayCheckInMap = React.useMemo(() => {
     const map = new Map<number, CheckIn>()
-    const d = new Date()
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const todayStr = `${year}-${month}-${day}`
-    
+    const todayStr = toLocalDateString()
+
     for (const ci of checkIns) {
       let ciDateStr = ci.date
       if (ci.timestamp) {
         const tDate = new Date(ci.timestamp)
         if (!isNaN(tDate.getTime())) {
-          const y = tDate.getFullYear()
-          const m = String(tDate.getMonth() + 1).padStart(2, '0')
-          const dt = String(tDate.getDate()).padStart(2, '0')
-          ciDateStr = `${y}-${m}-${dt}`
+          ciDateStr = toLocalDateString(tDate)
         }
       }
 
@@ -293,11 +287,7 @@ export default function CheckInOverviewPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const d = new Date()
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      const todayStr = `${year}-${month}-${day}`
+      const todayStr = toLocalDateString()
       const [studs, cis, cls, css] = await Promise.all([
         api.listStudents(),
         api.listCheckIns({ date: todayStr }),

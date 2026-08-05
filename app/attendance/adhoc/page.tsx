@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SearchableSelect } from "@/components/searchable-select"
 import { useAuth } from "@clerk/nextjs"
 import {
@@ -27,6 +27,7 @@ import {
   UserPlus,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
+import { toLocalDateString } from "@/lib/utils"
 import {
   type Subject,
   type Student,
@@ -150,7 +151,14 @@ const statusItems = [
 
 function AdHocAttendanceContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { getToken, isLoaded, isSignedIn } = useAuth()
+
+  const dateFromUrl = searchParams.get("date")
+  const layoutFromUrl = searchParams.get("layout")
+  const sessionIdFromUrl = searchParams.get("session_id")
+  const subjectIdFromUrl = searchParams.get("subject_id")
+  const teacherIdFromUrl = searchParams.get("teacher_id")
 
   // Base Options Metadata
   const [subjects, setSubjects] = React.useState<Subject[]>([])
@@ -170,21 +178,31 @@ function AdHocAttendanceContent() {
   // Pending cell updates map: "studentId-sessionId" -> boolean
   const [pendingCells, setPendingCells] = React.useState<Record<string, boolean>>({})
 
-  // Controls
-  const [viewLayout, setViewLayout] = React.useState<"matrix" | "roster">("matrix")
+  // Controls — seed from deep-link query params when present (e.g. Sessions → Take roll)
+  const [viewLayout, setViewLayout] = React.useState<"matrix" | "roster">(
+    layoutFromUrl === "roster" ? "roster" : "matrix"
+  )
   const [rangeMode, setRangeMode] = React.useState<"session" | "month" | "custom">("session")
 
   // Single Day / Session Filter
-  const [selectedDate, setSelectedDate] = React.useState<string>(new Date().toISOString().split("T")[0])
+  const [selectedDate, setSelectedDate] = React.useState<string>(
+    dateFromUrl || toLocalDateString()
+  )
 
   // Roster View Selected Session ID
-  const [rosterSessionId, setRosterSessionId] = React.useState<number | null>(null)
+  const [rosterSessionId, setRosterSessionId] = React.useState<number | null>(
+    sessionIdFromUrl ? Number(sessionIdFromUrl) : null
+  )
   const [rosterSearch, setRosterSearch] = React.useState("")
   const [studentSearch, setStudentSearch] = React.useState("")
 
   // Filters
-  const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>("all")
-  const [selectedTeacherId, setSelectedTeacherId] = React.useState<string>("all")
+  const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>(
+    subjectIdFromUrl || "all"
+  )
+  const [selectedTeacherId, setSelectedTeacherId] = React.useState<string>(
+    teacherIdFromUrl || "all"
+  )
 
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
@@ -199,7 +217,7 @@ function AdHocAttendanceContent() {
   const [isAddSessionOpen, setIsAddSessionOpen] = React.useState(false)
   const [newSubjectId, setNewSubjectId] = React.useState<string>("")
   const [newTeacherId, setNewTeacherId] = React.useState<string>("")
-  const [newDate, setNewDate] = React.useState<string>(new Date().toISOString().split("T")[0])
+  const [newDate, setNewDate] = React.useState<string>(toLocalDateString())
   const [newStartTime, setNewStartTime] = React.useState<string>("09:00:00")
   const [newEndTime, setNewEndTime] = React.useState<string>("10:00:00")
   const [isCreatingSession, setIsCreatingSession] = React.useState(false)
@@ -555,7 +573,7 @@ function AdHocAttendanceContent() {
 
       setNewSubjectId("")
       setNewTeacherId("")
-      setNewDate(new Date().toISOString().split("T")[0])
+      setNewDate(toLocalDateString())
       setNewStartTime("09:00:00")
       setNewEndTime("10:00:00")
       setIsAddSessionOpen(false)
@@ -673,7 +691,7 @@ function AdHocAttendanceContent() {
               setIsAddSessionOpen(true)
               if (subjects.length > 0) setNewSubjectId(subjects[0].id.toString())
               if (teachers.length > 0) setNewTeacherId(teachers[0].id.toString())
-              setNewDate(new Date().toISOString().split("T")[0])
+              setNewDate(toLocalDateString())
               setNewStartTime("09:00:00")
               setNewEndTime("10:00:00")
             },

@@ -26,6 +26,7 @@ import {
   ArrowLeft,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
+import { toLocalDateString } from "@/lib/utils"
 import {
   type Class,
   type Subject,
@@ -182,7 +183,7 @@ function ClassAttendanceContent() {
 
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
-  const todayStr = React.useMemo(() => new Date().toISOString().split("T")[0], [])
+  const todayStr = React.useMemo(() => toLocalDateString(), [])
 
   // ── Filters are derived from the URL search params (single source of truth) ──
   const dateParam = searchParams.get("date")

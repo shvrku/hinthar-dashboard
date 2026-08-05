@@ -42,7 +42,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { cn, toLocalDateString } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -147,9 +147,7 @@ function StudentFormModal({
 }) {
   const [name, setName] = React.useState("")
   const [dob, setDob] = React.useState("")
-  const [enrollmentDate, setEnrollmentDate] = React.useState(
-    () => new Date().toISOString().slice(0, 10)
-  )
+  const [enrollmentDate, setEnrollmentDate] = React.useState(() => toLocalDateString())
   const [contact, setContact] = React.useState("")
   const [examCandidateNumber, setExamCandidateNumber] = React.useState("")
 
@@ -160,7 +158,7 @@ function StudentFormModal({
       setEnrollmentDate(
         initial?.enrollment_date
           ? initial.enrollment_date.slice(0, 10)
-          : new Date().toISOString().slice(0, 10)
+          : toLocalDateString()
       )
       setContact(initial?.contact ?? "")
       setExamCandidateNumber(initial?.exam_candidate_number ?? "")

@@ -41,7 +41,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { cn, toLocalDateString } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Skeleton row
@@ -450,7 +450,7 @@ export default function TeachersPage() {
 
   const openAddModal = () => {
     setEditing(null)
-    setFormInitial({ ...EMPTY_FORM, join_date: new Date().toISOString().slice(0, 10) })
+    setFormInitial({ ...EMPTY_FORM, join_date: toLocalDateString() })
     setSchoolCode("HIS")
     setShowForm(true)
   }
