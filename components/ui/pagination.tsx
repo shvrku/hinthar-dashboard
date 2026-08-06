@@ -4,7 +4,7 @@ import * as React from "react"
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -48,10 +48,7 @@ function PaginationButton({
       data-active={isActive}
       variant={isActive ? "default" : "outline"}
       size={size}
-      className={cn(
-        "h-7 w-7 p-0 cursor-pointer select-none",
-        className
-      )}
+      className={cn("size-7 p-0 cursor-pointer select-none", className)}
       {...props}
     />
   )
@@ -66,7 +63,7 @@ function PaginationPrevious({
       aria-label="Go to previous page"
       variant="outline"
       size="icon-xs"
-      className={cn("h-7 w-7 p-0 cursor-pointer", className)}
+      className={cn("size-7 p-0 cursor-pointer", className)}
       {...props}
     >
       <ChevronLeftIcon className="size-3.5" />
@@ -84,7 +81,7 @@ function PaginationNext({
       aria-label="Go to next page"
       variant="outline"
       size="icon-xs"
-      className={cn("h-7 w-7 p-0 cursor-pointer", className)}
+      className={cn("size-7 p-0 cursor-pointer", className)}
       {...props}
     >
       <ChevronRightIcon className="size-3.5" />
@@ -101,7 +98,7 @@ function PaginationEllipsis({
     <span
       aria-hidden
       data-slot="pagination-ellipsis"
-      className={cn("flex h-7 w-7 items-center justify-center text-muted-foreground", className)}
+      className={cn("flex size-7 items-center justify-center text-muted-foreground", className)}
       {...props}
     >
       <MoreHorizontalIcon className="size-3.5" />

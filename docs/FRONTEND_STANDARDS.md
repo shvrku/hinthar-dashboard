@@ -43,19 +43,19 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
 | `/teachers` | Good | Payroll rate/bank fields removed. |
 | `/students` | Good | Server search + pagination; bulk import helps scale. |
+| `/students/[id]` | Good | Staff hub: profile, enrollments, QR activate/deactivate/regenerate, campus vs lesson analytics. |
 | `/subjects` | Good | Simple catalog. |
 | `/users` | Good | Server `q` + role filter. |
-| `/timetable` | Medium | Empty states / legend still thin. |
+| `/timetable` | Good | Empty states + week legend; Empty* when no classes / no slots. |
 | `/sessions` | Medium | Timetabled vs ad-hoc toggle easy to miss; Paid residue gone. |
 | `/attendance/` | Better | Landing → class or ad-hoc. Remaining: deep links from Sessions; optional density polish. |
 | `/attendance/class/[classId]/` | Good | Server subject/teacher filters; headers show subject · teacher; identifiers under names; excused supported. |
 | `/attendance/adhoc/` | Good | Add Session + **Add Students** (server search, load-more). Empty grid until students added. |
-| `/check-in/overview` | Medium–good | Needs redesign: class-first picker; group **Checked in** vs **Missing** (see scaling plan Phase 6). |
-| `/check-in/management` | Good | QR view + regenerate. Todo: activate/deactivate tokens. |
+| `/check-in/overview` | Good | Server aggregate. **All classes**: dual Missing \| Checked-in columns, each paginated via `status=`; single class keeps dual columns unpaginated; icon-only **Undo** / actions; school-wide search. |
+| `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
 | `/check-in/corrections` | Good | Undo mis-tap campus check-ins; auto-reverts lesson marks attributed to that check-in. |
-| `/check-in/terminal` | Good | Purpose-built. |
-| `/support`, `/feedback` | Placeholder | Hide until real. |
-| Auth / roles | Addressed | Gates exist; still enforce API scoping for teachers/students. |
+| `/check-in/terminal` | Good | Lookup → confirm → commit; deactivated QR shows confirmation-panel card with student info when available. |
+| Auth / roles | Addressed | Resource `auth.protect` + gates; still enforce API scoping for teachers/students. |
 
 ### Attendance UX — current contract
 
@@ -79,10 +79,11 @@ Verdicts are for **front-office / academic staff**, not developers.
 
 | Layer | Standard |
 |-------|----------|
-| Clerk | Middleware (`proxy.ts`) protects app routes; public: sign-in/up only |
+| Clerk | `proxy.ts` is session plumbing only (`clerkMiddleware()`). Do **not** use `createRouteMatcher` for auth gates. |
+| Resource auth | `await auth.protect()` in `app/(app)/layout.tsx`; API proxy checks session and returns 401. Public: `app/(public)/sign-in`, `sign-up`. |
 | Identity | Call `GET /me/` after sign-in; cache role on client context |
 | Nav | Filter sidebar items by `isStaffOrAbove` / `isTerminalOrAbove` / etc. |
-| Page gate | Shared `<RequireRole minimum="staff" />` (or allow-list) |
+| Page gate | Shared `<RequireRole minimum="staff" />` (or allow-list); `AppAccessGate` for terminal/pending redirects |
 | Actions | Hide destructive buttons the role cannot call (still enforced by API) |
 
 Mirror backend helpers in `lib/roles.ts`:
@@ -118,7 +119,31 @@ When adding a paginated list page:
 - Use shadcn primitives from `components/ui/` — do not reinvent Select/Dialog/Table.
 - Shared chrome: `StandardPageHeader`, KPI strip, confirm dialog (**one** shared `ConfirmDialog`, not per-page copies).
 - Forms: consistent required-field marking; no payroll fields on teachers/sessions.
-- Motion: keep existing subtle stagger; do not add decorative noise.
+- Motion: wrap management pages in `StaggerContainer` / `StaggerItem` (include the header). Do not add decorative noise or page-level padding on the stagger root.
+
+### Page header & reload contract
+
+| Slot | Use for | Variant |
+|------|---------|---------|
+| `back` | Parent navigation | Ghost — always **"Back to {label}"** |
+| `children` | Tertiary (Import CSV, Add Students, …) | `outline` |
+| `secondaryAction` | Reload list / matrix | **`outline`** via `buildReloadAction` |
+| `primaryAction` | Create / main CTA | `default` (filled) |
+
+Reload terminology (`buildReloadAction` / `reloadActionLabel`):
+
+- Before first successful fetch → **"Load Data"**
+- After data has loaded once → **"Refresh"**
+- While busy → keep that label, `disabled`, spin `RotateCcw` — **do not** use "Loading…" / "Refreshing…" as the button text
+- Empty before first load: `Click "Load Data" to fetch …`
+- Empty after load: `No … found.`
+
+Loading states:
+
+- Initial / empty table **and page changes**: shared skeletons from `components/page-skeletons.tsx` whenever `loading` is true (do not keep stale rows while page numbers move)
+- Pagination footer: pass `loading` to `StandardTablePagination` → **"Loading page…"** + spinner, disable page/size controls until the fetch finishes
+- Header reload: button spinner via `buildReloadAction` (label stays Load Data / Refresh)
+- Auth bootstrap only: full-page spinner OK
 
 ### Payroll UI scrap list
 
@@ -174,15 +199,29 @@ When a new overview is needed (e.g. class attendance for a term):
 |------------|--------|
 | Attendance Matrix (nav) | Session Attendance |
 | Paid session | (remove) |
-| Default rate | (remove until payroll) |
+| Default rate | Out of scope — do not show (payroll frozen) |
 | Dashboard (static home) | Overview **or** live Stats dashboard |
 
 Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI).
 
 ---
 
-## 7. Design system note
+## 7. Design system & color tokens
 
 - Follow shadcn skill / CLI; preset `b2C8WxsCO` when initializing or migrating tokens.
-- Until the preset is applied consistently, new UI must still use existing `components/ui` and CSS variables — no one-off color systems on individual pages.
-- Ignore nested `time_table/` tree for product work (legacy fork risk).
+- **Do not invent one-off palette colors** (`emerald-*`, `rose-*`, `amber-*`, `sky-*`) in page CSS.
+- Use semantic tokens from `app/globals.css` (wired in `@theme inline`):
+
+| Token | Use for |
+|-------|---------|
+| `success` / `success-foreground` | Positive feedback banners, success badges |
+| `warning` / `warning-foreground` | Soft alerts (already checked in, deactivated QR) |
+| `destructive` | Errors, destructive actions |
+| `attendance-present` / `late` / `absent` / `excused` | Lesson roll status UI + charts |
+| `attendance-campus` | Campus check-in chart series |
+
+- Shared class helpers: `lib/status-styles.ts` (`feedbackBanner`, `attendanceSurface`, …).
+- Chart fills: `lib/chart-colors.ts` (`ATTENDANCE_STATUS_COLORS`, `CAMPUS_CHECKIN_COLOR`).
+- Until the preset is applied consistently, new UI must still use existing `components/ui` and these CSS variables.
+
+Ignore nested `time_table/` tree for product work (legacy fork risk).

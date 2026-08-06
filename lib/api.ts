@@ -1,5 +1,9 @@
 export class ApiError extends Error {
-  constructor(public status: number, public userMessage: string) {
+  constructor(
+    public status: number,
+    public userMessage: string,
+    public payload?: unknown
+  ) {
     super(userMessage)
     this.name = "ApiError"
   }
@@ -9,6 +13,9 @@ export class ApiError extends Error {
 // This keeps all browser requests same-origin, avoiding CORS entirely.
 const API_BASE = "/api/v1"
 
+/** Builds a query string. The value `"all"` is omitted (UI filter sentinel =
+ * "no filter"). Callers that need a literal `all` (e.g. overview `class_id`)
+ * must build that param themselves — see `overviewClass`. */
 function buildQueryString(params?: Record<string, string | number | undefined | null>): string {
   const query = new URLSearchParams()
   if (params) {
@@ -48,10 +55,12 @@ async function request<T>(
 
   if (!res.ok) {
     let detail = "An error occurred"
+    let payload: unknown = undefined
     const raw = await res.text()
     if (raw) {
       try {
         const json = JSON.parse(raw)
+        payload = json
         if (json && typeof json === "object") {
           if (typeof json.detail === "string") {
             detail = json.detail
@@ -68,7 +77,7 @@ async function request<T>(
         detail = raw // use raw text if not JSON
       }
     }
-    throw new ApiError(res.status, detail)
+    throw new ApiError(res.status, detail, payload)
   }
 
   if (res.status === 204) return undefined as T
@@ -281,9 +290,31 @@ export function createApi(token: string) {
       request<import("./types").Student>(`/students/${id}/check_in_token/`, token),
 
     regenerateCheckInToken: (id: number) =>
-      request<import("./types").Student>(`/students/${id}/regenerate_check_in_token/`, token, {
-        method: "POST",
-      }),
+      request<{ check_in_token: string; check_in_token_active?: boolean }>(
+        `/students/${id}/regenerate_check_in_token/`,
+        token,
+        { method: "POST" }
+      ),
+
+    activateCheckInToken: (id: number) =>
+      request<{ check_in_token_active: boolean }>(
+        `/students/${id}/activate_check_in_token/`,
+        token,
+        { method: "POST" }
+      ),
+
+    deactivateCheckInToken: (id: number) =>
+      request<{ check_in_token_active: boolean }>(
+        `/students/${id}/deactivate_check_in_token/`,
+        token,
+        { method: "POST" }
+      ),
+
+    getStudentAttendanceSummary: (id: number, range: import("./types").StudentAnalyticsRange) =>
+      request<import("./types").StudentAttendanceSummary>(
+        `/students/${id}/attendance-summary/?range=${encodeURIComponent(range)}`,
+        token
+      ),
 
     // --- Check-Ins ---
     listCheckIns: (params?: Record<string, string | number | undefined | null>) =>
@@ -312,6 +343,52 @@ export function createApi(token: string) {
 
     deleteCheckIn: (id: number) =>
       request<void>(`/check-ins/${id}/`, token, { method: "DELETE" }),
+
+    // Server-side aggregate for the overview page. Mode is inferred from params:
+    // search -> paginated matches; class_id=all -> school roster; class_id -> one roster; neither -> picker summary.
+    overviewClasses: (date: string) =>
+      request<import("./types").OverviewClassesResponse>(
+        `/check-ins/overview/${buildQueryString({ date })}`,
+        token
+      ),
+
+    // class_id=all must be sent literally. buildQueryString strips "all" for
+    // filter UIs (subject/teacher = all means omit), which would wrongly hit
+    // the picker-summary mode instead of the school-wide roster.
+    overviewClass: (
+      date: string,
+      classId: number | "all",
+      params?: {
+        page?: number
+        page_size?: number
+        status?: "missing" | "arrived"
+      }
+    ) => {
+      const query = new URLSearchParams({
+        date,
+        class_id: String(classId),
+      })
+      if (classId === "all") {
+        if (params?.page != null) query.set("page", String(params.page))
+        if (params?.page_size != null)
+          query.set("page_size", String(params.page_size))
+        if (params?.status) query.set("status", params.status)
+      }
+      return request<
+        | import("./types").OverviewClassResponse
+        | import("./types").OverviewSchoolResponse
+      >(`/check-ins/overview/?${query.toString()}`, token)
+    },
+
+    overviewSearch: (
+      date: string,
+      search: string,
+      params?: { page?: number; page_size?: number }
+    ) =>
+      request<import("./types").OverviewSearchResponse>(
+        `/check-ins/overview/${buildQueryString({ date, search, ...params })}`,
+        token
+      ),
 
     bulkDeleteCheckIns: (ids: number[]) =>
       request<{

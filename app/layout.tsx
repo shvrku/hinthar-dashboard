@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Public_Sans, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
 import { FocusProvider } from "@/components/focus-context";
 import { CurrentUserProvider } from "@/components/current-user-provider";
-import { AppAccessGate } from "@/components/app-access-gate";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 import Script from "next/script";
@@ -26,13 +22,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "Hinthar — School Management Dashboard"
+const title = "Hinthar — School Management Dashboard";
 const description =
-  "Manage classes, students, teachers, sessions, and attendance in one place. Built for schools and education centres."
-const ogImage = "/opengraph-image"
+  "Manage classes, students, teachers, sessions, and attendance in one place. Built for schools and education centres.";
+const ogImage = "/opengraph-image";
 const siteUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
   title,
@@ -100,17 +96,7 @@ export default function RootLayout({
           <ThemeProvider>
             <ClerkThemeProvider>
               <CurrentUserProvider>
-                <TooltipProvider>
-                  <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
-                    <AppSidebar />
-                    <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                      <SiteHeader />
-                      <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
-                        <AppAccessGate>{children}</AppAccessGate>
-                      </main>
-                    </SidebarInset>
-                  </SidebarProvider>
-                </TooltipProvider>
+                <TooltipProvider>{children}</TooltipProvider>
               </CurrentUserProvider>
             </ClerkThemeProvider>
           </ThemeProvider>

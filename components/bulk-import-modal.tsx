@@ -506,7 +506,7 @@ export function BulkImportModal({
                             </TableCell>
                             <TableCell>
                               {item.valid ? (
-                                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 gap-1 font-normal">
+                                <Badge variant="secondary" className="bg-success/10 text-success gap-1 font-normal">
                                   <CheckCircle2 className="size-3" /> Valid
                                 </Badge>
                               ) : (

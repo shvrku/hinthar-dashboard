@@ -66,25 +66,23 @@ export function SiteHeader() {
                   Hinthar
                 </BreadcrumbLink>
               </BreadcrumbItem>
-              {segments.map((segment, index) => {
+              {segments.flatMap((segment, index) => {
                 const href = `/${segments.slice(0, index + 1).join("/")}`
                 const isLast = index === segments.length - 1
                 const title = formatPathSegment(segment)
 
-                return (
-                  <React.Fragment key={href}>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      {isLast ? (
-                        <BreadcrumbPage>{title}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink render={<Link href={href} />}>
-                          {title}
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                  </React.Fragment>
-                )
+                return [
+                  <BreadcrumbSeparator key={`${href}-sep`} />,
+                  <BreadcrumbItem key={href}>
+                    {isLast ? (
+                      <BreadcrumbPage>{title}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink render={<Link href={href} />}>
+                        {title}
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>,
+                ]
               })}
             </BreadcrumbList>
           </Breadcrumb>

@@ -143,9 +143,7 @@ The `sidebar-08` component pattern features an **Inset Frame** (`SidebarInset`),
   │     │     ├── <SidebarGroup label="Management">
   │     │     │     └── <SidebarMenu> [Classes, Teachers, Students, Subjects]
   │     │     ├── <SidebarGroup label="Operations">
-  │     │     │     └── <SidebarMenu> [Sessions, Timetables, Check-Ins, QR Terminal]
-  │     │     └── <SidebarGroup label="Finance">
-  │     │           └── <SidebarMenu> [Payroll, Payouts]
+  │     │     │     └── <SidebarMenu> [Sessions, Timetables, Session Attendance, Check-In]
   │     └── <SidebarFooter>
   │           └── <NavUser />  ── [User Profile, Theme Toggle, Logout]
   │

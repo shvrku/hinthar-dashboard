@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Loader2 } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -15,8 +16,8 @@ import {
   PaginationButton,
   PaginationNext,
   PaginationPrevious,
-  PaginationEllipsis,
 } from "@/components/ui/pagination"
+import { cn } from "@/lib/utils"
 
 interface StandardTablePaginationProps {
   currentPage: number
@@ -27,6 +28,8 @@ interface StandardTablePaginationProps {
   pageSize: number
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
+  /** True while the current page of rows is being fetched. */
+  loading?: boolean
 }
 
 export function StandardTablePagination({
@@ -38,8 +41,8 @@ export function StandardTablePagination({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  loading = false,
 }: StandardTablePaginationProps) {
-  // Generate page numbers array
   const pageNumbers = React.useMemo(() => {
     const pages: number[] = []
     const maxVisible = 5
@@ -57,23 +60,37 @@ export function StandardTablePagination({
   }, [currentPage, totalPages])
 
   return (
-    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 px-4 py-3 rounded-xl border border-border/80 bg-card shadow-2xs text-xs text-muted-foreground w-full">
-      {/* Items range summary */}
-      <div className="text-center sm:text-left text-muted-foreground w-full sm:w-auto">
-        Showing <span className="font-semibold text-foreground">{startIndex}</span> to{" "}
-        <span className="font-semibold text-foreground">{endIndex}</span> of{" "}
-        <span className="font-semibold text-foreground">{totalItems}</span> items
+    <div
+      className={cn(
+        "mt-4 flex w-full flex-col items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs sm:flex-row sm:gap-4",
+        loading && "opacity-90"
+      )}
+      aria-busy={loading}
+    >
+      <div className="flex w-full items-center justify-center gap-2 text-center sm:w-auto sm:justify-start sm:text-left">
+        {loading ? (
+          <>
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-foreground" />
+            <span className="font-medium text-foreground">Loading page…</span>
+          </>
+        ) : (
+          <span>
+            Showing <span className="font-semibold text-foreground">{startIndex}</span> to{" "}
+            <span className="font-semibold text-foreground">{endIndex}</span> of{" "}
+            <span className="font-semibold text-foreground">{totalItems}</span> items
+          </span>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
-        {/* Rows per page selector */}
-        <div className="flex items-center gap-2 shrink-0">
+      <div className="flex w-full flex-wrap items-center justify-center gap-3 sm:w-auto sm:justify-end sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2">
           <span className="whitespace-nowrap">Rows per page</span>
           <Select
             value={pageSize.toString()}
             onValueChange={(val) => onPageSizeChange(Number(val))}
+            disabled={loading}
           >
-            <SelectTrigger className="h-8 w-16 text-xs bg-background">
+            <SelectTrigger className="h-8 w-16 bg-background text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -87,13 +104,12 @@ export function StandardTablePagination({
           </Select>
         </div>
 
-        {/* Page navigation buttons using shadcn Pagination */}
         <Pagination className="mx-0 w-auto shrink-0">
           <PaginationContent className="gap-1">
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage <= 1}
+                disabled={loading || currentPage <= 1}
               />
             </PaginationItem>
 
@@ -103,10 +119,14 @@ export function StandardTablePagination({
               const isHiddenOnMobile = !isCurrent && !isAdjacent && pageNumbers.length > 3
 
               return (
-                <PaginationItem key={page} className={isHiddenOnMobile ? "hidden sm:inline-block" : ""}>
+                <PaginationItem
+                  key={page}
+                  className={isHiddenOnMobile ? "hidden sm:inline-block" : ""}
+                >
                   <PaginationButton
                     isActive={isCurrent}
                     onClick={() => onPageChange(page)}
+                    disabled={loading}
                   >
                     {page}
                   </PaginationButton>
@@ -117,7 +137,7 @@ export function StandardTablePagination({
             <PaginationItem>
               <PaginationNext
                 onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage >= totalPages}
+                disabled={loading || currentPage >= totalPages}
               />
             </PaginationItem>
           </PaginationContent>

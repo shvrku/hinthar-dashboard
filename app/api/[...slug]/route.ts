@@ -26,6 +26,8 @@ async function handleRequest(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string[] }> }
 ) {
+  // Resource-level auth (replaces middleware createRouteMatcher gate).
+  // Keep explicit 401 JSON — auth.protect() returns 404 for non-document requests.
   const { userId, getToken } = await auth()
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

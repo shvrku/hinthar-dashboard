@@ -64,6 +64,46 @@ export interface Student {
   exam_candidate_number: string | null
   user_id: number
   check_in_token: string
+  check_in_token_active?: boolean
+}
+
+export type StudentAnalyticsRange = "week" | "month" | "all"
+
+export interface StudentAttendanceSummary {
+  range: StudentAnalyticsRange
+  date_from: string
+  date_to: string
+  campus: {
+    days_in_range: number
+    days_checked_in: number
+    rate: number | null
+    daily: { date: string; checked_in: boolean }[]
+  }
+  lesson: {
+    total_sessions: number
+    present: number
+    late: number
+    absent: number
+    excused: number
+    rate_attended: number | null
+    by_status: { status: SessionAttendanceStatus; count: number }[]
+    by_class: {
+      class_id: number
+      class_label: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+      total: number
+    }[]
+    trend: {
+      date: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+    }[]
+  }
 }
 
 export interface Teacher {
@@ -191,6 +231,83 @@ export interface CheckIn {
 export interface CheckInPayload {
   student: number
   check_in_type: "qr" | "manual"
+}
+
+// --- Check-in overview aggregate (GET /check-ins/overview/) ---
+
+export interface CheckInStatus {
+  id: number
+  timestamp: string
+  check_in_type: "qr" | "manual"
+}
+
+export interface OverviewClassSummary {
+  id: number
+  label: string
+  arrived: number
+  total: number
+}
+
+export interface OverviewClassStudent {
+  id: number
+  name: string
+  unique_code: string | null
+  class_id?: number | null
+  class_label?: string | null
+  check_in: CheckInStatus | null
+}
+
+export interface OverviewSearchResult {
+  student_id: number
+  name: string
+  unique_code: string | null
+  class_id: number
+  class_label: string
+  check_in: CheckInStatus | null
+}
+
+export interface OverviewClassesResponse {
+  mode: "classes"
+  date: string
+  classes: OverviewClassSummary[]
+}
+
+export interface OverviewClassResponse {
+  mode: "class"
+  date: string
+  class: { id: number; label: string }
+  arrived: number
+  total: number
+  students: OverviewClassStudent[]
+}
+
+export interface OverviewSchoolResponse {
+  mode: "school"
+  date: string
+  class: { id: null; label: string }
+  arrived: number
+  total: number
+  count: number
+  page: number
+  page_size: number
+  num_pages: number
+  /** Present when requested via `status=missing|arrived`. */
+  status?: "missing" | "arrived"
+  students: OverviewClassStudent[]
+}
+
+export type OverviewRosterResponse =
+  | OverviewClassResponse
+  | OverviewSchoolResponse
+
+export interface OverviewSearchResponse {
+  mode: "search"
+  date: string
+  count: number
+  page: number
+  page_size: number
+  num_pages: number
+  results: OverviewSearchResult[]
 }
 
 // Safe student lookup for the terminal confirmation step (no QR token exposed).

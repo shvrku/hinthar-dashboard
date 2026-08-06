@@ -19,7 +19,7 @@ export function ThemeToggle() {
           exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
           transition={{ duration: 0.2 }}
         >
-          {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4 text-amber-400" />}
+          {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4 text-warning" />}
         </motion.div>
       </AnimatePresence>
       <span className="sr-only">Toggle theme</span>

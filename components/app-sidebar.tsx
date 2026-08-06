@@ -137,7 +137,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, [signOut])
 
   return (
-    <Sidebar collapsible="icon" variant="inset" {...props}>
+    <Sidebar
+      collapsible="icon"
+      variant="inset"
+      {...props}
+    >
       {/* Brand Header */}
       <SidebarHeader>
         <SidebarMenu>
@@ -313,18 +317,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   }
                 />
                 <DropdownMenuContent className="w-64" side="right" align="end" sideOffset={4}>
-                  <DropdownMenuLabel className="p-0 font-normal">
-                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                      <Avatar className="h-8 w-8 rounded-lg">
-                        <AvatarImage src={userAvatar} alt={userName} />
-                        <AvatarFallback className="rounded-lg">HT</AvatarFallback>
-                      </Avatar>
-                      <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-semibold">{userName}</span>
-                        <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="p-0 font-normal">
+                      <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                        <Avatar className="h-8 w-8 rounded-lg">
+                          <AvatarImage src={userAvatar} alt={userName} />
+                          <AvatarFallback className="rounded-lg">HT</AvatarFallback>
+                        </Avatar>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                          <span className="truncate font-semibold">{userName}</span>
+                          <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                        </div>
                       </div>
-                    </div>
-                  </DropdownMenuLabel>
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <DropdownMenuItem onClick={() => openUserProfile()} className="cursor-pointer">
@@ -333,20 +339,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleSwitchAccount}
-                    className="cursor-pointer"
-                  >
-                    <Repeat2 className="mr-2 size-4 text-primary" />
-                    <span>Switch account</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => signOut({ redirectUrl: "/sign-in/" })}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="mr-2 size-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={handleSwitchAccount}
+                      className="cursor-pointer"
+                    >
+                      <Repeat2 className="mr-2 size-4 text-primary" />
+                      <span>Switch account</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => signOut({ redirectUrl: "/sign-in/" })}
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                    >
+                      <LogOut className="mr-2 size-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (

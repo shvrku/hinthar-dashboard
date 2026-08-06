@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 
 const navigationItems = [
+  { title: "Dashboard", href: "/", group: "Overview", icon: LayoutDashboard },
   { title: "Classes Roster", href: "/classes", group: "Management", icon: GraduationCap },
   { title: "Student Directory", href: "/students", group: "Management", icon: Users },
   { title: "Teacher Faculty", href: "/teachers", group: "Management", icon: UserCheck },
