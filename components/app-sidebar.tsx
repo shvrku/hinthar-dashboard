@@ -23,6 +23,7 @@ import {
   School,
   Repeat2,
   Undo2,
+  Search,
 } from "lucide-react"
 
 import {
@@ -76,6 +77,7 @@ const managementItems = [
 
 const operationsItems = [
   { title: "Sessions", url: "/sessions", icon: Clock },
+  { title: "Find sessions", url: "/sessions/find", icon: Search },
   { title: "Timetables", url: "/timetable", icon: Calendar },
   { title: "Session Attendance", url: "/attendance", icon: ClipboardCheck },
 ]
@@ -201,7 +203,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarGroupLabel>Operations</SidebarGroupLabel>
               <SidebarMenu>
                 {operationsItems.map((item) => {
-                  const isActive = pathname === item.url
+                  const isActive =
+                    item.url === "/sessions"
+                      ? pathname === "/sessions" || pathname === "/sessions/"
+                      : pathname === item.url ||
+                        pathname.startsWith(`${item.url}/`)
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>

@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
-import { cn, toLocalDateString } from "@/lib/utils"
+import { cn, toLocalDateString, formatBackendDateTime } from "@/lib/utils"
 import {
   Table,
   TableHeader,
@@ -60,16 +60,7 @@ function checkInStudentCode(row: CheckIn): string | null {
 }
 
 function formatTimestamp(iso: string) {
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return iso
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  })
+  return formatBackendDateTime(iso)
 }
 
 function RowSkeleton() {

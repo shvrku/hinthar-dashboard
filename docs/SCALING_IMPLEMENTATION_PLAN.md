@@ -7,7 +7,7 @@ Cross-repo plan to bring **Hinthar-SMS** (backend) and **Hinthar-Dashboard** (fr
 
 Goal: scale students / teachers / class times / attendance safely; **scrap payroll from the product surface**; keep attendance matrices as scoped aggregate routes; introduce consistent pagination and role helpers.
 
-**Last status update:** 2026-08-06 (Clerk resource auth + Phase 0/5/6 polish).
+**Last status update:** 2026-08-06 (Phase 7 class/teacher hubs + actual_teacher cover + shadcn charts).
 
 ---
 
@@ -21,21 +21,21 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 | 3 | Pagination + list pages off fetch-all | **Done** — default page 50 / max 200; list pages use `list*Page` + server `q`/filters (no hybrid fetch-all) |
 | 4 | Attendance matrix filters + UX split | **Done** — matrix `class_id` 400; Sessions Take roll deep links |
 | 5 | Bulk / filter / OpenAPI hygiene | **Done** — `records` preferred; `class_id` aliases; page-boundary tests; error freeze; global handler deferred |
-| 6 | Design system, check-in UX, QR lifecycle | **Done** (preset migrate deferred) — ConfirmDialog, timetable empty/legend, thin role homes, Clerk resource auth |
-| 7 | Entity detail pages + analytics + teacher cover | **In progress** — student hub shipped; class/teacher hubs next |
+| 6 | Design system, check-in UX, QR lifecycle | **Done** — ConfirmDialog, timetable empty/legend, thin role homes, Clerk resource auth; shadcn **base-vega / zinc** + Chart |
+| 7 | Entity detail pages + analytics + teacher cover | **Done** — student / class / teacher hubs; `actual_teacher` cover; row-click lists |
 
 ### Remaining (priority order)
 
-1. **Class detail hub** — attendance analytics for that class (lesson roll metrics; keep campus check-in labeled separately if shown).
-2. **Teacher attendance + substitutes** — how staff mark teacher presence / absences and assign cover (product + API + UI TBD).
-3. **shadcn preset `b2C8WxsCO` migrate** — dedicated PR; re-merge semantic tokens after apply.
-4. Optional: commit Spectacular schema snapshot; global DRF exception handler.
+1. Optional: commit Spectacular schema snapshot; global DRF exception handler.
+2. Teacher-scoped querysets (if teacher login is imminent).
+3. Teacher check-in writing `actual_teacher` (deferred — field reserved).
 
 ### Out of scope until product asks
 
 - Reviving `payroll/`
 - Clerk multi-session / Pro org switching as the account-switch story (current: sign out → sign-in)
 - Student self-service portal
+- Day-level teacher attendance; dedicated `substituted` session status
 
 ---
 
@@ -134,13 +134,13 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 
 ---
 
-## Phase 6 — Design system, check-in UX & QR lifecycle — DONE (preset deferred)
+## Phase 6 — Design system, check-in UX & QR lifecycle — DONE
 
 | Task | Status |
 |------|--------|
 | `/dashboard` redirects to `/` | Done |
 | Live KPIs on `/` via `getStats()` | Done |
-| shadcn preset `b2C8WxsCO` migrate | Deferred — dedicated PR; preserve semantic tokens |
+| shadcn install (`base-vega` / zinc) | **Done** — see `components.json`; keep semantic tokens in `globals.css` |
 | Shared `ConfirmDialog` | **Done** — `components/confirm-dialog.tsx` |
 | Role-appropriate home surfaces | **Done** — thin teacher/student/pending copy on `/pending` |
 | Timetable empty states / legend | **Done** — Empty* + week legend |
@@ -176,7 +176,7 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 
 ---
 
-## Phase 7 — Entity detail hubs, analytics, teacher cover — IN PROGRESS
+## Phase 7 — Entity detail hubs, analytics, teacher cover — DONE
 
 Product goal: deep links from list pages into per-entity surfaces; stop bouncing staff to Class / Check-In Management for everyday enrollment and QR work.
 
@@ -188,34 +188,43 @@ Product goal: deep links from list pages into per-entity surfaces; stop bouncing
 | **Analytics** (campus vs lesson, labeled separately; `range=week\|month\|all`) | Done — `GET /students/{id}/attendance-summary/` |
 | Enrolled classes (list + enroll / unenroll) | Done |
 | QR management (view / regenerate / activate / deactivate) | Done |
+| Charts via shadcn `ChartContainer` | Done |
 
-### Class detail (`/classes/[id]` or extend attendance class route) — next
+### Class detail (`/classes/[id]`) — **shipped**
 
-| Capability | Notes |
+| Capability | Status |
 |------------|--------|
-| **Attendance analytics only** (v1) | Roll rates, excused, trends by subject/teacher/time — not a second full matrix rewrite |
-| Optional later | Roster shortcuts, timetable summary |
+| Identity + edit | Done |
+| Roster enroll / unenroll | Done |
+| Timetable summary + Take roll | Done |
+| Attendance analytics (campus vs lesson separate) | Done — `GET /classes/{id}/attendance-summary/` |
 
-Likely API: scoped **class attendance summary** aggregate (reuse matrix filters mentally; do not dump unbound lists).
+### Teacher detail (`/teachers/[id]`) — **shipped**
 
-### Teacher attendance + substitutes — next
-
-| Capability | Notes |
+| Capability | Status |
 |------------|--------|
-| Teacher presence / absence tracking | Product decision: per session, per day, or both? |
-| Substitutes / cover | Assign cover teacher to a session (or day); show on roll / timetable |
-| Teacher detail page | Analytics + upcoming sessions + cover history |
+| Identity + edit | Done |
+| Accountability (student rolls for sessions taught) | Done |
+| Personal presence (derived from status + assigned vs `actual_teacher`) | Done |
+| Assign cover (`actual_teacher` on Session) | Done |
 
-Likely needs **new SMS models/routes** (no substitute concept in live product today) — design before coding.
+### Cover model
+
+- `Session.teacher` / `AdHocSession.teacher` = **Assigned** (from generation).
+- `actual_teacher` nullable — empty means taught as assigned; set only for a substitute (later reusable for teacher check-in).
+- No `substituted` status; no separate teacher_attendance enum.
+- Same-as-assigned values normalize to null on save.
+
+### List QoL
+
+- Row click on students / teachers / classes → entity hub (`stopPropagation` on actions).
 
 ### Suggested next-cycle order
 
 ```text
-1  Class detail: attendance analytics aggregate + UI
-2  Teacher attendance + substitute model/API spike → UI
-3  Teacher detail hub (if spike lands)
-4  Phase 5 OpenAPI / bulk hygiene
-5  Phase 6 ConfirmDialog + preset pass
+1  Optional: OpenAPI schema snapshot / global DRF exception handler
+2  Teacher-scoped querysets (if teacher login imminent)
+3  Teacher check-in → write actual_teacher (when product asks)
 ```
 
 ---
@@ -223,11 +232,9 @@ Likely needs **new SMS models/routes** (no substitute concept in live product to
 ## Moving forward (recommended next work)
 
 ```text
-Next 1  Class attendance analytics hub
-Next 2  Teacher attendance + substitutes (design → API → UI)
-Next 3  Phase 5 OpenAPI / bulk hygiene
-Next 4  Phase 6 ConfirmDialog + preset pass
-Next 5  Teacher scoped querysets (if teacher login is imminent)
+Next 1  Optional: OpenAPI schema snapshot / global exception handler
+Next 2  Teacher scoped querysets (if teacher login is imminent)
+Next 3  Teacher check-in via actual_teacher (deferred)
 ```
 
 Analytics product sketch: class roll (have), **student profile trends** (have), **class attendance summary**, teacher/subject coverage, school heatmaps — **never** mix campus check-in rate with lesson roll without labeling.
@@ -247,9 +254,9 @@ PR-G  matrix filters + attendance UX split + class_id 400 + Take roll  ✓
 PR-H  payroll field deprecation migrations (SMS)                 ✓
 PR-I  check-in correction + overview aggregate (school/search)   ✓
 PR-J  student hub + QR activate/deactivate + attendance-summary  ✓
-PR-K  class detail hub + analytics                               ← next
-PR-L  teacher attendance + substitutes                              ← next
-PR-M  design-system preset + ConfirmDialog                       ← can parallelize
+PR-K  class detail hub + analytics                               ✓
+PR-L  teacher attendance + substitutes (actual_teacher)            ✓
+PR-M  shadcn charts + list row-click                             ✓
 ```
 
 ---
@@ -285,8 +292,9 @@ PR-M  design-system preset + ConfirmDialog                       ← can paralle
 | Attendance matrices as scoped routes | **Done pattern** |
 | Check-in overview aggregate | **Done** — keep school dual-column + status pagination |
 | Hierarchy Admin &gt; Staff &gt; Terminal &gt; Teacher / Student | **Done** — keep tests green as routes change |
-| Entity detail hubs + analytics | **Student hub done**; class + teacher next |
-| Teacher cover / substitutes | **Next** — design models before UI |
+| Entity detail hubs + analytics | **Student / class / teacher hubs done** |
+| Teacher cover / substitutes | **Done** — `actual_teacher` (empty = as assigned) |
 | Semantic color tokens | **Done** — prefer tokens over palette utilities |
+| shadcn charts | **Done** — `components/ui/chart` |
 
-The main remaining scale risks are **OpenAPI drift**, **teacher over-open reads** (if teachers log in), and **missing class/teacher analytics / cover workflows** — not unbounded check-in overview downloads or payroll UI.
+The main remaining scale risks are **OpenAPI drift** and **teacher over-open reads** (if teachers log in) — not missing entity hubs or unbounded check-in overview downloads.

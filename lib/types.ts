@@ -68,6 +68,7 @@ export interface Student {
 }
 
 export type StudentAnalyticsRange = "week" | "month" | "all"
+export type AnalyticsRange = StudentAnalyticsRange
 
 export interface StudentAttendanceSummary {
   range: StudentAnalyticsRange
@@ -96,6 +97,15 @@ export interface StudentAttendanceSummary {
       excused: number
       total: number
     }[]
+    by_subject?: {
+      subject_id: number | null
+      subject_label: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+      total: number
+    }[]
     trend: {
       date: string
       present: number
@@ -103,6 +113,118 @@ export interface StudentAttendanceSummary {
       absent: number
       excused: number
     }[]
+  }
+}
+
+export interface ClassAttendanceSummary {
+  range: AnalyticsRange
+  date_from: string
+  date_to: string
+  campus: {
+    enrolled_students: number
+    days_in_range: number
+    check_ins: number
+    rate: number | null
+    daily: { date: string; checked_in: number; enrolled: number }[]
+  }
+  lesson: {
+    total_marks: number
+    present: number
+    late: number
+    absent: number
+    excused: number
+    rate_attended: number | null
+    by_status: { status: SessionAttendanceStatus; count: number }[]
+    by_subject: {
+      subject_id: number | null
+      subject_label: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+      total: number
+    }[]
+    by_teacher: {
+      teacher_id: number | null
+      teacher_name: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+      total: number
+    }[]
+    trend: {
+      date: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+    }[]
+  }
+}
+
+export type TeacherPersonalOutcome =
+  | "unmarked"
+  | "present"
+  | "covered"
+  | "cover_taught"
+  | "no_show"
+  | "cancelled"
+
+export interface TeacherAttendanceSummary {
+  range: AnalyticsRange
+  date_from: string
+  date_to: string
+  accountability: {
+    sessions_taught: number
+    total_marks: number
+    present: number
+    late: number
+    absent: number
+    excused: number
+    rate_attended: number | null
+    by_status: { status: SessionAttendanceStatus; count: number }[]
+    by_class: {
+      class_id: number
+      class_label: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+      total: number
+    }[]
+    by_subject?: {
+      subject_id: number | null
+      subject_label: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+      total: number
+    }[]
+  }
+  personal: {
+    by_outcome: { outcome: TeacherPersonalOutcome; count: number }[]
+    unmarked: number
+    present: number
+    covered: number
+    cover_taught: number
+    no_show: number
+    cancelled: number
+    recent_sessions: {
+      kind: "session" | "adhoc"
+      session_id: number
+      date: string
+      status: SessionStatus | string
+      outcome: TeacherPersonalOutcome
+      class_label: string | null
+      subject_label: string | null
+      assigned_teacher_id: number
+      assigned_teacher_name: string | null
+      actual_teacher_id: number | null
+      actual_teacher_name: string | null
+    }[]
+    cover_history: TeacherAttendanceSummary["personal"]["recent_sessions"]
   }
 }
 
@@ -137,6 +259,8 @@ export interface Session {
   id: number
   timetable_slot: TimetableSlot | null
   teacher: Teacher
+  /** Who actually taught; null means taught as assigned (or not yet run). */
+  actual_teacher?: Teacher | null
   class_obj: Class | null
   start_time: string
   end_time: string
@@ -197,10 +321,11 @@ export interface TeacherPayload {
 }
 
 export interface SessionPayload {
-  start_time: string
-  end_time: string
+  start_time?: string
+  end_time?: string
   status?: SessionStatus | null
   teacher_id?: number | null
+  actual_teacher_id?: number | null
   class_obj_id?: number | null
   timetable_slot_id?: number | null
 }

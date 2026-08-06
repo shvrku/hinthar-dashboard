@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCheck, Upload, Eye } from "lucide-react"
 import Link from "next/link"
 import { createApi, ApiError } from "@/lib/api"
@@ -233,6 +234,7 @@ function StudentFormModal({
 // ===========================================================================
 export default function StudentsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const router = useRouter()
 
   // Current server page of students — always driven by listStudentsPage.
   const [pageStudents, setPageStudents] = React.useState<Student[]>([])
@@ -726,8 +728,8 @@ export default function StudentsPage() {
                   displayedStudents.map((student) => {
                     const isSelected = selectedIds.includes(student.id)
                     return (
-                      <TableRow key={student.id} data-state={isSelected ? "selected" : undefined}>
-                        <TableCell className="text-center">
+                      <TableRow key={student.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/students/${student.id}/`)}>
+                        <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleSelectRow(student.id)}
@@ -751,12 +753,13 @@ export default function StudentsPage() {
                           <TruncatedContent value={student.exam_candidate_number} />
                         </TableCell>
                         <TableCell className="text-muted-foreground">{student.enrollment_date}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Link
                               href={`/students/${student.id}/`}
                               title="View profile"
                               className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <Eye className="size-4" />
                             </Link>

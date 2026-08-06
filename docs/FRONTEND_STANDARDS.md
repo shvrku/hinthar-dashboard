@@ -1,6 +1,6 @@
 # Hinthar-Dashboard Frontend Standards & UX Review
 
-Standards for the Next.js App Router dashboard as the school management UI scales. Design system target: **shadcn/ui** with preset `b2C8WxsCO` (see `.agents/rules/style-guide.md`). Current install uses **base-maia / mist** in `components.json` — align to the chosen preset in a dedicated design-system pass.
+Standards for the Next.js App Router dashboard as the school management UI scales. Design system: **shadcn/ui** with **base-vega / zinc** (`components.json`; see `.agents/rules/style-guide.md`).
 
 Backend contract: follow `Hinthar-SMS/docs/API_STANDARDS.md` in the sibling SMS repository.
 
@@ -208,7 +208,7 @@ Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI)
 
 ## 7. Design system & color tokens
 
-- Follow shadcn skill / CLI; preset `b2C8WxsCO` when initializing or migrating tokens.
+- Follow shadcn skill / CLI; project style is **base-vega** with **zinc** base (`components.json`).
 - **Do not invent one-off palette colors** (`emerald-*`, `rose-*`, `amber-*`, `sky-*`) in page CSS.
 - Use semantic tokens from `app/globals.css` (wired in `@theme inline`):
 
@@ -222,6 +222,6 @@ Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI)
 
 - Shared class helpers: `lib/status-styles.ts` (`feedbackBanner`, `attendanceSurface`, …).
 - Chart fills: `lib/chart-colors.ts` (`ATTENDANCE_STATUS_COLORS`, `CAMPUS_CHECKIN_COLOR`).
-- Until the preset is applied consistently, new UI must still use existing `components/ui` and these CSS variables.
+- New UI must use existing `components/ui` and these CSS variables.
 
 Ignore nested `time_table/` tree for product work (legacy fork risk).

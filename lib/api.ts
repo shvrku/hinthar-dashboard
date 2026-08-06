@@ -216,6 +216,12 @@ export function createApi(token: string) {
     getClass: (id: number) =>
       request<import("./types").Class>(`/classes/${id}/`, token),
 
+    getClassAttendanceSummary: (id: number, range: import("./types").AnalyticsRange) =>
+      request<import("./types").ClassAttendanceSummary>(
+        `/classes/${id}/attendance-summary/?range=${encodeURIComponent(range)}`,
+        token
+      ),
+
     createClass: async (data: import("./types").ClassPayload) => {
       const res = await request<import("./types").Class>(`/classes/`, token, {
         method: "POST",
@@ -517,6 +523,12 @@ export function createApi(token: string) {
     getTeacher: (id: number) =>
       request<import("./types").Teacher>(`/teachers/${id}/`, token),
 
+    getTeacherAttendanceSummary: (id: number, range: import("./types").AnalyticsRange) =>
+      request<import("./types").TeacherAttendanceSummary>(
+        `/teachers/${id}/attendance-summary/?range=${encodeURIComponent(range)}`,
+        token
+      ),
+
     createTeacher: async (data: import("./types").TeacherPayload) => {
       const res = await request<import("./types").Teacher>(`/teachers/`, token, {
         method: "POST",
@@ -578,6 +590,12 @@ export function createApi(token: string) {
     updateSession: (id: number, data: import("./types").SessionPayload) =>
       request<import("./types").Session>(`/sessions/${id}/`, token, {
         method: "PUT",
+        body: JSON.stringify(data),
+      }),
+
+    patchSession: (id: number, data: Partial<import("./types").SessionPayload>) =>
+      request<import("./types").Session>(`/sessions/${id}/`, token, {
+        method: "PATCH",
         body: JSON.stringify(data),
       }),
 

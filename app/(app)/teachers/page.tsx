@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCheck, Upload } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
@@ -66,7 +67,7 @@ function TruncatedContent({
   const text = value.trim()
   return (
     <Tooltip>
-      <TooltipTrigger className={cn("group/trunc relative block w-full text-left focus:outline-none cursor-pointer", className)}>
+      <TooltipTrigger onClick={(event) => event.stopPropagation()} className={cn("group/trunc relative block w-full text-left focus:outline-none cursor-pointer", className)}>
         <span className="block truncate transition-colors duration-150 group-hover/trunc:text-primary group-hover/trunc:underline decoration-dashed decoration-primary/40 underline-offset-3">
           {text}
         </span>
@@ -186,6 +187,7 @@ function TeacherFormModal({
               Employment Type
             </label>
             <Select
+              items={[{ value: "none", label: "None" }, ...EMPLOYMENT_TYPES]}
               value={form.employment_type || "none"}
               onValueChange={(val) =>
                 setForm((prev) => ({
@@ -195,7 +197,7 @@ function TeacherFormModal({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Employment Type" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
@@ -248,6 +250,7 @@ function TeacherFormModal({
 
 export default function TeachersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const router = useRouter()
 
   // Current server page of teachers — always driven by listTeachersPage.
   const [pageTeachers, setPageTeachers] = React.useState<Teacher[]>([])
@@ -736,8 +739,8 @@ export default function TeachersPage() {
                   displayedTeachers.map((t) => {
                     const isSelected = selectedIds.includes(t.id)
                     return (
-                      <TableRow key={t.id} data-state={isSelected ? "selected" : undefined}>
-                        <TableCell className="text-center">
+                      <TableRow key={t.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/teachers/${t.id}/`)}>
+                        <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleSelectRow(t.id)}
@@ -759,7 +762,7 @@ export default function TeachersPage() {
                         <TableCell className="max-w-[140px]">
                           <TruncatedContent value={t.contact} />
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"

@@ -24,7 +24,12 @@ import {
   Clock,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { toLocalDateString } from "@/lib/utils"
+import {
+  parseBackendDateTime,
+  parseDateAndClock,
+  toLocalDateString,
+  toSessionDateString,
+} from "@/lib/utils"
 import {
   type Class,
   type Subject,
@@ -58,32 +63,6 @@ import {
 
 const LAST_CLASS_KEY = "hinthar.attendance.lastClassId"
 
-// Helper to parse dates from backend API
-function parseBackendDateTime(str: string): Date {
-  if (!str) return new Date(NaN)
-  if (str.includes("T") || str.includes("-")) {
-    const d = new Date(str)
-    if (!isNaN(d.getTime())) return d
-  }
-  const parts = str.split(" ")
-  if (parts.length === 2) {
-    const dateParts = parts[0].split("/")
-    const timeParts = parts[1].split(":")
-    if (dateParts.length === 3 && timeParts.length === 3) {
-      const day = parseInt(dateParts[0], 10)
-      const month = parseInt(dateParts[1], 10) - 1
-      const year = parseInt(dateParts[2], 10) + 2000
-      const hours = parseInt(timeParts[0], 10)
-      const minutes = parseInt(timeParts[1], 10)
-      const seconds = parseInt(timeParts[2], 10)
-
-      const date = new Date(year, month, day, hours, minutes, seconds)
-      if (!isNaN(date.getTime())) return date
-    }
-  }
-  return new Date(str)
-}
-
 const MONTHS = [
   { value: 1, label: "January" },
   { value: 2, label: "February" },
@@ -101,18 +80,23 @@ const MONTHS = [
 
 function getSessionStartTime(session: AttendanceMatrixSession): Date {
   if (session.date) {
-    return new Date(`${session.date}T${session.start_time}`)
+    return parseDateAndClock(session.date, session.start_time)
   }
   return parseBackendDateTime(session.start_time)
 }
 
 function formatSessionMeta(session: AttendanceMatrixSession) {
   const d = getSessionStartTime(session)
+  const valid = !isNaN(d.getTime())
   return {
     subject: session.subject?.trim() || "—",
     teacher: session.teacher_name?.trim() || "—",
-    dateStr: d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" }),
-    timeStr: d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+    dateStr: valid
+      ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", weekday: "short" })
+      : "—",
+    timeStr: valid
+      ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
+      : "—",
   }
 }
 
@@ -487,14 +471,25 @@ function ClassAttendanceContent() {
     }
   }
 
-  // Metric Summaries
+  // Metric Summaries — exclude future sessions (pregenerated absent defaults)
   const stats = React.useMemo(() => {
     let presentCount = 0
     let lateCount = 0
     let absentCount = 0
     let excusedCount = 0
 
+    const countableSessionIds = new Set(
+      sessions
+        .filter((s) => toSessionDateString(s.start_time) <= todayStr)
+        .map((s) => s.id)
+    )
+
     attendances.forEach((a) => {
+      const sessId =
+        typeof a.session === "object" && a.session
+          ? a.session.id
+          : (a.session_id ?? a.session)
+      if (!countableSessionIds.has(Number(sessId))) return
       if (a.status === "present") presentCount++
       else if (a.status === "late") lateCount++
       else if (a.status === "absent") absentCount++
@@ -507,14 +502,14 @@ function ClassAttendanceContent() {
 
     return {
       totalStudents: students.length,
-      totalSessions: sessions.length,
+      totalSessions: countableSessionIds.size,
       presentCount,
       lateCount,
       absentCount,
       excusedCount,
       attendanceRate,
     }
-  }, [attendances, students, sessions])
+  }, [attendances, students, sessions, todayStr])
 
   const currentClass = React.useMemo(
     () => classes.find((c) => c.id.toString() === classId) ?? null,

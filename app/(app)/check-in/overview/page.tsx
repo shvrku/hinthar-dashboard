@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 
 import { createApi, ApiError } from "@/lib/api"
-import { toLocalDateString } from "@/lib/utils"
+import { formatBackendTime, toLocalDateString } from "@/lib/utils"
 import type {
   CheckInStatus,
   OverviewClassResponse,
@@ -89,13 +89,7 @@ interface ClassRow {
 }
 
 function formatCheckInTime(timestamp: string): string {
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
+  return formatBackendTime(timestamp)
 }
 
 function ClassStudentTable({

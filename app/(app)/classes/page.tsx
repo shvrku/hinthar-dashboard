@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { Plus, Pencil, Trash2, Loader2, Search, ArrowLeft, GraduationCap, Users } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Plus, Pencil, Trash2, Loader2, Search, GraduationCap, Users } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { Class, ClassPayload, EDUCATION_LEVELS, Student, ClassStudent } from "@/lib/types"
+import { Class, ClassPayload, EDUCATION_LEVELS } from "@/lib/types"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,11 +43,10 @@ function TableSkeletonRow() {
 
 export default function ClassesPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const router = useRouter()
 
   // Data
   const [classes, setClasses] = React.useState<Class[]>([])
-  const [students, setStudents] = React.useState<Student[]>([])
-  const [classStudents, setClassStudents] = React.useState<ClassStudent[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
@@ -59,13 +59,11 @@ export default function ClassesPage() {
 
   // Search
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [rosterSearchQuery, setRosterSearchQuery] = React.useState("")
 
   // Modals / Selection
   const [modalOpen, setModalOpen] = React.useState(false)
   const [editingClass, setEditingClass] = React.useState<Class | null>(null)
   const [formSubmitting, setFormSubmitting] = React.useState(false)
-  const [activeRosterClass, setActiveRosterClass] = React.useState<Class | null>(null)
 
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<number | null>(null)
@@ -93,14 +91,8 @@ export default function ClassesPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const [classesData, classStudentsData, studentsData] = await Promise.all([
-        api.listClasses(),
-        api.listClassStudents(),
-        api.listStudents(),
-      ])
+      const classesData = await api.listClasses()
       setClasses(classesData)
-      setClassStudents(classStudentsData)
-      setStudents(studentsData)
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
@@ -221,33 +213,7 @@ export default function ClassesPage() {
     }
   }
 
-  // Roster assignment logic
-  const handleAssign = async (studentId: number) => {
-    if (!activeRosterClass) return
-    try {
-      const token = await getToken()
-      if (!token) throw new Error("No auth token available")
-      const api = createApi(token)
-      const newEntry = await api.createClassStudent(activeRosterClass.id, studentId)
-      setClassStudents((prev) => [...prev, newEntry])
-      setSuccessMessage("Student enrolled in class successfully.")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assign student")
-    }
-  }
-
-  const handleUnassign = async (classStudentId: number) => {
-    try {
-      const token = await getToken()
-      if (!token) throw new Error("No auth token available")
-      const api = createApi(token)
-      await api.deleteClassStudent(classStudentId)
-      setClassStudents((prev) => prev.filter((cs) => cs.id !== classStudentId))
-      setSuccessMessage("Student removed from class successfully.")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove student")
-    }
-  }
+  // Roster assignment logic moved to /classes/[id]
 
   const [levelFilter, setLevelFilter] = React.useState<string>("all")
 
@@ -292,36 +258,6 @@ export default function ClassesPage() {
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     )
   }
-
-  // Roster helpers
-  const enrolledList = React.useMemo(() => {
-    if (!activeRosterClass) return []
-    const relations = classStudents.filter((cs) => {
-      const cId = typeof cs.class_obj === "object" && cs.class_obj ? cs.class_obj.id : cs.class_obj_id ?? (typeof cs.class_obj === "number" ? cs.class_obj : null)
-      return cId === activeRosterClass.id
-    })
-    return relations
-      .map((cs) => {
-        const sId = typeof cs.student === "object" && cs.student ? cs.student.id : cs.student_id ?? (typeof cs.student === "number" ? cs.student : null)
-        const student = students.find((s) => s.id === sId)
-        return student ? { student, classStudentId: cs.id } : null
-      })
-      .filter((x): x is { student: Student; classStudentId: number } => x !== null)
-  }, [activeRosterClass, classStudents, students])
-
-  const enrolledStudentIds = React.useMemo(
-    () => new Set(enrolledList.map((x) => x.student.id)),
-    [enrolledList]
-  )
-
-  const filteredUnassigned = React.useMemo(() => {
-    const unassigned = students.filter((s) => !enrolledStudentIds.has(s.id))
-    if (!rosterSearchQuery.trim()) return unassigned
-    const q = rosterSearchQuery.toLowerCase().trim()
-    return unassigned.filter(
-      (s) => s.name.toLowerCase().includes(q) || String(s.id).includes(q)
-    )
-  }, [students, enrolledStudentIds, rosterSearchQuery])
 
   if (!isLoaded) {
     return (
@@ -404,111 +340,7 @@ export default function ClassesPage() {
         </div>
       )}
 
-      {/* Roster View vs Main Table */}
-      {activeRosterClass ? (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActiveRosterClass(null)}
-            >
-              <ArrowLeft className="mr-2 size-4" />
-              Back to Classes
-            </Button>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="px-3 py-1">
-                {activeRosterClass.education_level} - {activeRosterClass.cohort_identifier}
-                {activeRosterClass.cohort_sub_category && ` (${activeRosterClass.cohort_sub_category})`}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Enrolled Students Card */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span>Enrolled Students</span>
-                  <Badge variant="default">{enrolledList.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {enrolledList.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No students currently enrolled.
-                  </p>
-                ) : (
-                  enrolledList.map(({ student, classStudentId }) => (
-                    <div
-                      key={student.id}
-                      className="flex items-center justify-between rounded-lg border p-3 bg-muted/20"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{student.name}</p>
-                        <p className="text-xs text-muted-foreground">ID: {student.id}</p>
-                      </div>
-                      <Button
-                        size="xs"
-                        variant="destructive"
-                        onClick={() => handleUnassign(classStudentId)}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Unassigned Students Card */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Available Students to Enroll</CardTitle>
-                <div className="relative pt-2">
-                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search available students..."
-                    value={rosterSearchQuery}
-                    onChange={(e) => setRosterSearchQuery(e.target.value)}
-                    className="pl-9 h-8 text-xs"
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
-                {filteredUnassigned.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No matching unassigned students.
-                  </p>
-                ) : (
-                  filteredUnassigned.map((student) => (
-                    <div
-                      key={student.id}
-                      className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{student.name}</p>
-                        <p className="text-xs text-muted-foreground">ID: {student.id}</p>
-                      </div>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        className="text-success border-success/30 hover:bg-success/10 hover:text-success"
-                        onClick={() => handleAssign(student.id)}
-                      >
-                        Enroll
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ) : (
-        /* Class list table */
-        <div>
+      <div>
           {/* Standardized Management Toolbar Card */}
           <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
@@ -633,8 +465,8 @@ export default function ClassesPage() {
                   pagination.paginatedItems.map((cls) => {
                     const isSelected = selectedIds.includes(cls.id)
                     return (
-                      <TableRow key={cls.id} data-state={isSelected ? "selected" : undefined}>
-                        <TableCell className="text-center">
+                      <TableRow key={cls.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/classes/${cls.id}/`)}>
+                        <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleSelectRow(cls.id)}
@@ -651,13 +483,13 @@ export default function ClassesPage() {
                         <TableCell className="text-muted-foreground">
                           {cls.cohort_sub_category || "—"}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              onClick={() => setActiveRosterClass(cls)}
-                              title="Roster / Students"
+                              onClick={() => router.push(`/classes/${cls.id}/`)}
+                              title="Open class hub"
                             >
                               <Users className="size-4" />
                             </Button>
@@ -702,7 +534,6 @@ export default function ClassesPage() {
             />
           )}
         </div>
-      )}
 
       {/* Create / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={(val) => !val && closeModal()}>

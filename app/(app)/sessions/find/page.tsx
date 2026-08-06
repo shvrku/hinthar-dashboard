@@ -4,9 +4,10 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarCheck, GraduationCap, Loader2, ArrowRight, BookOpen } from "lucide-react"
-import { createApi, ApiError } from "@/lib/api"
+import { ArrowRight, Clock, GraduationCap, Loader2, Search } from "lucide-react"
+import { ApiError, createApi } from "@/lib/api"
 import type { Class } from "@/lib/types"
+import { formatClassLabel } from "@/lib/format-class"
 import { RequireRole } from "@/components/require-role"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { SearchableSelect } from "@/components/searchable-select"
@@ -14,19 +15,15 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
-const LAST_CLASS_KEY = "hinthar.attendance.lastClassId"
+const LAST_CLASS_KEY = "hinthar.sessions.find.lastClassId"
 
-function AttendanceLandingContent() {
+function FindSessionsLandingContent() {
   const router = useRouter()
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const [classes, setClasses] = React.useState<Class[]>([])
-  const [selectedClassId, setSelectedClassId] = React.useState<string>("")
+  const [selectedClassId, setSelectedClassId] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-
-  const now = new Date()
-  const [month] = React.useState(now.getMonth() + 1)
-  const [year] = React.useState(now.getFullYear())
 
   React.useEffect(() => {
     if (!isLoaded || !isSignedIn) return
@@ -60,28 +57,26 @@ function AttendanceLandingContent() {
 
   const classItems = React.useMemo(
     () =>
-      classes.map((c) => {
-        const label =
-          `${c.education_level || ""} ${c.cohort_identifier || ""}${
-            c.cohort_sub_category ? c.cohort_sub_category : ""
-          }`.trim() || `Class #${c.id}`
-        return { value: c.id.toString(), label }
-      }),
+      classes.map((c) => ({
+        value: c.id.toString(),
+        label: formatClassLabel(c),
+      })),
     [classes]
   )
 
-  const openClassAttendance = () => {
+  const openClass = () => {
     if (!selectedClassId) return
     localStorage.setItem(LAST_CLASS_KEY, selectedClassId)
-    router.push(`/attendance/class/${selectedClassId}/?month=${month}&year=${year}&layout=matrix`)
+    router.push(`/sessions/find/${selectedClassId}/`)
   }
 
   return (
     <StaggerContainer className="space-y-6">
       <StaggerItem>
         <StandardPageHeader
-          title="Session Attendance"
-          description="Choose a class to open the monthly matrix or roster. Tutoring (ad-hoc) sessions have a separate entry."
+          title="Find sessions"
+          description="Pick a class, then click a week-grid slot to open its filtered sessions table."
+          back={{ href: "/sessions/", label: "Sessions" }}
         />
       </StaggerItem>
 
@@ -94,73 +89,58 @@ function AttendanceLandingContent() {
       ) : null}
 
       <StaggerItem className="mx-auto w-full max-w-2xl">
-        <Card className="p-6 space-y-5 border-border/80 shadow-xs">
+        <Card className="space-y-5 border-border/80 p-6 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg border bg-muted/40">
-              <GraduationCap className="size-5 text-primary" />
+              <Search className="size-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold">Class lessons</h2>
+              <h2 className="text-sm font-semibold">Browse by class slot</h2>
               <p className="text-xs text-muted-foreground">
-                Timetabled sessions for one cohort — matrix and per-session roster.
+                Week grid of timetable slots — click a slot to list its generated sessions.
               </p>
             </div>
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+            <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
               Loading classes…
+            </div>
+          ) : classes.length === 0 ? (
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>No classes yet. Create a cohort and timetable before finding sessions.</p>
+              <Button variant="outline" render={<Link href="/classes/" />}>
+                <GraduationCap className="size-4" />
+                Go to Classes
+              </Button>
             </div>
           ) : (
             <>
               <SearchableSelect
                 options={classItems}
                 value={selectedClassId}
-                onValueChange={(val) => setSelectedClassId(val)}
+                onValueChange={setSelectedClassId}
                 placeholder="Select a class…"
                 searchPlaceholder="Search classes…"
               />
-              <Button
-                className="w-full gap-2"
-                disabled={!selectedClassId}
-                onClick={openClassAttendance}
-              >
-                Open class attendance
+              <Button className="w-full gap-2" disabled={!selectedClassId} onClick={openClass}>
+                <Clock className="size-4" />
+                Open class slots
                 <ArrowRight className="size-4" />
               </Button>
             </>
           )}
         </Card>
       </StaggerItem>
-
-      <StaggerItem className="mx-auto w-full max-w-2xl">
-        <Card className="p-6 space-y-4 border-border/80 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg border bg-muted/40">
-              <BookOpen className="size-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold">Ad-hoc / tutoring</h2>
-              <p className="text-xs text-muted-foreground">
-                One-off sessions not tied to a class timetable.
-              </p>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full gap-2" render={<Link href="/attendance/adhoc/" />}>
-            <CalendarCheck className="size-4" />
-            Open ad-hoc attendance
-          </Button>
-        </Card>
-      </StaggerItem>
     </StaggerContainer>
   )
 }
 
-export default function AttendanceLandingPage() {
+export default function FindSessionsLandingPage() {
   return (
     <RequireRole mode="staff">
-      <AttendanceLandingContent />
+      <FindSessionsLandingContent />
     </RequireRole>
   )
 }

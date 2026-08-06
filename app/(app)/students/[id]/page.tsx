@@ -22,21 +22,17 @@ import {
   Trash2,
   User,
 } from "lucide-react"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, Label, Pie, PieChart, XAxis, YAxis } from "recharts"
 import { createApi, ApiError } from "@/lib/api"
-import { ATTENDANCE_STATUS_COLORS, CAMPUS_CHECKIN_COLOR } from "@/lib/chart-colors"
+import { ATTENDANCE_STATUS_COLORS } from "@/lib/chart-colors"
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import { formatClassLabel } from "@/lib/format-class"
 import {
   SCHOOL_CODES,
@@ -87,6 +83,20 @@ const LESSON_STATUS_LABELS: Record<string, string> = {
   excused: "Excused",
 }
 
+const lessonStatusChartConfig = {
+  present: { label: "Present", color: ATTENDANCE_STATUS_COLORS.present },
+  late: { label: "Late", color: ATTENDANCE_STATUS_COLORS.late },
+  absent: { label: "Absent", color: ATTENDANCE_STATUS_COLORS.absent },
+  excused: { label: "Excused", color: ATTENDANCE_STATUS_COLORS.excused },
+} satisfies ChartConfig
+
+const lessonClassChartConfig = {
+  present: { label: "Present", color: ATTENDANCE_STATUS_COLORS.present },
+  late: { label: "Late", color: ATTENDANCE_STATUS_COLORS.late },
+  absent: { label: "Absent", color: ATTENDANCE_STATUS_COLORS.absent },
+  excused: { label: "Excused", color: ATTENDANCE_STATUS_COLORS.excused },
+} satisfies ChartConfig
+
 function QrCanvas({ value, size = 180 }: { value: string; size?: number }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   React.useEffect(() => {
@@ -100,11 +110,6 @@ function QrCanvas({ value, size = 180 }: { value: string; size?: number }) {
 function formatPercent(rate: number | null | undefined): string {
   if (rate == null || Number.isNaN(rate)) return "—"
   return `${Math.round(rate * 100)}%`
-}
-
-function shortDate(iso: string): string {
-  const d = new Date(iso + "T12:00:00")
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
 
 function StudentDetailContent() {
@@ -330,14 +335,6 @@ function StudentDetailContent() {
     [allClasses, enrolledClassIds]
   )
 
-  const campusChartData = React.useMemo(() => {
-    if (!summary) return []
-    return summary.campus.daily.map((d) => ({
-      date: shortDate(d.date),
-      present: d.checked_in ? 1 : 0,
-    }))
-  }, [summary])
-
   const lessonStatusData = React.useMemo(() => {
     if (!summary) return []
     return summary.lesson.by_status.map((s) => ({
@@ -360,6 +357,17 @@ function StudentDetailContent() {
       late: c.late,
       absent: c.absent,
       excused: c.excused,
+    }))
+  }, [summary])
+
+  const lessonSubjectData = React.useMemo(() => {
+    if (!summary?.lesson.by_subject?.length) return []
+    return summary.lesson.by_subject.map((s) => ({
+      name: s.subject_label,
+      present: s.present,
+      late: s.late,
+      absent: s.absent,
+      excused: s.excused,
     }))
   }, [summary])
 
@@ -501,7 +509,7 @@ function StudentDetailContent() {
                             <p className="font-medium">{label}</p>
                             {cls && (
                               <Link
-                                href={`/classes/`}
+                                href={`/classes/${cls.id}/`}
                                 className="text-xs text-muted-foreground hover:text-primary"
                               >
                                 View in classes
@@ -634,7 +642,7 @@ function StudentDetailContent() {
                   Attendance overview
                 </CardTitle>
                 <CardDescription>
-                  Campus presence and lesson roll are measured separately.
+                  Lesson roll is primary; campus check-in is supporting context only.
                   {summary && (
                     <span className="block mt-1 text-xs">
                       {summary.date_from} → {summary.date_to}
@@ -658,54 +666,20 @@ function StudentDetailContent() {
               ) : !summary ? (
                 <p className="text-sm text-muted-foreground">No analytics available.</p>
               ) : (
-                <div className="grid gap-8 xl:grid-cols-2">
-                  {/* Campus */}
-                  <section className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold">Campus check-in</h3>
-                      <p className="text-xs text-muted-foreground">On-site presence each day.</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border bg-muted/30 p-4">
-                        <p className="text-2xl font-bold">{summary.campus.days_checked_in}</p>
-                        <p className="text-xs text-muted-foreground">days checked in</p>
-                      </div>
-                      <div className="rounded-xl border bg-muted/30 p-4">
-                        <p className="text-2xl font-bold">{formatPercent(summary.campus.rate)}</p>
-                        <p className="text-xs text-muted-foreground">of {summary.campus.days_in_range} days</p>
-                      </div>
-                    </div>
-                    <Progress value={(summary.campus.rate ?? 0) * 100} className="w-full">
-                      <div className="flex w-full items-center justify-between text-xs">
-                        <ProgressLabel>Campus presence</ProgressLabel>
-                        <ProgressValue />
-                      </div>
-                    </Progress>
-                    <div className="h-48 w-full min-w-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={campusChartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                          <YAxis allowDecimals={false} domain={[0, 1]} tick={{ fontSize: 10 }} />
-                          <Tooltip
-                            formatter={(v) => (Number(v) ? "Checked in" : "Missing")}
-                            contentStyle={{ borderRadius: 12, fontSize: 12 }}
-                          />
-                          <Bar dataKey="present" fill={CAMPUS_CHECKIN_COLOR} radius={[4, 4, 0, 0]} name="Campus" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </section>
-
-                  {/* Lesson roll */}
+                <div className="space-y-8">
+                  {/* Lesson roll — primary */}
                   <section className="space-y-4">
                     <div>
                       <h3 className="font-semibold">Lesson roll</h3>
                       <p className="text-xs text-muted-foreground">
-                        Class sessions — may include auto-mark from campus check-in.
+                        Present / late / absent / excused across class and ad-hoc sessions.
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      <div className="rounded-xl border bg-muted/30 p-3 text-center">
+                        <p className="text-xl font-bold">{formatPercent(summary.lesson.rate_attended)}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Attended</p>
+                      </div>
                       {(["present", "late", "absent", "excused"] as const).map((key) => (
                         <div
                           key={key}
@@ -720,59 +694,129 @@ function StudentDetailContent() {
                       ))}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Attended rate:{" "}
-                      <span className="font-semibold text-foreground">
-                        {formatPercent(summary.lesson.rate_attended)}
-                      </span>{" "}
-                      ({summary.lesson.present + summary.lesson.late} of{" "}
-                      {summary.lesson.total_sessions - summary.lesson.excused} countable sessions)
+                      {summary.lesson.present + summary.lesson.late} of{" "}
+                      {summary.lesson.total_sessions - summary.lesson.excused} countable sessions
+                      {summary.lesson.total_sessions ? ` (${summary.lesson.total_sessions} total marks)` : ""}
                     </p>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="h-44 min-w-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={filteredLessonStatusData}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={40}
-                              outerRadius={64}
-                              paddingAngle={2}
-                            >
-                              {filteredLessonStatusData.map((entry) => (
-                                <Cell
-                                  key={entry.status}
-                                  fill={ATTENDANCE_STATUS_COLORS[entry.status as keyof typeof ATTENDANCE_STATUS_COLORS]}
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip contentStyle={{ borderRadius: 12, fontSize: 12 }} />
-                            <Legend wrapperStyle={{ fontSize: 11 }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {lessonClassData.length > 0 && (
-                        <div className="h-44 min-w-0">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={lessonClassData} layout="vertical" margin={{ left: 8, right: 8 }}>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                              <XAxis type="number" tick={{ fontSize: 10 }} />
-                              <YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 9 }} />
-                              <Tooltip contentStyle={{ borderRadius: 12, fontSize: 12 }} />
-                              <Legend wrapperStyle={{ fontSize: 10 }} />
-                              <Bar dataKey="present" stackId="a" fill={ATTENDANCE_STATUS_COLORS.present} name="Present" />
-                              <Bar dataKey="late" stackId="a" fill={ATTENDANCE_STATUS_COLORS.late} name="Late" />
-                              <Bar dataKey="absent" stackId="a" fill={ATTENDANCE_STATUS_COLORS.absent} name="Absent" />
-                              <Bar dataKey="excused" stackId="a" fill={ATTENDANCE_STATUS_COLORS.excused} name="Excused" />
-                            </BarChart>
-                          </ResponsiveContainer>
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <ChartContainer
+                        config={lessonStatusChartConfig}
+                        className="mx-auto h-48 w-full max-w-[240px] aspect-square"
+                      >
+                        <PieChart>
+                          <ChartTooltip content={<ChartTooltipContent nameKey="status" hideLabel />} />
+                          <Pie
+                            data={filteredLessonStatusData}
+                            dataKey="value"
+                            nameKey="status"
+                            innerRadius={40}
+                            outerRadius={64}
+                            paddingAngle={2}
+                          >
+                            {filteredLessonStatusData.map((entry) => (
+                              <Cell key={entry.status} fill={`var(--color-${entry.status})`} />
+                            ))}
+                            <Label
+                              content={({ viewBox }) => {
+                                if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                                  return (
+                                    <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                                      <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-lg font-bold">
+                                        {summary.lesson.total_sessions}
+                                      </tspan>
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) + 16}
+                                        className="fill-muted-foreground text-[10px]"
+                                      >
+                                        sessions
+                                      </tspan>
+                                    </text>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                          </Pie>
+                          <ChartLegend content={<ChartLegendContent nameKey="status" />} />
+                        </PieChart>
+                      </ChartContainer>
+                      {lessonSubjectData.length > 0 ? (
+                        <ChartContainer
+                          config={lessonClassChartConfig}
+                          className="h-52 w-full aspect-auto"
+                        >
+                          <BarChart data={lessonSubjectData} layout="vertical" margin={{ left: 8, right: 8 }}>
+                            <CartesianGrid horizontal={false} />
+                            <XAxis type="number" tickLine={false} axisLine={false} />
+                            <YAxis
+                              type="category"
+                              dataKey="name"
+                              width={90}
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={4}
+                            />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            <Bar dataKey="present" stackId="a" fill="var(--color-present)" />
+                            <Bar dataKey="late" stackId="a" fill="var(--color-late)" />
+                            <Bar dataKey="absent" stackId="a" fill="var(--color-absent)" />
+                            <Bar dataKey="excused" stackId="a" fill="var(--color-excused)" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ChartContainer>
+                      ) : lessonClassData.length > 0 ? (
+                        <ChartContainer
+                          config={lessonClassChartConfig}
+                          className="h-52 w-full aspect-auto"
+                        >
+                          <BarChart data={lessonClassData} layout="vertical" margin={{ left: 8, right: 8 }}>
+                            <CartesianGrid horizontal={false} />
+                            <XAxis type="number" tickLine={false} axisLine={false} />
+                            <YAxis type="category" dataKey="name" width={72} tickLine={false} axisLine={false} />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            <Bar dataKey="present" stackId="a" fill="var(--color-present)" />
+                            <Bar dataKey="late" stackId="a" fill="var(--color-late)" />
+                            <Bar dataKey="absent" stackId="a" fill="var(--color-absent)" />
+                            <Bar dataKey="excused" stackId="a" fill="var(--color-excused)" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ChartContainer>
+                      ) : (
+                        <div className="flex h-52 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
+                          No subject breakdown for this range.
                         </div>
                       )}
                     </div>
                   </section>
-                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 text-xs text-muted-foreground">
+
+                  {/* Campus — supporting */}
+                  <section className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground">Campus check-in (supporting)</h3>
+                      <p className="text-xs text-muted-foreground">On-site presence — not the same as lesson roll.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg border bg-background/60 p-3">
+                        <p className="text-lg font-bold">{summary.campus.days_checked_in}</p>
+                        <p className="text-[10px] text-muted-foreground">days checked in</p>
+                      </div>
+                      <div className="rounded-lg border bg-background/60 p-3">
+                        <p className="text-lg font-bold">{formatPercent(summary.campus.rate)}</p>
+                        <p className="text-[10px] text-muted-foreground">of {summary.campus.days_in_range} days</p>
+                      </div>
+                      <div className="rounded-lg border bg-background/60 p-3 sm:col-span-1 col-span-2">
+                        <Progress value={(summary.campus.rate ?? 0) * 100} className="w-full mt-1">
+                          <div className="flex w-full items-center justify-between text-[10px]">
+                            <ProgressLabel>Campus</ProgressLabel>
+                            <ProgressValue />
+                          </div>
+                        </Progress>
+                      </div>
+                    </div>
+                  </section>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <CalendarDays className="size-3.5" />
                       <span>

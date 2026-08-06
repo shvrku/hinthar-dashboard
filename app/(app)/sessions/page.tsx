@@ -14,7 +14,7 @@ import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
-import { cn, toLocalDateString } from "@/lib/utils"
+import { cn, toLocalDateString, toSessionDateString, parseBackendDateTime, formatBackendDateTime, toMonthEndDateString } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -36,6 +36,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
+import { SessionTeacherCell } from "@/components/session-teacher-cell"
+import { SearchableSelect } from "@/components/searchable-select"
 
 const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
   const hour = Math.floor(7 + i / 2)
@@ -58,41 +60,13 @@ const DURATIONS = [
   { value: "custom", label: "Custom End Time" },
 ]
 
-function parseBackendDateTime(str: string): Date {
-  if (!str) return new Date(NaN)
-  if (str.includes("T") || str.includes("-")) {
-    const d = new Date(str)
-    if (!isNaN(d.getTime())) return d
-  }
-  const parts = str.split(" ")
-  if (parts.length === 2) {
-    const dateParts = parts[0].split("/")
-    const timeParts = parts[1].split(":")
-    if (dateParts.length === 3 && timeParts.length === 3) {
-      const day = parseInt(dateParts[0], 10)
-      const month = parseInt(dateParts[1], 10) - 1
-      const year = parseInt(dateParts[2], 10) + 2000
-      const hours = parseInt(timeParts[0], 10)
-      const minutes = parseInt(timeParts[1], 10)
-      const seconds = parseInt(timeParts[2], 10)
-
-      const date = new Date(year, month, day, hours, minutes, seconds)
-      if (!isNaN(date.getTime())) return date
-    }
-  }
-  return new Date(str)
-}
-
 /** Deep-link to class session attendance (roster for this session's date). */
 function takeRollHrefForSession(session: Session): string | null {
   if (!session.class_obj?.id || !session.start_time) return null
   const d = parseBackendDateTime(session.start_time)
   if (isNaN(d.getTime())) return null
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, "0")
-  const dd = String(d.getDate()).padStart(2, "0")
   const qs = new URLSearchParams({
-    date: `${yyyy}-${mm}-${dd}`,
+    date: toLocalDateString(d),
     layout: "roster",
     session_id: String(session.id),
   })
@@ -101,11 +75,13 @@ function takeRollHrefForSession(session: Session): string | null {
 
 /** Deep-link to ad-hoc attendance for the session's day / id. */
 function takeRollHrefForAdHoc(session: AdHocSession): string {
-  const date =
-    session.date ||
-    (session.start_time ? session.start_time.slice(0, 10) : toLocalDateString())
+  const date = session.date
+    ? toSessionDateString(session.date)
+    : session.start_time
+      ? toSessionDateString(session.start_time)
+      : toLocalDateString()
   const qs = new URLSearchParams({
-    date,
+    date: date === "—" ? toLocalDateString() : date,
     layout: "roster",
     session_id: String(session.id),
   })
@@ -133,12 +109,6 @@ function renderStatusBadge(status: SessionStatus | null) {
     default:
       return <Badge variant="secondary">{statusLabel(status)}</Badge>
   }
-}
-
-function formatDateTime(iso: string): string {
-  const d = parseBackendDateTime(iso)
-  if (isNaN(d.getTime())) return "—"
-  return d.toLocaleString()
 }
 
 function RowSkeleton() {
@@ -196,10 +166,7 @@ export default function SessionsPage() {
   const [generateModalOpen, setGenerateModalOpen] = React.useState(false)
   const [genClassId, setGenClassId] = React.useState<string>("")
   const [genStartDate, setGenStartDate] = React.useState<string>(toLocalDateString())
-  const [genEndDate, setGenEndDate] = React.useState<string>(() => {
-    const d = new Date()
-    return toLocalDateString(new Date(d.getFullYear(), d.getMonth() + 1, 0))
-  })
+  const [genEndDate, setGenEndDate] = React.useState<string>(() => toMonthEndDateString())
   const [isGenerating, setIsGenerating] = React.useState(false)
 
   // Delete confirmation
@@ -213,6 +180,7 @@ export default function SessionsPage() {
   const [formCustomEndTime, setFormCustomEndTime] = React.useState("")
   const [formStatus, setFormStatus] = React.useState<string>("")
   const [formTeacherId, setFormTeacherId] = React.useState<string>("")
+  const [formActualTeacherId, setFormActualTeacherId] = React.useState<string>("")
   const [formClassId, setFormClassId] = React.useState<string>("")
   const [formTimetableSlotId, setFormTimetableSlotId] = React.useState<string>("")
 
@@ -539,6 +507,7 @@ export default function SessionsPage() {
     setFormCustomEndTime("")
     setFormStatus("scheduled")
     setFormTeacherId("")
+    setFormActualTeacherId("")
     setFormClassId("")
     setFormTimetableSlotId("")
     setModalOpen(true)
@@ -582,6 +551,9 @@ export default function SessionsPage() {
 
     setFormStatus(session.status ?? "")
     setFormTeacherId(session.teacher ? session.teacher.id.toString() : "")
+    setFormActualTeacherId(
+      session.actual_teacher ? session.actual_teacher.id.toString() : ""
+    )
     setFormClassId(session.class_obj ? session.class_obj.id.toString() : "")
     setFormTimetableSlotId(session.timetable_slot ? session.timetable_slot.id.toString() : "")
     setModalOpen(true)
@@ -621,6 +593,9 @@ export default function SessionsPage() {
         end_time: endD.toISOString(),
         status: formStatus === "" ? null : (formStatus as SessionStatus),
         teacher_id: formTeacherId ? parseInt(formTeacherId, 10) : null,
+        actual_teacher_id: formActualTeacherId
+          ? parseInt(formActualTeacherId, 10)
+          : null,
         class_obj_id: formClassId ? parseInt(formClassId, 10) : null,
         timetable_slot_id: formTimetableSlotId ? parseInt(formTimetableSlotId, 10) : null,
       }
@@ -917,14 +892,19 @@ export default function SessionsPage() {
                           <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select session #${session.id}`} />
                         </TableCell>
                         <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
-                        <TableCell className="font-medium">{session.teacher?.name ?? "—"}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <SessionTeacherCell
+                            teacher={session.teacher}
+                            actualTeacher={session.actual_teacher}
+                          />
+                        </TableCell>
                         <TableCell>
                           {session.class_obj ? (
                             <Badge variant="outline">{session.class_obj.education_level} {session.class_obj.cohort_identifier}</Badge>
                           ) : "—"}
                         </TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(session.start_time)}</TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateTime(session.end_time)}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.start_time)}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.end_time)}</TableCell>
                         <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -1061,7 +1041,7 @@ export default function SessionsPage() {
                   onValueChange={(val) => handleClassChange(val ?? "")}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Class" />
+                    <SelectValue>{(value: string | null) => { const c = classes.find((x) => x.id.toString() === value); return c ? `${c.education_level} ${c.cohort_identifier}${c.cohort_sub_category ? ` (${c.cohort_sub_category})` : ""}` : (value ? `Class #${value}` : "Select Class"); }}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {classes.map((c) => (
@@ -1081,12 +1061,12 @@ export default function SessionsPage() {
                   disabled={!formClassId}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Slot" />
+                    <SelectValue>{(value: string | null) => { const s = filteredSlots.find((x) => x.id.toString() === value); if (!s) return value ? `Slot #${value}` : "Select Slot"; const day = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][s.day_of_week] ?? s.day_of_week; return `${day} ${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)}${s.subject?.name ? ` · ${s.subject.name}` : ""}`; }}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {filteredSlots.map((s) => (
                       <SelectItem key={s.id} value={s.id.toString()}>
-                        {s.day_of_week} {s.start_time}-{s.end_time}
+                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][s.day_of_week] ?? s.day_of_week} {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}{s.subject?.name ? ` · ${s.subject.name}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1096,13 +1076,13 @@ export default function SessionsPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Teacher</label>
+                <label className="mb-1.5 block text-sm font-medium">Assigned teacher</label>
                 <Select
                   value={formTeacherId}
                   onValueChange={(val) => setFormTeacherId(val ?? "")}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Teacher" />
+                    <SelectValue>{(value: string | null) => teachers.find((t) => t.id.toString() === value)?.name ?? (value ? `Teacher #${value}` : "Select Teacher")}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {teachers.map((t) => (
@@ -1123,6 +1103,36 @@ export default function SessionsPage() {
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-sm font-medium">Substitute teacher</label>
+                {formActualTeacherId ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormActualTeacherId("")}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+              <SearchableSelect
+                options={teachers.map((t) => ({
+                  value: t.id.toString(),
+                  label: t.name,
+                  subLabel: t.unique_code ?? undefined,
+                }))}
+                value={formActualTeacherId}
+                onValueChange={setFormActualTeacherId}
+                placeholder="None — taught as assigned"
+                searchPlaceholder="Search teachers…"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Leave empty when the assigned teacher taught. Setting a substitute records who covered.
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1182,11 +1192,12 @@ export default function SessionsPage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Status</label>
                 <Select
+                  items={[{ value: "none", label: "None" }, ...SESSION_STATUSES]}
                   value={formStatus || "none"}
                   onValueChange={(val) => setFormStatus(!val || val === "none" ? "" : val)}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Status" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>

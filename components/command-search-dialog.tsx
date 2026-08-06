@@ -31,6 +31,7 @@ const navigationItems = [
   { title: "Teacher Faculty", href: "/teachers", group: "Management", icon: UserCheck },
   { title: "Subjects Catalog", href: "/subjects", group: "Management", icon: BookOpen },
   { title: "Sessions Schedule", href: "/sessions", group: "Operations", icon: Clock },
+  { title: "Find Sessions", href: "/sessions/find", group: "Operations", icon: Search },
   { title: "Class Timetables", href: "/timetable", group: "Operations", icon: Calendar },
   { title: "Attendance Logs", href: "/attendance", group: "Operations", icon: ClipboardCheck },
   { title: "Check-In Overview", href: "/check-in/overview", group: "Operations", icon: LayoutDashboard },
