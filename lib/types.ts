@@ -15,8 +15,8 @@ export type EducationLevel =
   | "Year6" | "Year7" | "Year8" | "Year9"
 
 export const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
-  { value: "IAL", label: "IAL" },
-  { value: "IG", label: "IG" },
+  { value: "IAL", label: "IAL (A Level)" },
+  { value: "IG", label: "IGCSE" },
   { value: "Year1", label: "Year 1" },
   { value: "Year2", label: "Year 2" },
   { value: "Year3", label: "Year 3" },
@@ -66,6 +66,9 @@ export interface Student {
   /** Present on student detail / token endpoints only — omitted from list responses. */
   check_in_token?: string
   check_in_token_active?: boolean
+  /** Enrollment summary from list/detail (class display names). */
+  class_labels?: string[]
+  class_ids?: number[]
 }
 
 export type StudentAnalyticsRange = "week" | "month" | "all"

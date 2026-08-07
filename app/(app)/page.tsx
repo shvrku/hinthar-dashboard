@@ -8,6 +8,7 @@ import {
   UserPlus,
   QrCode,
   BookOpen,
+  Download,
 } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -19,6 +20,8 @@ import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { useStatsQuery, apiQueryKeys } from "@/hooks/use-api-queries"
 import { useQueryClient } from "@tanstack/react-query"
 import type { Stats } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { downloadCsv } from "@/lib/export-utils"
 
 const statCards: {
   key: keyof Stats
@@ -76,22 +79,46 @@ function OverviewContent() {
           {showSkeleton ? (
             <DashboardStatGridSkeleton />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {statCards.map(({ key, label, icon: Icon }) => (
-                <Card key={key}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{label}</CardTitle>
-                    <Icon className="size-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    {stats ? (
-                      <div className="text-2xl font-bold">{stats[key]}</div>
-                    ) : (
-                      <Skeleton className="h-8 w-16" />
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={!stats}
+                  onClick={() => {
+                    if (!stats) return
+                    downloadCsv(
+                      "dashboard-stats.csv",
+                      statCards.map(({ key, label }) => ({
+                        metric: label,
+                        value: stats[key],
+                      }))
+                    )
+                  }}
+                >
+                  <Download className="size-3.5" />
+                  Export CSV
+                </Button>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {statCards.map(({ key, label, icon: Icon }) => (
+                  <Card key={key}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">{label}</CardTitle>
+                      <Icon className="size-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      {stats ? (
+                        <div className="text-2xl font-bold">{stats[key]}</div>
+                      ) : (
+                        <Skeleton className="h-8 w-16" />
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           )}
         </StableBlock>

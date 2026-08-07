@@ -43,6 +43,29 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { SessionTeacherCell } from "@/components/session-teacher-cell"
 import { SearchableSelect } from "@/components/searchable-select"
+import { formatClassLabel } from "@/lib/format-class"
+
+const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
+
+function formatSlotOption(s: TimetableSlot) {
+  const day = DAY_SHORT[s.day_of_week] ?? String(s.day_of_week)
+  const start = s.start_time.slice(0, 5)
+  const end = s.end_time.slice(0, 5)
+  const subject = s.subject?.name?.trim() || "No subject"
+  const teacher = s.teacher?.name?.trim()
+  const room = s.room?.trim()
+  const details = [teacher, room ? `Room ${room}` : null].filter(Boolean).join(" · ")
+  return {
+    value: s.id.toString(),
+    label: `${day} ${start}–${end} · ${subject}`,
+    subLabel: details || undefined,
+  }
+}
+
+function compareSlots(a: TimetableSlot, b: TimetableSlot) {
+  if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week
+  return a.start_time.localeCompare(b.start_time)
+}
 
 const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
   const hour = Math.floor(7 + i / 2)
@@ -458,7 +481,10 @@ export default function SessionsPage() {
 
   const filteredSlots = React.useMemo(() => {
     if (!formClassId) return []
-    return timetableSlots.filter((slot) => slot.class_obj?.id.toString() === formClassId)
+    return timetableSlots
+      .filter((slot) => slot.class_obj?.id.toString() === formClassId)
+      .slice()
+      .sort(compareSlots)
   }, [timetableSlots, formClassId])
 
   const handleClassChange = (classId: string) => {
@@ -1057,7 +1083,7 @@ export default function SessionsPage() {
 
       {/* Form modal */}
       <Dialog open={modalOpen} onOpenChange={(val) => !val && closeModal()}>
-        <DialogContent onClose={closeModal} className="max-w-xl">
+        <DialogContent onClose={closeModal} className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingSession ? "Edit Session" : "Add Session"}</DialogTitle>
             <DialogDescription>
@@ -1066,45 +1092,45 @@ export default function SessionsPage() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Class</label>
-                <Select
-                  value={formClassId}
-                  onValueChange={(val) => handleClassChange(val ?? "")}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>{(value: string | null) => { const c = classes.find((x) => x.id.toString() === value); return c ? `${c.education_level} ${c.cohort_identifier}${c.cohort_sub_category ? ` (${c.cohort_sub_category})` : ""}` : (value ? `Class #${value}` : "Select Class"); }}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {classes.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.education_level} {c.cohort_identifier} {c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Class</label>
+              <Select
+                value={formClassId}
+                onValueChange={(val) => handleClassChange(val ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string | null) => {
+                      const c = classes.find((x) => x.id.toString() === value)
+                      return c ? formatClassLabel(c) : value ? `Class #${value}` : "Select Class"
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {formatClassLabel(c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Timetable Slot</label>
-                <Select
-                  value={formTimetableSlotId}
-                  onValueChange={(val) => handleSlotChange(val ?? "")}
-                  disabled={!formClassId}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>{(value: string | null) => { const s = filteredSlots.find((x) => x.id.toString() === value); if (!s) return value ? `Slot #${value}` : "Select Slot"; const day = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][s.day_of_week] ?? s.day_of_week; return `${day} ${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)}${s.subject?.name ? ` · ${s.subject.name}` : ""}`; }}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredSlots.map((s) => (
-                      <SelectItem key={s.id} value={s.id.toString()}>
-                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][s.day_of_week] ?? s.day_of_week} {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}{s.subject?.name ? ` · ${s.subject.name}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Timetable slot</label>
+              <SearchableSelect
+                options={filteredSlots.map(formatSlotOption)}
+                value={formTimetableSlotId}
+                onValueChange={handleSlotChange}
+                placeholder={formClassId ? "Search day, time, or subject…" : "Select a class first"}
+                searchPlaceholder="Search day, time, or subject…"
+                disabled={!formClassId}
+                wrapLabels
+                contentClassName="max-h-72"
+              />
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Search by weekday, time, or subject. Full subject names are shown below each slot.
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

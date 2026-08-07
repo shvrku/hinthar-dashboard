@@ -111,6 +111,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const showTerminalNav = canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
 
+  const closeMobileSidebar = React.useCallback(() => {
+    if (isMobile) setOpenMobile(false)
+  }, [isMobile, setOpenMobile])
+
+  const handleOpenAccount = React.useCallback(() => {
+    closeMobileSidebar()
+    // Let the sheet finish closing so Clerk's modal isn't trapped under it.
+    window.setTimeout(() => openUserProfile(), isMobile ? 150 : 0)
+  }, [closeMobileSidebar, isMobile, openUserProfile])
+
   React.useEffect(() => {
     if (pathname.startsWith("/check-in")) {
       setCheckInOpen(true)
@@ -136,8 +146,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Free-plan account switching: end this session and return to sign-in.
   // True simultaneous account switching requires Clerk multi-session handling.
   const handleSwitchAccount = React.useCallback(() => {
+    closeMobileSidebar()
     void signOut({ redirectUrl: "/sign-in/" })
-  }, [signOut])
+  }, [closeMobileSidebar, signOut])
+
+  const handleSignOut = React.useCallback(() => {
+    closeMobileSidebar()
+    void signOut({ redirectUrl: "/sign-in/" })
+  }, [closeMobileSidebar, signOut])
 
   return (
     <Sidebar
@@ -302,15 +318,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ) : null}
       </SidebarContent>
 
-      {/* User Footer */}
-      <SidebarFooter>
+      {/* User Footer — sticky on mobile sheet so account/settings stay reachable */}
+      <SidebarFooter className="mt-auto ">
         <SidebarMenu>
           <SidebarMenuItem>
             {isLoaded && isSignedIn && user ? (
-              <DropdownMenu modal={false}>
+              <DropdownMenu modal={isMobile}>
                 <DropdownMenuTrigger
                   render={
-                    <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
+                    <SidebarMenuButton
+                      size="lg"
+                      className="data-[state=open]:bg-sidebar-accent"
+                      tooltip="Account"
+                    >
                       <Avatar className="h-8 w-8 rounded-lg">
                         <AvatarImage src={userAvatar} alt={userName} />
                         <AvatarFallback className="rounded-lg">HT</AvatarFallback>
@@ -323,7 +343,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarMenuButton>
                   }
                 />
-                <DropdownMenuContent className="w-64" side="right" align="end" sideOffset={4}>
+                <DropdownMenuContent
+                  className="z-[100] w-64"
+                  side={isMobile ? "top" : "right"}
+                  align="end"
+                  sideOffset={8}
+                >
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="p-0 font-normal">
                       <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -342,12 +367,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <DropdownMenuGroup>
                     <DropdownMenuItem
                       className="cursor-pointer"
-                      render={<Link href="/settings" onClick={handleNavClick} />}
+                      render={
+                        <Link
+                          href="/settings"
+                          onClick={() => {
+                            closeMobileSidebar()
+                          }}
+                        />
+                      }
                     >
                       <Settings className="mr-2 size-4 text-primary" />
                       <span>Settings</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openUserProfile()} className="cursor-pointer">
+                    <DropdownMenuItem onClick={handleOpenAccount} className="cursor-pointer">
                       <UserCog className="mr-2 size-4 text-primary" />
                       <span>Manage Account</span>
                     </DropdownMenuItem>
@@ -362,7 +394,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       <span>Switch account</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => signOut({ redirectUrl: "/sign-in/" })}
+                      onClick={handleSignOut}
                       className="cursor-pointer text-destructive focus:text-destructive"
                     >
                       <LogOut className="mr-2 size-4" />

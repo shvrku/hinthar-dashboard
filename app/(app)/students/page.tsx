@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCheck, Upload, Eye } from "lucide-react"
 import Link from "next/link"
 import { createApi, ApiError } from "@/lib/api"
-import { SCHOOL_CODES, type Student, StudentPayload } from "@/lib/types"
+import { SCHOOL_CODES, type Class, type Student, StudentPayload } from "@/lib/types"
+import { formatClassLabel, formatClassLabelText } from "@/lib/format-class"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -277,6 +278,9 @@ export default function StudentsPage() {
   }, [getToken])
 
   const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
+  const [classFilter, setClassFilter] = React.useState<string>("all")
+  const [groupByClass, setGroupByClass] = React.useState(false)
+  const [classes, setClasses] = React.useState<Class[]>([])
 
   const fetchPage = React.useCallback(async () => {
     const api = await getApi()
@@ -285,17 +289,20 @@ export default function StudentsPage() {
       page_size: serverPg.pageSize,
       q: debouncedQuery || undefined,
       school_code: schoolFilter === "all" ? undefined : schoolFilter,
+      class_id: classFilter === "all" ? undefined : classFilter,
     })
     setPageStudents(data.results)
     serverPg.setTotalItems(data.count)
-  }, [getApi, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, schoolFilter])
+  }, [getApi, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, schoolFilter, classFilter])
 
   const loadData = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     setSelectedIds([])
     try {
-      await fetchPage()
+      const api = await getApi()
+      const [, classList] = await Promise.all([fetchPage(), api.listClasses()])
+      setClasses(classList)
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
@@ -306,7 +313,7 @@ export default function StudentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [fetchPage])
+  }, [fetchPage, getApi])
 
   // Once data has been loaded at least once, keep the server page in sync:
   // reset to page 1 when search/filter changes, and refetch whenever
@@ -314,7 +321,7 @@ export default function StudentsPage() {
   const filterKeyRef = React.useRef<string | null>(null)
   React.useEffect(() => {
     if (lastLoaded === null) return
-    const filterKey = `${debouncedQuery}|${schoolFilter}`
+    const filterKey = `${debouncedQuery}|${schoolFilter}|${classFilter}`
     const filterChanged = filterKeyRef.current !== null && filterKey !== filterKeyRef.current
     filterKeyRef.current = filterKey
     if (filterChanged && serverPg.page !== 1) {
@@ -336,11 +343,26 @@ export default function StudentsPage() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverPg.page, serverPg.pageSize, debouncedQuery, schoolFilter])
+  }, [serverPg.page, serverPg.pageSize, debouncedQuery, schoolFilter, classFilter])
 
   // Sorting (client-side; only sorts the current server page)
   const { items: sortedStudents, requestSort, sortConfig } = useSortableData(pageStudents, "id", "asc")
   const displayedStudents = sortedStudents
+  const groupedStudents = React.useMemo(() => {
+    if (!groupByClass) {
+      return [{ key: "all", label: null as string | null, students: displayedStudents }]
+    }
+    const map = new Map<string, Student[]>()
+    for (const s of displayedStudents) {
+      const key = formatClassLabelText(s.class_labels?.[0]?.trim() || "Unassigned")
+      const list = map.get(key) ?? []
+      list.push(s)
+      map.set(key, list)
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, students]) => ({ key, label: key, students }))
+  }, [groupByClass, displayedStudents])
 
   const tablePagination = {
     currentPage: serverPg.page,
@@ -570,6 +592,35 @@ export default function StudentsPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={classFilter} onValueChange={(val) => setClassFilter(val ?? "all")}>
+              <SelectTrigger className="w-48 text-xs">
+                <SelectValue>
+                  {classFilter === "all"
+                    ? "All classes"
+                    : (classes.find((c) => String(c.id) === classFilter)
+                        ? formatClassLabel(classes.find((c) => String(c.id) === classFilter)!)
+                        : "Class")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All classes</SelectItem>
+                {classes.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {formatClassLabel(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              size="sm"
+              variant={groupByClass ? "default" : "outline"}
+              onClick={() => setGroupByClass((v) => !v)}
+            >
+              Group by class
+            </Button>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -662,15 +713,7 @@ export default function StudentsPage() {
                     Identifier
                   </TableHeadSortable>
 
-                  <TableHeadSortable
-                    className="min-w-[90px]"
-                    sortKey="school_code"
-                    currentSortKey={sortConfig.key}
-                    currentSortOrder={sortConfig.order}
-                    onSort={requestSort}
-                  >
-                    School
-                  </TableHeadSortable>
+                  <TableHead className="min-w-[140px]">Class</TableHead>
 
                   <TableHeadSortable
                     className="min-w-[140px]"
@@ -740,8 +783,24 @@ export default function StudentsPage() {
                 emptyTitle="No students found"
                 emptyDescription="Try adjusting search or filters, then load again."
               >
-                {displayedStudents.map((student) => {
+                {groupedStudents.flatMap((group) => [
+                  ...(group.label
+                    ? [
+                        <TableRow key={`g-${group.key}`} className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={9}
+                            className="bg-muted/40 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                          >
+                            {group.label}
+                          </TableCell>
+                        </TableRow>,
+                      ]
+                    : []),
+                  ...group.students.map((student) => {
                     const isSelected = selectedIds.includes(student.id)
+                    const classLabel =
+                      student.class_labels?.filter(Boolean).map(formatClassLabelText).join(", ") ||
+                      "Unassigned"
                     return (
                       <TableRow key={student.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/students/${student.id}/`)}>
                         <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
@@ -753,9 +812,7 @@ export default function StudentsPage() {
                         </TableCell>
                         <TableCell className="font-semibold text-foreground">{student.unique_code}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="text-xs font-normal">
-                            {student.school_code}
-                          </Badge>
+                          <span className="text-sm text-muted-foreground">{classLabel}</span>
                         </TableCell>
                         <TableCell className="max-w-[180px]">
                           <TruncatedContent value={student.name} className="font-medium text-foreground" />
@@ -799,7 +856,8 @@ export default function StudentsPage() {
                         </TableCell>
                       </TableRow>
                     )
-                  })}
+                  }),
+                ])}
               </AnimatedTableBody>
             </Table>
           </Card>

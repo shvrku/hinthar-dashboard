@@ -26,6 +26,11 @@ interface SearchableSelectProps {
   searchPlaceholder?: string
   className?: string
   triggerClassName?: string
+  /** Extra classes for the popup (e.g. wider panel). */
+  contentClassName?: string
+  /** Allow long labels to wrap instead of truncating. */
+  wrapLabels?: boolean
+  disabled?: boolean
 }
 
 export function SearchableSelect({
@@ -36,6 +41,9 @@ export function SearchableSelect({
   searchPlaceholder,
   className,
   triggerClassName,
+  contentClassName,
+  wrapLabels = false,
+  disabled = false,
 }: SearchableSelectProps) {
   const selected = React.useMemo(
     () => options.find((opt) => opt.value === value) ?? null,
@@ -53,6 +61,7 @@ export function SearchableSelect({
         itemToStringLabel={(item) => item.label}
         itemToStringValue={(item) => item.value}
         isItemEqualToValue={(a, b) => a.value === b.value}
+        disabled={disabled}
         filter={(item, query) => {
           const q = query.trim().toLowerCase()
           if (!q) return true
@@ -67,16 +76,29 @@ export function SearchableSelect({
           placeholder={searchPlaceholder ?? placeholder}
           className={cn("w-full", triggerClassName)}
           showClear={false}
+          disabled={disabled}
         />
-        <ComboboxContent className="min-w-[var(--anchor-width)]">
+        <ComboboxContent
+          className={cn(
+            "min-w-[var(--anchor-width)] w-[var(--anchor-width)] max-w-[min(100vw-2rem,36rem)]",
+            contentClassName
+          )}
+        >
           <ComboboxEmpty>No results found.</ComboboxEmpty>
           <ComboboxList>
             {(item) => (
               <ComboboxItem key={item.value} value={item}>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate">{item.label}</span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
+                  <span className={cn(wrapLabels ? "whitespace-normal break-words" : "truncate")}>
+                    {item.label}
+                  </span>
                   {item.subLabel ? (
-                    <span className="truncate text-[11px] text-muted-foreground">
+                    <span
+                      className={cn(
+                        "text-[11px] text-muted-foreground",
+                        wrapLabels ? "whitespace-normal break-words" : "truncate"
+                      )}
+                    >
                       {item.subLabel}
                     </span>
                   ) : null}
