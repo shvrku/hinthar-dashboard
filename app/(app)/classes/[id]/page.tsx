@@ -1,13 +1,12 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { ArrowLeft, CalendarDays, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts"
 import { ApiError, createApi } from "@/lib/api"
-import { ATTENDANCE_STATUS_COLORS, CAMPUS_CHECKIN_COLOR } from "@/lib/chart-colors"
 import { formatClassLabel } from "@/lib/format-class"
 import { formatBackendDate } from "@/lib/utils"
 import type { AnalyticsRange, Class, ClassAttendanceSummary, ClassPayload, ClassStudent, Student, TimetableSlot } from "@/lib/types"
@@ -15,6 +14,7 @@ import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
 import { TimetableWeekSnippet } from "@/components/timetable-week-snippet"
 import { AttendanceOverviewSkeleton, StudentDetailPageSkeleton } from "@/components/page-skeletons"
+import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,8 +23,16 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { EDUCATION_LEVELS } from "@/lib/types"
+
+const ClassCampusChart = dynamic(
+  () => import("@/components/charts/class-attendance-charts").then((m) => m.ClassCampusChart),
+  { ssr: false, loading: () => <ChartChunkSkeleton className="h-52" /> }
+)
+const ClassLessonCharts = dynamic(
+  () => import("@/components/charts/class-attendance-charts").then((m) => m.ClassLessonCharts),
+  { ssr: false, loading: () => <ChartChunkSkeleton className="h-52" /> }
+)
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
   { value: "week", label: "This week" },
@@ -32,13 +40,6 @@ const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
   { value: "all", label: "All time" },
 ]
 const STATUS_LABELS: Record<string, string> = { present: "Present", late: "Late", absent: "Absent", excused: "Excused" }
-const statusConfig = {
-  present: { label: "Present", color: ATTENDANCE_STATUS_COLORS.present },
-  late: { label: "Late", color: ATTENDANCE_STATUS_COLORS.late },
-  absent: { label: "Absent", color: ATTENDANCE_STATUS_COLORS.absent },
-  excused: { label: "Excused", color: ATTENDANCE_STATUS_COLORS.excused },
-} satisfies ChartConfig
-const campusConfig = { checked_in: { label: "Checked in", color: CAMPUS_CHECKIN_COLOR } } satisfies ChartConfig
 
 function formatPercent(value: number | null | undefined) {
   return value == null ? "—" : `${Math.round(value * 100)}%`
@@ -195,8 +196,8 @@ function ClassDetailContent() {
       </div>
 
       <Card className="border-border/80"><CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle>Attendance overview</CardTitle><CardDescription>Campus check-ins and lesson roll are reported separately.{summary && <span className="block">{summary.date_from} → {summary.date_to}</span>}</CardDescription></div><Tabs value={range} onValueChange={(value) => setRange(value as AnalyticsRange)}><TabsList>{RANGE_OPTIONS.map((option) => <TabsTrigger key={option.value} value={option.value} disabled={summaryLoading}>{option.label}</TabsTrigger>)}</TabsList></Tabs></CardHeader><CardContent>{summaryLoading ? <AttendanceOverviewSkeleton /> : !summary ? <p className="text-sm text-muted-foreground">No attendance data available.</p> : <div className="grid gap-8 xl:grid-cols-2">
-        <section className="flex flex-col gap-4"><div><h3 className="font-semibold">Campus check-in</h3><p className="text-xs text-muted-foreground">Daily on-site presence across the roster.</p></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold">{summary.campus.check_ins}</p><p className="text-xs text-muted-foreground">check-ins</p></div><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold">{formatPercent(summary.campus.rate)}</p><p className="text-xs text-muted-foreground">attendance rate</p></div></div><ChartContainer config={campusConfig} className="h-52 w-full aspect-auto"><BarChart data={campusData}><CartesianGrid vertical={false} /><XAxis dataKey="date" tickLine={false} axisLine={false} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Bar dataKey="checked_in" fill="var(--color-checked_in)" radius={[4, 4, 0, 0]} /></BarChart></ChartContainer></section>
-        <section className="flex flex-col gap-4"><div><h3 className="font-semibold">Lesson roll</h3><p className="text-xs text-muted-foreground">Marks recorded during class sessions.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(["present", "late", "absent", "excused"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-3 text-center"><p className="text-xl font-bold">{summary.lesson[key]}</p><p className="text-[10px] uppercase text-muted-foreground">{STATUS_LABELS[key]}</p></div>)}</div><div className="grid gap-4 md:grid-cols-2"><ChartContainer config={statusConfig} className="mx-auto h-48 w-full max-w-[240px] aspect-square"><PieChart><ChartTooltip content={<ChartTooltipContent nameKey="status" hideLabel />} /><Pie data={statusData} dataKey="count" nameKey="status" innerRadius={42} outerRadius={70}>{statusData.map((item) => <Cell key={item.status} fill={`var(--color-${item.status})`} />)}</Pie><ChartLegend content={<ChartLegendContent nameKey="status" />} /></PieChart></ChartContainer>{subjectData.length > 0 && <ChartContainer config={statusConfig} className="h-52 w-full aspect-auto"><BarChart data={subjectData} layout="vertical"><CartesianGrid horizontal={false} /><XAxis type="number" /><YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Bar dataKey="present" stackId="a" fill="var(--color-present)" /><Bar dataKey="late" stackId="a" fill="var(--color-late)" /><Bar dataKey="absent" stackId="a" fill="var(--color-absent)" /><Bar dataKey="excused" stackId="a" fill="var(--color-excused)" /></BarChart></ChartContainer>}</div></section>
+        <section className="flex flex-col gap-4"><div><h3 className="font-semibold">Campus check-in</h3><p className="text-xs text-muted-foreground">Daily on-site presence across the roster.</p></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold">{summary.campus.check_ins}</p><p className="text-xs text-muted-foreground">check-ins</p></div><div className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold">{formatPercent(summary.campus.rate)}</p><p className="text-xs text-muted-foreground">attendance rate</p></div></div><ClassCampusChart data={campusData} /></section>
+        <section className="flex flex-col gap-4"><div><h3 className="font-semibold">Lesson roll</h3><p className="text-xs text-muted-foreground">Marks recorded during class sessions.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(["present", "late", "absent", "excused"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-3 text-center"><p className="text-xl font-bold">{summary.lesson[key]}</p><p className="text-[10px] uppercase text-muted-foreground">{STATUS_LABELS[key]}</p></div>)}</div><ClassLessonCharts statusData={statusData} subjectData={subjectData} /></section>
       </div>}</CardContent></Card>
       <Button onClick={() => router.push(`/attendance/class/${classItem.id}/`)}>Take roll</Button>
       <Dialog open={editOpen} onOpenChange={setEditOpen}><DialogContent onClose={() => setEditOpen(false)}><DialogHeader><DialogTitle>Edit class</DialogTitle><DialogDescription>Update this cohort&apos;s details.</DialogDescription></DialogHeader><div className="flex flex-col gap-4"><div><label className="text-sm font-medium">Education level</label><Select items={EDUCATION_LEVELS} value={educationLevel} onValueChange={(value) => setEducationLevel(value as ClassPayload["education_level"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{EDUCATION_LEVELS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div><div><label className="text-sm font-medium" htmlFor="cohort">Cohort identifier</label><Input id="cohort" value={cohort} onChange={(event) => setCohort(event.target.value)} maxLength={1} /></div><div><label className="text-sm font-medium" htmlFor="subcategory">Sub-category</label><Input id="subcategory" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} maxLength={1} /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button disabled={saving || !cohort.trim()} onClick={() => void saveClass()}>{saving && <Loader2 data-icon="inline-start" className="animate-spin" />}Save</Button></DialogFooter></DialogContent></Dialog>

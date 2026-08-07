@@ -10,6 +10,19 @@ import { cn } from "@/lib/utils";
 
 import Script from "next/script";
 
+/** Must remain a static string — never interpolate request/user input (SEC-L5). */
+const THEME_INIT_SCRIPT = `
+try {
+  var stored = localStorage.getItem('theme');
+  var preferred = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  if (preferred === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+} catch (e) {}
+`;
+
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const geistSans = Geist({
@@ -76,19 +89,7 @@ export default function RootLayout({
         <Script
           id="theme-initializer"
           strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var stored = localStorage.getItem('theme');
-                var preferred = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-                if (preferred === 'dark') {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (e) {}
-            `,
-          }}
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
       </head>
       <body className="h-full flex flex-col bg-background text-foreground overflow-hidden" suppressHydrationWarning>

@@ -12,10 +12,10 @@ Keep these **visually and verbally separate** in nav and page titles:
 
 | Domain | What it means | Primary routes |
 |--------|---------------|----------------|
-| **People & classes** | Students, teachers, subjects, class cohorts, enrollment | `/students`, `/teachers`, `/subjects`, `/classes` |
-| **Schedule** | Weekly slots → generated dated sessions; ad-hoc tutoring | `/timetable`, `/sessions` |
+| **People & classes** | Students, teachers, subjects, class cohorts, enrollment | `/students`, `/teachers`, `/subjects`, `/classes` (+ `/[id]` hubs) |
+| **Schedule** | Weekly slots → generated dated sessions; ad-hoc tutoring | `/timetable`, `/sessions`, `/sessions/find/` |
 | **Lesson attendance** | Present / late / absent / excused **per class or ad-hoc session** | `/attendance/`, `/attendance/class/[classId]/`, `/attendance/adhoc/` |
-| **Campus check-in** | Daily building presence via QR / terminal | `/check-in/overview`, `/management`, `/terminal` |
+| **Campus check-in** | Daily building presence via QR / terminal | `/check-in/overview`, `/management`, `/terminal`, `/corrections` |
 | **Payroll / finance** | **Out of scope** — residue removed from live UI/API | none |
 
 Staff confusion risk: keep **Session Attendance** vs **Check-In** verbally separate (campus presence ≠ lesson roll).
@@ -35,21 +35,24 @@ Verdicts are for **front-office / academic staff**, not developers.
 - Check-in terminal is lookup → confirm → commit (no token leakage in UI).
 - Role gates via `RequireRole` / sidebar filtering; Clerk is identity, Django owns role.
 
-### Issues by page (as of 2026-08-06)
+### Issues by page (as of 2026-08-07)
 
 | Page | Graspability | Notes |
 |------|--------------|-------|
 | `/` (Overview) | Medium | Prefer live KPIs here (Phase 6); `/dashboard` redirects to `/`. |
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
+| `/classes/[id]` | Good | Hub: roster, timetable summary, attendance analytics. |
 | `/teachers` | Good | Payroll rate/bank fields removed. |
+| `/teachers/[id]` | Good | Hub: analytics; recent sessions **read-only** — manage substitute on Sessions / Find sessions. |
 | `/students` | Good | Server search + pagination; bulk import helps scale. |
 | `/students/[id]` | Good | Staff hub: profile, enrollments, QR activate/deactivate/regenerate, campus vs lesson analytics. |
 | `/subjects` | Good | Simple catalog. |
 | `/users` | Good | Server `q` + role filter. |
-| `/timetable` | Good | Empty states + week legend; Empty* when no classes / no slots. |
-| `/sessions` | Medium | Timetabled vs ad-hoc toggle easy to miss; Paid residue gone. |
+| `/timetable` | Good | Landing → class week grid; empty states + week legend. |
+| `/sessions` | Good | Bulk / cross-class lookup; Assigned + Substitute on edit; `SessionTeacherCell`. |
+| `/sessions/find/` | Good | Slot-first path: class → week grid → slot occurrence table + edit. |
 | `/attendance/` | Better | Landing → class or ad-hoc. Remaining: deep links from Sessions; optional density polish. |
-| `/attendance/class/[classId]/` | Good | Server subject/teacher filters; headers show subject · teacher; identifiers under names; excused supported. |
+| `/attendance/class/[classId]/` | Good | Server subject/teacher filters; headers show subject · teacher; identifiers under names; excused supported; month KPIs exclude future sessions. |
 | `/attendance/adhoc/` | Good | Add Session + **Add Students** (server search, load-more). Empty grid until students added. |
 | `/check-in/overview` | Good | Server aggregate. **All classes**: dual Missing \| Checked-in columns, each paginated via `status=`; single class keeps dual columns unpaginated; icon-only **Undo** / actions; school-wide search. |
 | `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
@@ -65,6 +68,20 @@ Verdicts are for **front-office / academic staff**, not developers.
 4. Ad-hoc participants = attendance rows created via Add Students (start **absent**).
 5. Sessions **Take roll** deep-links into class/ad-hoc roster with `session_id` (+ date filters).
 
+### Find sessions / substitute UX — current contract
+
+1. Prefer `/sessions/find/` when staff know the class + weekly slot; keep `/sessions` for bulk search.
+2. Week grid must match `/timetable/[classId]/` (time × day), not day-column stacks.
+3. Slot click → filtered occurrence **table** (`timetable_slot_id` + date range); row click → session edit dialog.
+4. Substitute edits live on Sessions / Find sessions only — teacher hub recent rows are read-only.
+5. UI copy: **Substitute** (not “cover”); Assigned teacher stays the generation teacher; empty `actual_teacher` = taught as assigned.
+6. Always pass `class_id` when loading timetable slots for a class-scoped UI.
+
+### Datetime handling
+
+- Parse/display backend DateTimes only via `lib/utils.ts` (`parseBackendDateTime`, `formatBackendDateTime`, `formatBackendDate`, `formatBackendTime`, `toSessionDateString`, `formatSlotClock`, …).
+- Expect **ISO-8601** from the API; helpers still tolerate legacy `dd/mm/yy` input during transition.
+- Do not use bare `new Date(backendString)` for list/matrix keys or filters.
 ---
 
 ## 3. Frontend architecture standards
@@ -203,6 +220,8 @@ When a new overview is needed (e.g. class attendance for a term):
 | Dashboard (static home) | Overview **or** live Stats dashboard |
 
 Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI).
+
+Teacher fields: **Assigned** (generation teacher) vs **Substitute** (`actual_teacher` when set). Empty substitute = taught as assigned.
 
 ---
 

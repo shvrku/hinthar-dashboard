@@ -85,7 +85,7 @@ function FindSessionsClassContent() {
 
   const openSlot = React.useCallback(
     (slotId: number) => {
-      router.push(`/sessions/find/${classId}/slot/${slotId}/`)
+      router.push(`/sessions/find/${classId}/${slotId}/`)
     },
     [classId, router]
   )

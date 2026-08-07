@@ -11,10 +11,8 @@ const nextConfig: NextConfig = {
   // Only a default bot whitelist gets blocking/static metadata. Telegram is NOT
   // in that list. Set to /.*/ to serve blocking metadata to ALL user agents so
   // OG tags are always present in the initial HTML for social previews.
+  // PERF-M5: intentional tradeoff (slightly worse TTFB) for social OG reliability.
   htmlLimitedBots: /.*/,
-  experimental: {
-    cpus: 1,
-  },
   // Same-origin /api proxy — no cross-origin CORS headers required.
   async headers() {
     return [

@@ -293,7 +293,7 @@ export function createApi(token: string) {
       }),
 
     getCheckInToken: (id: number) =>
-      request<import("./types").Student>(`/students/${id}/check_in_token/`, token),
+      request<{ check_in_token: string }>(`/students/${id}/check_in_token/`, token),
 
     regenerateCheckInToken: (id: number) =>
       request<{ check_in_token: string; check_in_token_active?: boolean }>(

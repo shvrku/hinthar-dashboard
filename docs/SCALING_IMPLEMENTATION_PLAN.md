@@ -7,7 +7,7 @@ Cross-repo plan to bring **Hinthar-SMS** (backend) and **Hinthar-Dashboard** (fr
 
 Goal: scale students / teachers / class times / attendance safely; **scrap payroll from the product surface**; keep attendance matrices as scoped aggregate routes; introduce consistent pagination and role helpers.
 
-**Last status update:** 2026-08-06 (Phase 7 class/teacher hubs + actual_teacher cover + shadcn charts).
+**Last status update:** 2026-08-07 (Phase 8 Find sessions + substitute UX ownership + datetime ISO standardization).
 
 ---
 
@@ -23,12 +23,14 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 | 5 | Bulk / filter / OpenAPI hygiene | **Done** — `records` preferred; `class_id` aliases; page-boundary tests; error freeze; global handler deferred |
 | 6 | Design system, check-in UX, QR lifecycle | **Done** — ConfirmDialog, timetable empty/legend, thin role homes, Clerk resource auth; shadcn **base-vega / zinc** + Chart |
 | 7 | Entity detail pages + analytics + teacher cover | **Done** — student / class / teacher hubs; `actual_teacher` cover; row-click lists |
+| 8 | Find sessions hub, substitute UX, datetime standards | **Done** — slot-first finder; substitute on `/sessions`; ISO DateTime wire format |
 
 ### Remaining (priority order)
 
 1. Optional: commit Spectacular schema snapshot; global DRF exception handler.
 2. Teacher-scoped querysets (if teacher login is imminent).
-3. Teacher check-in writing `actual_teacher` (deferred — field reserved).
+3. Teacher check-in writing `actual_teacher` (deferred — field reserved; staff assign via Sessions / Find sessions today).
+4. Optional polish: deep-link Find sessions from teacher hub recent rows; ad-hoc substitute UI parity if product wants it on ad-hoc edit.
 
 ### Out of scope until product asks
 
@@ -36,29 +38,30 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 - Clerk multi-session / Pro org switching as the account-switch story (current: sign out → sign-in)
 - Student self-service portal
 - Day-level teacher attendance; dedicated `substituted` session status
+- Removing `/sessions` table (kept for lookup + bulk)
 
 ---
 
-## Achieved this conversation cycle (2026-08-06) — student hub + color tokens
+## Achieved this conversation cycle (2026-08-07) — Find sessions + datetime
 
 ### Backend (SMS)
 
-- `Student.check_in_token_active` (+ migration `0013`); regenerate re-activates.
-- `POST /students/{id}/activate_check_in_token/` / `deactivate_check_in_token/` (staff+).
-- `GET /students/{id}/attendance-summary/?range=week|month|all` — campus check-in vs lesson roll labeled separately (`people/student_analytics.py`).
-- QR check-in + lookup reject inactive tokens; lookup **403** payload includes safe `student` summary for terminal card (no blocking top banner required).
+- `GET /sessions/?timetable_slot_id=` filter (+ date_from/date_to) for slot occurrence lists.
+- `GET /timetable-slots/?class_id=` filter (Find sessions / editors must not load all-school slots).
+- Session DateTime API output standardized to **ISO-8601** (`SessionSerializer`, attendance-list nested times, generate summaries). Legacy `dd/mm/yy HH:MM:SS` still accepted on **input**.
+- Prior Phase 7: class/teacher attendance-summary, `actual_teacher` on Session / AdHocSession.
 
 ### Frontend (Dashboard)
 
-- `/students/[id]/` staff hub: profile, enrollments, QR activate/deactivate/regenerate, attendance charts (Recharts).
-- Analytics range tabs use layout-matched skeletons (no spinner overlay).
-- Check-in overview: icon-only row actions + pagination.
-- Terminal: deactivated QR shown as confirmation-panel card with student info when available.
-- Semantic colors: `--success` / `--warning` / `--attendance-*` in `globals.css`; helpers in `lib/status-styles.ts` + `lib/chart-colors.ts`; replaced ad-hoc emerald/rose/amber/sky in management + attendance + terminal.
+- **Find sessions** (`/sessions/find/` → `/sessions/find/[classId]/` week grid → `/sessions/find/[classId]/[slotId]/` filtered table + edit dialog).
+- Substitute ownership: teacher hub Recent sessions **read-only**; assign/clear substitute on `/sessions` edit + Find slot edit; `SessionTeacherCell` (Substitute badge + Assigned tooltip).
+- Timetable / attendance / find landings: class picker cards centered; headers stay full-width.
+- Month KPI stats on attendance class/adhoc exclude future sessions (pregenerated absents).
+- Shared datetime helpers in `lib/utils.ts` (`parseBackendDateTime`, `formatBackendDateTime`, `toSessionDateString`, `formatSlotClock`, …); attendance/sessions/check-in call sites migrated.
 
-### Earlier same-day (already on branch)
+### Earlier (2026-08-06) — Phase 7 hubs
 
-- Check-in overview aggregate (school-wide dual columns); corrections; matrix `class_id` 400; list pages on server `q` + pagination.
+- Student / class / teacher hubs; shadcn charts; row-click lists; `actual_teacher` cover model.
 
 ---
 
@@ -206,26 +209,63 @@ Product goal: deep links from list pages into per-entity surfaces; stop bouncing
 | Identity + edit | Done |
 | Accountability (student rolls for sessions taught) | Done |
 | Personal presence (derived from status + assigned vs `actual_teacher`) | Done |
-| Assign cover (`actual_teacher` on Session) | Done |
+| Recent sessions list | Done — **read-only** (Phase 8); manage substitute on `/sessions` or Find sessions |
+| Assign cover inline on hub | **Superseded** — edit moved to Sessions / Find sessions (Phase 8) |
 
-### Cover model
+### Cover / substitute model
 
 - `Session.teacher` / `AdHocSession.teacher` = **Assigned** (from generation).
-- `actual_teacher` nullable — empty means taught as assigned; set only for a substitute (later reusable for teacher check-in).
+- `actual_teacher` nullable — empty means taught as assigned; set only for a **Substitute** (UI label). Field reserved for future teacher check-in write.
 - No `substituted` status; no separate teacher_attendance enum.
 - Same-as-assigned values normalize to null on save.
+- Staff set/clear substitute via `/sessions` edit dialog and Find sessions slot table — not the teacher hub.
 
 ### List QoL
 
 - Row click on students / teachers / classes → entity hub (`stopPropagation` on actions).
 
-### Suggested next-cycle order
+---
 
-```text
-1  Optional: OpenAPI schema snapshot / global DRF exception handler
-2  Teacher-scoped querysets (if teacher login imminent)
-3  Teacher check-in → write actual_teacher (when product asks)
-```
+## Phase 8 — Find sessions, substitute UX ownership, datetime ISO — DONE
+
+Product goal: staff find a class slot’s dated occurrences without hunting the full sessions table; one place owns substitute edits; wire format matches parsers.
+
+### Find sessions — **shipped**
+
+| Capability | Status |
+|------------|--------|
+| Landing `/sessions/find/` → class picker | Done |
+| Class week grid `/sessions/find/[classId]/` (same layout as timetable) | Done |
+| Slot table `/sessions/find/[classId]/[slotId]/` + date range + edit dialog | Done |
+| Nav + command search “Find sessions” | Done |
+| `GET /sessions/?timetable_slot_id=` (+ `date_from` / `date_to`) | Done |
+| `GET /timetable-slots/?class_id=` (must not dump all-school slots) | Done |
+
+`/sessions` table **kept** for bulk / cross-class lookup. Find sessions is the slot-first path.
+
+### Substitute UX — **shipped**
+
+| Capability | Status |
+|------------|--------|
+| `SessionTeacherCell` — substitute name + Substitute badge; Assigned tooltip | Done |
+| `/sessions` edit: Assigned + Substitute fields | Done |
+| Teacher hub: no Assign cover / Clear / status edit on recent rows | Done |
+| Link “Manage on Sessions” from teacher hub | Done |
+
+### Datetime standards — **shipped**
+
+| Capability | Status |
+|------------|--------|
+| SMS: Session (and nested attendance-list) DateTimes emit **ISO-8601** | Done |
+| SMS: legacy `dd/mm/yy HH:MM:SS` still accepted on input | Done |
+| Dashboard: `lib/utils.ts` parsers/formatters; attendance / sessions / check-in migrated | Done |
+| Find slot table: client clamp to selected date range after parse | Done |
+
+### Attendance / timetable polish (same cycle)
+
+- Month KPI stats exclude future pregenerated absents.
+- Class picker cards centered on attendance / timetable / find landings (headers full-width).
+- Timetable class page title / auto-load / Refresh aligned with attendance class page.
 
 ---
 
@@ -235,9 +275,10 @@ Product goal: deep links from list pages into per-entity surfaces; stop bouncing
 Next 1  Optional: OpenAPI schema snapshot / global exception handler
 Next 2  Teacher scoped querysets (if teacher login is imminent)
 Next 3  Teacher check-in via actual_teacher (deferred)
+Next 4  Optional: deep-link Find sessions from teacher hub; ad-hoc substitute UI parity
 ```
 
-Analytics product sketch: class roll (have), **student profile trends** (have), **class attendance summary**, teacher/subject coverage, school heatmaps — **never** mix campus check-in rate with lesson roll without labeling.
+Analytics product sketch: class roll (have), **student profile trends** (have), **class / teacher attendance summary** (have), teacher/subject coverage, school heatmaps — **never** mix campus check-in rate with lesson roll without labeling.
 
 ---
 
@@ -257,6 +298,7 @@ PR-J  student hub + QR activate/deactivate + attendance-summary  ✓
 PR-K  class detail hub + analytics                               ✓
 PR-L  teacher attendance + substitutes (actual_teacher)            ✓
 PR-M  shadcn charts + list row-click                             ✓
+PR-N  Find sessions + substitute ownership + ISO datetime        ✓
 ```
 
 ---
@@ -265,10 +307,10 @@ PR-M  shadcn charts + list row-click                             ✓
 
 | Area | Signal |
 |------|--------|
-| Scale | Listing 5k+ sessions/check-ins stays fast (paged); matrix monthly for one class stays &lt; 2s p95; overview never fetch-alls |
+| Scale | Listing 5k+ sessions/check-ins stays fast (paged); matrix monthly for one class stays &lt; 2s p95; overview never fetch-alls; Find sessions never loads all-school slots |
 | Auth | Teacher token cannot list all students; terminal cannot PATCH teachers |
-| UX | New staff can mark a class roll in &lt; 3 clicks after class is known; no payroll fields visible; enroll + QR from student page |
-| Docs | OpenAPI + standards match running code; no fake pagination envelopes |
+| UX | New staff can mark a class roll in &lt; 3 clicks after class is known; find a slot’s sessions without scanning the full sessions table; no payroll fields visible; enroll + QR from student page |
+| Docs | OpenAPI + standards match running code; no fake pagination envelopes; DateTime wire = ISO |
 
 ---
 
@@ -279,7 +321,8 @@ PR-M  shadcn charts + list row-click                             ✓
 3. ~~**Keep `paid` boolean**~~ — **dropped** with payroll residue.
 4. **Clerk role sync** vs admin-only Django role assignment — **Django remains source of truth**; Clerk carries identity claims only.
 5. **Teacher attendance grain** — session-level vs day-level vs both?
-6. **Substitute model** — replace teacher on `Session` only, or also timetable-slot defaults + ad-hoc?
+6. ~~**Substitute model**~~ — **decided**: nullable `actual_teacher` on Session / AdHocSession (empty = as assigned). Slot defaults and teacher check-in write still open when product asks.
+7. **Remove or thin `/sessions` table** once Find sessions + filters cover staff habits? — currently **keep**.
 
 ---
 
@@ -293,8 +336,10 @@ PR-M  shadcn charts + list row-click                             ✓
 | Check-in overview aggregate | **Done** — keep school dual-column + status pagination |
 | Hierarchy Admin &gt; Staff &gt; Terminal &gt; Teacher / Student | **Done** — keep tests green as routes change |
 | Entity detail hubs + analytics | **Student / class / teacher hubs done** |
-| Teacher cover / substitutes | **Done** — `actual_teacher` (empty = as assigned) |
+| Teacher cover / substitutes | **Done** — `actual_teacher`; edit on Sessions / Find sessions |
+| Find sessions (slot-first) | **Done** — keep `/sessions` for bulk lookup |
+| ISO DateTime wire + shared parsers | **Done** — do not reintroduce locale datetime dumps |
 | Semantic color tokens | **Done** — prefer tokens over palette utilities |
 | shadcn charts | **Done** — `components/ui/chart` |
 
-The main remaining scale risks are **OpenAPI drift** and **teacher over-open reads** (if teachers log in) — not missing entity hubs or unbounded check-in overview downloads.
+The main remaining scale risks are **OpenAPI drift** and **teacher over-open reads** (if teachers log in) — not missing entity hubs, Find sessions, or unbounded check-in overview downloads.

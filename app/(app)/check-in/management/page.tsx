@@ -5,7 +5,6 @@ import { useAuth } from "@clerk/nextjs"
 import { RefreshCw, Download, Eye, Loader2, Search, QrCode, UserCheck } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Student } from "@/lib/types"
-import QRCode from "qrcode"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -15,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { QrCanvas } from "@/components/qr-canvas"
 import {
   Table,
   TableHeader,
@@ -24,18 +24,6 @@ import {
   TableHeadSortable,
   TableCell,
 } from "@/components/ui/table"
-
-function QrCanvas({ value, size = 200 }: { value: string; size?: number }) {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null)
-
-  React.useEffect(() => {
-    if (canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, value, { width: size, margin: 2 })
-    }
-  }, [value, size])
-
-  return <canvas ref={canvasRef} width={size} height={size} className="rounded-lg shadow-xs" />
-}
 
 function RowSkeleton() {
   return (
@@ -145,9 +133,26 @@ export default function CheckInManagementPage() {
   const totalStudentsCount = serverPg.totalItems
 
   const selectStudent = React.useCallback(async (student: Student) => {
-    setSelected(student)
     setError(null)
-  }, [])
+    // List payloads omit check_in_token (SEC-H2) — fetch via dedicated endpoint.
+    if (student.check_in_token) {
+      setSelected(student)
+      return
+    }
+    setSelected({ ...student, check_in_token: undefined })
+    if (!isSignedIn) return
+    try {
+      const token = await getToken()
+      if (!token) return
+      const { check_in_token } = await createApi(token).getCheckInToken(student.id)
+      setSelected((prev) =>
+        prev && prev.id === student.id ? { ...prev, check_in_token } : prev
+      )
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.userMessage)
+      else setError(err instanceof Error ? err.message : "Failed to load check-in token")
+    }
+  }, [getToken, isSignedIn])
 
   const handleRegenerate = React.useCallback(async () => {
     if (!selected || !isSignedIn) return
@@ -405,7 +410,7 @@ export default function CheckInManagementPage() {
                 <CardContent className="space-y-4">
                   {selected.check_in_token ? (
                     <div className="flex flex-col items-center gap-3">
-                      <QrCanvas value={selected.check_in_token} size={180} />
+                      <QrCanvas value={selected.check_in_token} size={180} className="rounded-lg shadow-xs" />
                       <p className="font-mono text-xs text-muted-foreground break-all text-center">
                         {selected.check_in_token}
                       </p>

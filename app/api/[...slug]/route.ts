@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server"
 
 const API_ORIGIN = (
   process.env.BACKEND_API_ORIGIN ||
+  // Legacy fallback — prefer BACKEND_API_ORIGIN (server-only).
   process.env.NEXT_PUBLIC_API_ORIGIN ||
   "http://localhost:8000"
 ).replace(/\/+$/, "")
@@ -21,6 +22,17 @@ const STRIP_RESPONSE_HEADERS = new Set([
   "content-encoding",
   "content-length",
 ])
+
+function isSafeApiSlug(slugParts: string[]): boolean {
+  if (slugParts.length === 0) return false
+  // Reject path traversal and empty/dot segments
+  if (slugParts.some((part) => part === ".." || part === "." || part.includes("\\"))) {
+    return false
+  }
+  // Only forward /api/v1/* to Django (slug arrives without the leading "api")
+  if (slugParts[0] !== "v1") return false
+  return true
+}
 
 async function handleRequest(
   request: NextRequest,
@@ -39,7 +51,28 @@ async function handleRequest(
   }
 
   const { slug } = await params
-  const cleanSlug = slug.filter(Boolean).join("/")
+  const slugParts = (slug || []).filter(Boolean)
+
+  // SEC-M5: allowlist /api/v1/* and reject traversal
+  if (!isSafeApiSlug(slugParts)) {
+    // #region agent log
+    fetch("http://127.0.0.1:7494/ingest/034dad9a-cd9e-49bb-a577-1a6936ff77a1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "5b0a01" },
+      body: JSON.stringify({
+        sessionId: "5b0a01",
+        hypothesisId: "M5",
+        location: "app/api/[...slug]/route.ts:isSafeApiSlug",
+        message: "rejected unsafe proxy slug",
+        data: { slugParts },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+    return NextResponse.json({ error: "Invalid API path" }, { status: 400 })
+  }
+
+  const cleanSlug = slugParts.join("/")
   const pathname = `/api/${cleanSlug}/`
   const search = request.nextUrl.search || ""
   const proxyUrl = `${API_ORIGIN}${pathname}${search}`
@@ -72,8 +105,16 @@ async function handleRequest(
       method: request.method,
       headers: forwardHeaders,
       body: requestBody,
-      redirect: "follow",
+      // SEC-M5: do not follow redirects to non-allowlisted locations
+      redirect: "manual",
     })
+
+    if (response.status >= 300 && response.status < 400) {
+      return NextResponse.json(
+        { error: "Unexpected redirect from backend" },
+        { status: 502 }
+      )
+    }
 
     const body = await response.arrayBuffer()
 

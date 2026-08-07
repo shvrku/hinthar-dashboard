@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "motion/react"
 import { AlertTriangle, Check, X, Camera, Loader2, Search, User as UserIcon } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { CheckInLookup } from "@/lib/types"
-import jsQR from "jsqr"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StandardPageHeader } from "@/components/standard-page-header"
@@ -66,6 +65,7 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const onScanRef = React.useRef(onScan)
   const scanLockedRef = React.useRef(false)
+  const lastDecodeAtRef = React.useRef(0)
   const [active, setActive] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -82,39 +82,58 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
   React.useEffect(() => {
     let stream: MediaStream | null = null
     let animationId: number | null = null
+    let cancelled = false
+    // PERF-H2: ~8 fps decode cadence
+    const DECODE_INTERVAL_MS = 125
+    const MAX_DECODE_WIDTH = 320
 
     async function start() {
       try {
+        // PERF-M3: load jsQR only on the terminal route
+        const { default: jsQR } = await import("jsqr")
+        if (cancelled) return
+
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment", width: 640, height: 480 },
         })
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
           setActive(true)
-          scan()
+          scan(jsQR)
         }
       } catch {
-        setError("Camera access denied or unavailable.")
+        if (!cancelled) setError("Camera access denied or unavailable.")
       }
     }
 
-    function scan() {
-      if (!videoRef.current || !canvasRef.current) {
-        animationId = requestAnimationFrame(scan)
-        return
-      }
+    function scan(jsQR: typeof import("jsqr").default) {
+      if (cancelled) return
+      animationId = requestAnimationFrame(() => scan(jsQR))
+
+      // Skip while locked, tab hidden, or between throttle windows
+      if (scanLockedRef.current || document.hidden) return
+      const now = performance.now()
+      if (now - lastDecodeAtRef.current < DECODE_INTERVAL_MS) return
+
+      if (!videoRef.current || !canvasRef.current) return
       const video = videoRef.current
       const canvas = canvasRef.current
-      const ctx = canvas.getContext("2d")
-      if (!ctx || video.readyState < 2) {
-        animationId = requestAnimationFrame(scan)
-        return
-      }
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })
+      if (!ctx || video.readyState < 2) return
+
+      lastDecodeAtRef.current = now
+      const scale = Math.min(1, MAX_DECODE_WIDTH / Math.max(video.videoWidth, 1))
+      const w = Math.max(1, Math.floor(video.videoWidth * scale))
+      const h = Math.max(1, Math.floor(video.videoHeight * scale))
+      canvas.width = w
+      canvas.height = h
+      ctx.drawImage(video, 0, 0, w, h)
+      const imageData = ctx.getImageData(0, 0, w, h)
       const code = jsQR(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: "dontInvert",
       })
@@ -122,12 +141,12 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
         scanLockedRef.current = true
         onScanRef.current(code.data)
       }
-      animationId = requestAnimationFrame(scan)
     }
 
     start()
 
     return () => {
+      cancelled = true
       if (animationId) cancelAnimationFrame(animationId)
       if (stream) stream.getTracks().forEach((t) => t.stop())
     }

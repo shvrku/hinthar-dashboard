@@ -1,17 +1,17 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { ArrowLeft, CalendarDays, Loader2, Pencil, UserCheck } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts"
 import { ApiError, createApi } from "@/lib/api"
-import { ATTENDANCE_STATUS_COLORS } from "@/lib/chart-colors"
 import type { AnalyticsRange, Teacher, TeacherAttendanceSummary, TeacherPayload } from "@/lib/types"
 import { EMPLOYMENT_TYPES, SCHOOL_CODES } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
 import { AttendanceOverviewSkeleton, StudentDetailPageSkeleton } from "@/components/page-skeletons"
+import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,22 +20,21 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
+
+const TeacherAccountabilityCharts = dynamic(
+  () =>
+    import("@/components/charts/teacher-attendance-charts").then((m) => m.TeacherAccountabilityCharts),
+  { ssr: false, loading: () => <ChartChunkSkeleton className="h-72" /> }
+)
+const TeacherPersonalOutcomeChart = dynamic(
+  () =>
+    import("@/components/charts/teacher-attendance-charts").then((m) => m.TeacherPersonalOutcomeChart),
+  { ssr: false, loading: () => <ChartChunkSkeleton className="h-56 max-w-[280px] mx-auto" /> }
+)
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [{ value: "week", label: "This week" }, { value: "month", label: "This month" }, { value: "all", label: "All time" }]
 const STATUS_LABELS: Record<string, string> = { present: "Present", late: "Late", absent: "Absent", excused: "Excused" }
 const OUTCOME_LABELS: Record<string, string> = { unmarked: "Unmarked", present: "Present", covered: "Covered", cover_taught: "Cover taught", no_show: "No show", cancelled: "Cancelled" }
-const statusConfig = {
-  present: { label: "Present", color: ATTENDANCE_STATUS_COLORS.present },
-  late: { label: "Late", color: ATTENDANCE_STATUS_COLORS.late },
-  absent: { label: "Absent", color: ATTENDANCE_STATUS_COLORS.absent },
-  excused: { label: "Excused", color: ATTENDANCE_STATUS_COLORS.excused },
-} satisfies ChartConfig
-const outcomeConfig = {
-  unmarked: { label: "Unmarked", color: "var(--chart-1)" }, present: { label: "Present", color: "var(--chart-2)" },
-  covered: { label: "Covered", color: "var(--chart-3)" }, cover_taught: { label: "Cover taught", color: "var(--chart-4)" },
-  no_show: { label: "No show", color: "var(--chart-5)" }, cancelled: { label: "Cancelled", color: "var(--muted-foreground)" },
-} satisfies ChartConfig
 
 function TeacherDetailContent() {
   const params = useParams()
@@ -123,8 +122,8 @@ function TeacherDetailContent() {
     {error && <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
     {loading ? <StudentDetailPageSkeleton /> : !teacher ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><UserCheck /></EmptyMedia><EmptyTitle>Teacher not found</EmptyTitle><EmptyDescription>This teacher may have been removed.</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => router.push("/teachers/")}>Back to Teachers</Button></Empty> : <>
       <Card className="border-border/80"><CardContent className="p-6 md:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="space-y-3"><div className="flex gap-2"><Badge variant="secondary">{teacher.school_code}</Badge><Badge variant="outline">{EMPLOYMENT_TYPES.find((item) => item.value === teacher.employment_type)?.label ?? "Unspecified"}</Badge></div><h1 className="text-2xl font-bold tracking-tight">{teacher.name}</h1><dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Identifier</dt><dd className="font-medium">{teacher.unique_code}</dd></div><div><dt className="text-muted-foreground">Joined</dt><dd className="font-medium">{teacher.join_date ?? "—"}</dd></div><div><dt className="text-muted-foreground">Contact</dt><dd className="font-medium">{teacher.contact ?? "—"}</dd></div></dl></div><Button variant="outline" size="sm" onClick={openEdit}><Pencil data-icon="inline-start" />Edit profile</Button></div></CardContent></Card>
-      <Card className="border-border/80"><CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle>Teaching accountability</CardTitle><CardDescription>Lesson attendance for sessions this teacher taught (assigned or cover).{summary && <span className="block">{summary.date_from} → {summary.date_to}</span>}</CardDescription></div><Tabs value={range} onValueChange={(value) => setRange(value as AnalyticsRange)}><TabsList>{RANGE_OPTIONS.map((option) => <TabsTrigger key={option.value} value={option.value} disabled={summaryLoading}>{option.label}</TabsTrigger>)}</TabsList></Tabs></CardHeader><CardContent>{summaryLoading ? <AttendanceOverviewSkeleton /> : !summary ? <p className="text-sm text-muted-foreground">No analytics available.</p> : <div className="space-y-6"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(["present", "late", "absent", "excused"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-3 text-center"><p className="text-xl font-bold">{summary.accountability[key]}</p><p className="text-[10px] uppercase text-muted-foreground">{STATUS_LABELS[key]}</p></div>)}</div><p className="text-sm text-muted-foreground">{summary.accountability.sessions_taught} sessions taught · {summary.accountability.total_marks} marks · attended {summary.accountability.rate_attended == null ? "—" : `${Math.round(summary.accountability.rate_attended * 100)}%`}</p><div className="grid gap-6 lg:grid-cols-2"><ChartContainer config={statusConfig} className="mx-auto h-48 w-full max-w-[260px] aspect-square"><PieChart><ChartTooltip content={<ChartTooltipContent nameKey="status" hideLabel />} /><Pie data={accountabilityStatus} dataKey="count" nameKey="status" innerRadius={42} outerRadius={70}>{accountabilityStatus.map((item) => <Cell key={item.status} fill={`var(--color-${item.status})`} />)}</Pie><ChartLegend content={<ChartLegendContent nameKey="status" />} /></PieChart></ChartContainer>{accountabilitySubjects.length > 0 ? <ChartContainer config={statusConfig} className="h-72 w-full aspect-auto"><BarChart data={accountabilitySubjects} layout="vertical"><CartesianGrid horizontal={false} /><XAxis type="number" /><YAxis type="category" dataKey="name" width={90} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="present" stackId="a" fill="var(--color-present)" /><Bar dataKey="late" stackId="a" fill="var(--color-late)" /><Bar dataKey="absent" stackId="a" fill="var(--color-absent)" /><Bar dataKey="excused" stackId="a" fill="var(--color-excused)" /></BarChart></ChartContainer> : <div className="flex h-72 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">No subject breakdown for this range.</div>}</div></div>}</CardContent></Card>
-      <Card className="border-border/80"><CardHeader><CardTitle>Personal attendance</CardTitle><CardDescription>Session outcomes for this teacher.</CardDescription></CardHeader><CardContent>{summaryLoading ? <AttendanceOverviewSkeleton /> : summary && <div className="grid gap-6 lg:grid-cols-[1fr_280px]"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{(["present", "covered", "cover_taught", "no_show", "cancelled", "unmarked"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold">{summary.personal[key]}</p><p className="text-xs text-muted-foreground">{OUTCOME_LABELS[key]}</p></div>)}</div><ChartContainer config={outcomeConfig} className="mx-auto h-56 w-full max-w-[280px] aspect-square"><PieChart><ChartTooltip content={<ChartTooltipContent nameKey="outcome" hideLabel />} /><Pie data={outcomes} dataKey="count" nameKey="outcome" innerRadius={48} outerRadius={80}>{outcomes.map((item) => <Cell key={item.outcome} fill={`var(--color-${item.outcome})`} />)}</Pie><ChartLegend content={<ChartLegendContent nameKey="outcome" />} /></PieChart></ChartContainer></div>}</CardContent></Card>
+      <Card className="border-border/80"><CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle>Teaching accountability</CardTitle><CardDescription>Lesson attendance for sessions this teacher taught (assigned or cover).{summary && <span className="block">{summary.date_from} → {summary.date_to}</span>}</CardDescription></div><Tabs value={range} onValueChange={(value) => setRange(value as AnalyticsRange)}><TabsList>{RANGE_OPTIONS.map((option) => <TabsTrigger key={option.value} value={option.value} disabled={summaryLoading}>{option.label}</TabsTrigger>)}</TabsList></Tabs></CardHeader><CardContent>{summaryLoading ? <AttendanceOverviewSkeleton /> : !summary ? <p className="text-sm text-muted-foreground">No analytics available.</p> : <div className="space-y-6"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(["present", "late", "absent", "excused"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-3 text-center"><p className="text-xl font-bold">{summary.accountability[key]}</p><p className="text-[10px] uppercase text-muted-foreground">{STATUS_LABELS[key]}</p></div>)}</div><p className="text-sm text-muted-foreground">{summary.accountability.sessions_taught} sessions taught · {summary.accountability.total_marks} marks · attended {summary.accountability.rate_attended == null ? "—" : `${Math.round(summary.accountability.rate_attended * 100)}%`}</p><TeacherAccountabilityCharts statusData={accountabilityStatus} subjectData={accountabilitySubjects} /></div>}</CardContent></Card>
+      <Card className="border-border/80"><CardHeader><CardTitle>Personal attendance</CardTitle><CardDescription>Session outcomes for this teacher.</CardDescription></CardHeader><CardContent>{summaryLoading ? <AttendanceOverviewSkeleton /> : summary && <div className="grid gap-6 lg:grid-cols-[1fr_280px]"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{(["present", "covered", "cover_taught", "no_show", "cancelled", "unmarked"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-4"><p className="text-2xl font-bold">{summary.personal[key]}</p><p className="text-xs text-muted-foreground">{OUTCOME_LABELS[key]}</p></div>)}</div><TeacherPersonalOutcomeChart outcomes={outcomes} /></div>}</CardContent></Card>
       <Card className="border-border/80"><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="flex items-center gap-2"><CalendarDays />Recent sessions</CardTitle><CardDescription>Assigned versus substitute teacher. Manage substitutes on Sessions.</CardDescription></div><Link href="/sessions/" className={buttonVariants({ variant: "outline", size: "sm" })}>Manage on Sessions</Link></CardHeader><CardContent>{!summary ? <p className="text-sm text-muted-foreground">No sessions available.</p> : summary.personal.recent_sessions.length === 0 ? <p className="text-sm text-muted-foreground">No recent sessions in this range.</p> : <div className="divide-y rounded-xl border">{summary.personal.recent_sessions.map((session) => {
         const hasSubstitute = Boolean(session.actual_teacher_id)
         return (
