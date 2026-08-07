@@ -24,6 +24,7 @@ import {
   Repeat2,
   Undo2,
   Search,
+  Settings,
 } from "lucide-react"
 
 import {
@@ -66,6 +67,7 @@ import { Badge } from "@/components/ui/badge"
 
 const overviewItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Settings", url: "/settings", icon: Settings },
 ]
 
 const managementItems = [

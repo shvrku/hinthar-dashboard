@@ -21,6 +21,9 @@ try {
   } else {
     document.documentElement.classList.remove('dark');
   }
+  var storedPalette = localStorage.getItem('palette');
+  var palette = storedPalette === 'mono' ? 'mono' : 'emerald';
+  document.documentElement.setAttribute('data-palette', palette);
 } catch (e) {}
 `;
 

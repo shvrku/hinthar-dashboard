@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/pagination"
 import { cn } from "@/lib/utils"
 import { useTableReveal } from "@/components/animation/table-reveal-context"
+import { useTheme } from "@/components/theme-provider"
 
 interface StandardTablePaginationProps {
   currentPage: number
@@ -53,6 +54,8 @@ export function StandardTablePagination({
   placement,
 }: StandardTablePaginationProps) {
   const reveal = useTableReveal()
+  const { palette } = useTheme()
+  const isMono = palette === "mono"
 
   const markOrigin = React.useCallback(() => {
     if (placement === "bottom") reveal.markBottom()
@@ -94,7 +97,10 @@ export function StandardTablePagination({
   return (
     <div
       className={cn(
-        "flex w-full flex-col items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs sm:flex-row sm:gap-4",
+        "flex w-full flex-col items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:gap-4",
+        isMono
+          ? "border-border bg-muted/30 shadow-none"
+          : "border-border/80 bg-card shadow-2xs",
         loading && "opacity-90",
         className
       )}
@@ -157,7 +163,19 @@ export function StandardTablePagination({
                   className={isHiddenOnMobile ? "hidden sm:inline-block" : ""}
                 >
                   <PaginationButton
-                    isActive={isCurrent}
+                    isActive={isCurrent && !isMono}
+                    variant={
+                      isCurrent
+                        ? isMono
+                          ? "outline"
+                          : "default"
+                        : "outline"
+                    }
+                    className={cn(
+                      isCurrent &&
+                        isMono &&
+                        "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+                    )}
                     onClick={() => handlePageChange(page)}
                     disabled={loading}
                   >
