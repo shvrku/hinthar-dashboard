@@ -179,3 +179,69 @@
 .hinthar-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(150, 150, 150, 0.6);
 }
+
+/* Initial hide for stagger items / auto-stagger cards until GSAP marks them shown.
+   Avoid React style={{ opacity: 0 }} — re-renders would hide content again. */
+[data-stagger-item]:not([data-stagger-shown]),
+[data-stagger-card]:not([data-stagger-shown]) {
+  opacity: 0;
+}
+
+[data-gsap-enter]:not([data-gsap-entered]) {
+  opacity: 0;
+}
+
+/* App toggle (`data-reduced-motion`) wins over OS when set.
+   OS media query still applies unless the user forced motion on (`false`). */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-reduced-motion="false"]) [data-stagger-item]:not([data-stagger-shown]),
+  html:not([data-reduced-motion="false"]) [data-stagger-card]:not([data-stagger-shown]),
+  html:not([data-reduced-motion="false"]) [data-gsap-enter]:not([data-gsap-entered]) {
+    opacity: 1;
+  }
+
+  html:not([data-reduced-motion="false"]) .skeleton-shimmer {
+    animation: none;
+  }
+}
+
+html[data-reduced-motion="true"] [data-stagger-item]:not([data-stagger-shown]),
+html[data-reduced-motion="true"] [data-stagger-card]:not([data-stagger-shown]),
+html[data-reduced-motion="true"] [data-gsap-enter]:not([data-gsap-entered]) {
+  opacity: 1;
+}
+
+html[data-reduced-motion="true"] .skeleton-shimmer {
+  animation: none;
+}
+
+/* Layout-stable loading shimmer (replaces animate-pulse skeletons) */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background-color: var(--muted);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--foreground) 6%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.dark .skeleton-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--foreground) 10%, transparent) 50%,
+    transparent 100%
+  );
+}

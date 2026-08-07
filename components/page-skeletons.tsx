@@ -35,41 +35,77 @@ export function TableSkeletonRows({
 }
 
 const STUDENT_TABLE_CELLS = [
-  "mx-auto size-4 rounded-sm",
-  "h-4 w-14",
-  "h-5 w-10 rounded-full",
-  "h-4 w-36",
-  "h-4 w-20",
-  "h-4 w-28",
-  "h-4 w-16",
-  "h-4 w-24",
-  "ml-auto h-8 w-24 rounded-lg",
+  "mx-auto size-4 shrink-0 rounded-sm",
+  "h-4 w-full max-w-[3.5rem]",
+  "h-5 w-full max-w-[2.5rem] rounded-full",
+  "h-4 w-full max-w-[9rem]",
+  "h-4 w-full max-w-[5rem]",
+  "h-4 w-full max-w-[7rem]",
+  "h-4 w-full max-w-[4rem]",
+  "h-4 w-full max-w-[6rem]",
+  "ml-auto h-8 w-full max-w-[6rem] rounded-lg",
 ]
 
 const TEACHER_TABLE_CELLS = [
-  "mx-auto size-4 rounded-sm",
-  "h-4 w-14",
-  "h-5 w-10 rounded-full",
-  "h-4 w-36",
-  "h-4 w-24",
-  "h-4 w-20",
-  "ml-auto h-8 w-24 rounded-lg",
+  "mx-auto size-4 shrink-0 rounded-sm",
+  "h-4 w-full max-w-[3.5rem]",
+  "h-5 w-full max-w-[2.5rem] rounded-full",
+  "h-4 w-full max-w-[9rem]",
+  "h-4 w-full max-w-[6rem]",
+  "h-4 w-full max-w-[5rem]",
+  "ml-auto h-8 w-full max-w-[6rem] rounded-lg",
 ]
 
 const CLASS_TABLE_CELLS = [
-  "mx-auto size-4 rounded-sm",
-  "h-4 w-24",
-  "h-4 w-16",
-  "h-4 w-12",
-  "h-4 w-12",
-  "ml-auto h-8 w-28 rounded-lg",
+  "mx-auto size-4 shrink-0 rounded-sm",
+  "h-4 w-full max-w-[6rem]",
+  "h-4 w-full max-w-[4rem]",
+  "h-4 w-full max-w-[3rem]",
+  "h-4 w-full max-w-[3rem]",
+  "ml-auto h-8 w-full max-w-[7rem] rounded-lg",
 ]
 
 const SUBJECT_TABLE_CELLS = [
-  "mx-auto size-4 rounded-sm",
-  "h-4 w-32",
-  "h-4 w-48",
-  "ml-auto h-8 w-24 rounded-lg",
+  "mx-auto size-4 shrink-0 rounded-sm",
+  "h-4 w-full max-w-[8rem]",
+  "h-4 w-full max-w-[12rem]",
+  "ml-auto h-8 w-full max-w-[6rem] rounded-lg",
+]
+
+/** Checkbox · ID · Teacher · Class · Start · End · Status · Actions */
+const SESSION_TABLE_CELLS = [
+  "mx-auto size-4 shrink-0 rounded-sm",
+  "h-4 w-full max-w-[3rem]",
+  "h-4 w-full max-w-[9rem]",
+  "h-5 w-full max-w-[5rem] rounded-full",
+  "h-4 w-full max-w-[7rem]",
+  "h-4 w-full max-w-[7rem]",
+  "mx-auto h-5 w-full max-w-[4.5rem] rounded-full",
+  "ml-auto h-8 w-full max-w-[6rem] rounded-lg",
+]
+
+/** Checkbox · ID · Teacher · Subject · Date · Start · End · Status · Actions */
+const ADHOC_SESSION_TABLE_CELLS = [
+  "mx-auto size-4 shrink-0 rounded-sm",
+  "h-4 w-full max-w-[3rem]",
+  "h-4 w-full max-w-[8rem]",
+  "h-4 w-full max-w-[6rem]",
+  "h-4 w-full max-w-[5rem]",
+  "h-4 w-full max-w-[4rem]",
+  "h-4 w-full max-w-[4rem]",
+  "mx-auto h-5 w-full max-w-[4.5rem] rounded-full",
+  "ml-auto h-8 w-full max-w-[6rem] rounded-lg",
+]
+
+/** ID · Date · Start · End · Teacher · Status · Actions (find-slot occurrence table) */
+const SESSION_OCCURRENCE_TABLE_CELLS = [
+  "h-4 w-full max-w-[3rem]",
+  "h-4 w-full max-w-[5rem]",
+  "h-4 w-full max-w-[7rem]",
+  "h-4 w-full max-w-[7rem]",
+  "h-4 w-full max-w-[9rem]",
+  "mx-auto h-5 w-full max-w-[4.5rem] rounded-full",
+  "ml-auto h-8 w-full max-w-[5rem] rounded-lg",
 ]
 
 export function StudentTableSkeletonRows({ rows = 5 }: { rows?: number }) {
@@ -86,6 +122,26 @@ export function ClassTableSkeletonRows({ rows = 5 }: { rows?: number }) {
 
 export function SubjectTableSkeletonRows({ rows = 5 }: { rows?: number }) {
   return <TableSkeletonRows rows={rows} columns={4} cellClassNames={SUBJECT_TABLE_CELLS} />
+}
+
+export function SessionTableSkeletonRows({ rows = 5 }: { rows?: number }) {
+  return <TableSkeletonRows rows={rows} columns={8} cellClassNames={SESSION_TABLE_CELLS} />
+}
+
+export function AdhocSessionTableSkeletonRows({ rows = 5 }: { rows?: number }) {
+  return (
+    <TableSkeletonRows rows={rows} columns={9} cellClassNames={ADHOC_SESSION_TABLE_CELLS} />
+  )
+}
+
+export function SessionOccurrenceTableSkeletonRows({ rows = 5 }: { rows?: number }) {
+  return (
+    <TableSkeletonRows
+      rows={rows}
+      columns={7}
+      cellClassNames={SESSION_OCCURRENCE_TABLE_CELLS}
+    />
+  )
 }
 
 export function DashboardStatGridSkeleton() {

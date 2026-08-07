@@ -4,6 +4,8 @@ Standards for the Next.js App Router dashboard as the school management UI scale
 
 Backend contract: follow `Hinthar-SMS/docs/API_STANDARDS.md` in the sibling SMS repository.
 
+**Motion / GSAP:** see [`docs/ANIMATION_STANDARDS.md`](./ANIMATION_STANDARDS.md) for entrance, table, skeleton, and performance rules.
+
 ---
 
 ## 1. Product domains (mental model for staff)
@@ -242,5 +244,10 @@ Teacher fields: **Assigned** (generation teacher) vs **Substitute** (`actual_tea
 - Shared class helpers: `lib/status-styles.ts` (`feedbackBanner`, `attendanceSurface`, …).
 - Chart fills: `lib/chart-colors.ts` (`ATTENDANCE_STATUS_COLORS`, `CAMPUS_CHECKIN_COLOR`).
 - New UI must use existing `components/ui` and these CSS variables.
+
+### Motion
+
+- Stack: GSAP 3 + `@gsap/react` only (no Motion / Framer Motion).
+- Full rules, primitives, checklists, and performance assessment: [`docs/ANIMATION_STANDARDS.md`](./ANIMATION_STANDARDS.md).
 
 Ignore nested `time_table/` tree for product work (legacy fork risk).

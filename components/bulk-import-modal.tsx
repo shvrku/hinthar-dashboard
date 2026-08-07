@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Upload, Download, FileText, CheckCircle2, AlertCircle, Loader2, X, Trash2 } from "lucide-react"
-import { motion, AnimatePresence } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -487,14 +486,9 @@ export function BulkImportModal({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        <AnimatePresence mode="popLayout">
-                          {parsedItems.map((item, index) => (
-                            <motion.tr
+                          {parsedItems.map((item) => (
+                            <TableRow
                               key={item.id}
-                              initial={{ opacity: 0, y: 6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -6 }}
-                              transition={{ duration: 0.2, delay: index * 0.02 }}
                               className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
                               data-state={item.selected ? "selected" : undefined}
                             >
@@ -587,9 +581,8 @@ export function BulkImportModal({
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </TableCell>
-                          </motion.tr>
+                          </TableRow>
                         ))}
-                      </AnimatePresence>
                     </TableBody>
                     </Table>
                   </div>

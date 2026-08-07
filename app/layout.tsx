@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MotionPreferenceProvider } from "@/components/motion-preference-provider";
 import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
 import { FocusProvider } from "@/components/focus-context";
 import { CurrentUserProvider } from "@/components/current-user-provider";
@@ -20,6 +21,19 @@ try {
   } else {
     document.documentElement.classList.remove('dark');
   }
+} catch (e) {}
+`;
+
+/** Must remain a static string — never interpolate request/user input (SEC-L5). */
+const MOTION_INIT_SCRIPT = `
+try {
+  var storedMotion = localStorage.getItem('reduced-motion');
+  var reduced = storedMotion === 'true'
+    ? true
+    : storedMotion === 'false'
+      ? false
+      : window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.documentElement.setAttribute('data-reduced-motion', reduced ? 'true' : 'false');
 } catch (e) {}
 `;
 
@@ -91,15 +105,22 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
+        <Script
+          id="motion-initializer"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: MOTION_INIT_SCRIPT }}
+        />
       </head>
       <body className="h-full flex flex-col bg-background text-foreground overflow-hidden" suppressHydrationWarning>
         <FocusProvider>
           <ThemeProvider>
-            <ClerkThemeProvider>
-              <CurrentUserProvider>
-                <TooltipProvider>{children}</TooltipProvider>
-              </CurrentUserProvider>
-            </ClerkThemeProvider>
+            <MotionPreferenceProvider>
+              <ClerkThemeProvider>
+                <CurrentUserProvider>
+                  <TooltipProvider>{children}</TooltipProvider>
+                </CurrentUserProvider>
+              </ClerkThemeProvider>
+            </MotionPreferenceProvider>
           </ThemeProvider>
         </FocusProvider>
       </body>

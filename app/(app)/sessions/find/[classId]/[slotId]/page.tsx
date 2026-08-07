@@ -50,12 +50,13 @@ import {
 } from "@/components/ui/select"
 import {
   Table,
-  TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { SessionOccurrenceTableSkeletonRows } from "@/components/page-skeletons"
 
 const DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const TIME_SLOTS = Array.from({ length: 29 }).map((_, i) => {
@@ -394,81 +395,79 @@ function FindSlotSessionsContent() {
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
-                    <Loader2 className="mx-auto size-4 animate-spin" />
-                  </TableCell>
-                </TableRow>
-              ) : sessions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
-                    No sessions for this slot in the selected range.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sessions.map((session) => {
-                  const rollHref = takeRollHrefForSession(session, classId)
-                  return (
-                    <TableRow
-                      key={session.id}
-                      className="cursor-pointer"
-                      onClick={() => openEditModal(session)}
+            <AnimatedTableBody
+              loading={loading}
+              hasData={sessions.length > 0}
+              rowCount={8}
+              skeletonRowCount={8}
+              colSpan={7}
+              skeleton={<SessionOccurrenceTableSkeletonRows rows={8} />}
+              idle={lastLoaded === null}
+              idleTitle="No sessions loaded yet"
+              idleDescription="Reload to fetch occurrences for this timetable slot."
+              emptyTitle="No sessions for this slot"
+              emptyDescription="No sessions in the selected date range. Try widening the range."
+            >
+              {sessions.map((session) => {
+                const rollHref = takeRollHrefForSession(session, classId)
+                return (
+                  <TableRow
+                    key={session.id}
+                    className="cursor-pointer"
+                    onClick={() => openEditModal(session)}
+                  >
+                    <TableCell className="font-semibold">{session.id}</TableCell>
+                    <TableCell className="whitespace-nowrap font-medium">
+                      {toSessionDateString(session.start_time)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatBackendDateTime(session.start_time)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatBackendDateTime(session.end_time)}
+                    </TableCell>
+                    <TableCell
+                      className="max-w-[220px]"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <TableCell className="font-semibold">{session.id}</TableCell>
-                      <TableCell className="whitespace-nowrap font-medium">
-                        {toSessionDateString(session.start_time)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {formatBackendDateTime(session.start_time)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {formatBackendDateTime(session.end_time)}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[220px]"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <SessionTeacherCell
-                          teacher={session.teacher}
-                          actualTeacher={session.actual_teacher}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {statusBadge(session.status)}
-                      </TableCell>
-                      <TableCell
-                        className="text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-end gap-1">
-                          {rollHref ? (
-                            <Link
-                              href={rollHref}
-                              title="Take roll"
-                              className={cn(
-                                buttonVariants({ variant: "ghost", size: "icon-sm" })
-                              )}
-                            >
-                              <ClipboardList className="size-4" />
-                            </Link>
-                          ) : null}
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            title="Edit"
-                            onClick={() => openEditModal(session)}
+                      <SessionTeacherCell
+                        teacher={session.teacher}
+                        actualTeacher={session.actual_teacher}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {statusBadge(session.status)}
+                    </TableCell>
+                    <TableCell
+                      className="text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        {rollHref ? (
+                          <Link
+                            href={rollHref}
+                            title="Take roll"
+                            className={cn(
+                              buttonVariants({ variant: "ghost", size: "icon-sm" })
+                            )}
                           >
-                            <Pencil className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
+                            <ClipboardList className="size-4" />
+                          </Link>
+                        ) : null}
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          title="Edit"
+                          onClick={() => openEditModal(session)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </AnimatedTableBody>
           </Table>
         </Card>
       </StaggerItem>

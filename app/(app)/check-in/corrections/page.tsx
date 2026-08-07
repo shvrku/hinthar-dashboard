@@ -23,11 +23,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
+import { TableSkeletonRows } from "@/components/page-skeletons"
 import { cn, toLocalDateString, formatBackendDateTime } from "@/lib/utils"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
@@ -61,18 +63,6 @@ function checkInStudentCode(row: CheckIn): string | null {
 
 function formatTimestamp(iso: string) {
   return formatBackendDateTime(iso)
-}
-
-function RowSkeleton() {
-  return (
-    <TableRow>
-      {Array.from({ length: 7 }).map((_, i) => (
-        <TableCell key={i}>
-          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
-        </TableCell>
-      ))}
-    </TableRow>
-  )
 }
 
 export default function CheckInCorrectionsPage() {
@@ -354,6 +344,22 @@ export default function CheckInCorrectionsPage() {
       </StaggerItem>
 
       <StaggerItem>
+        <TableRevealProvider>
+        {serverPg.totalItems > 0 && (
+          <StandardTablePagination
+            currentPage={serverPg.page}
+            totalPages={serverPg.totalPages}
+            totalItems={serverPg.totalItems}
+            startIndex={serverPg.startIndex}
+            endIndex={serverPg.endIndex}
+            pageSize={serverPg.pageSize}
+            onPageChange={serverPg.setPage}
+            onPageSizeChange={serverPg.setPageSize}
+            loading={loading}
+            placement="top"
+            className="mb-4"
+          />
+        )}
         <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
           <Table>
             <TableHeader>
@@ -387,63 +393,63 @@ export default function CheckInCorrectionsPage() {
                 <TableHead className="w-[100px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => <RowSkeleton key={i} />)
-              ) : lastLoaded === null ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    Click &quot;Load Data&quot; to list check-ins for the selected date.
-                  </TableCell>
-                </TableRow>
-              ) : sortedRows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    No check-ins found for this date
-                    {debouncedQuery ? " and search" : ""}.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedRows.map((row) => {
-                  const code = checkInStudentCode(row)
-                  const isSelected = selectedIds.includes(row.id)
-                  return (
-                    <TableRow key={row.id} data-state={isSelected ? "selected" : undefined}>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelectRow(row.id)}
-                          aria-label={`Select check-in #${row.id}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{row.student_name}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {code ?? `ID ${checkInStudentId(row)}`}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground whitespace-nowrap text-sm">
-                        {formatTimestamp(row.timestamp)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {row.check_in_type === "qr" ? "QR" : "Manual"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          title="Remove check-in"
-                          onClick={() => setDeletingId(row.id)}
-                        >
-                          <Undo2 className="size-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
+            <AnimatedTableBody
+              loading={loading}
+              hasData={sortedRows.length > 0}
+              rowCount={Math.min(serverPg.pageSize, 8)}
+              skeletonRowCount={Math.min(serverPg.pageSize, 8)}
+              colSpan={6}
+              skeleton={
+                <TableSkeletonRows
+                  columns={6}
+                  rows={Math.min(serverPg.pageSize, 8)}
+                />
+              }
+              idle={lastLoaded === null}
+              idleTitle="No check-ins loaded yet"
+              idleDescription="Use Load Data to list check-ins for the selected date."
+              emptyTitle="No check-ins found"
+              emptyDescription={`Nothing matched this date${debouncedQuery ? " and search" : ""}.`}
+            >
+              {sortedRows.map((row) => {
+                const code = checkInStudentCode(row)
+                const isSelected = selectedIds.includes(row.id)
+                return (
+                  <TableRow key={row.id} data-state={isSelected ? "selected" : undefined}>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectRow(row.id)}
+                        aria-label={`Select check-in #${row.id}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{row.student_name}</TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-xs">
+                      {code ?? `ID ${checkInStudentId(row)}`}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap text-sm">
+                      {formatTimestamp(row.timestamp)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {row.check_in_type === "qr" ? "QR" : "Manual"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        title="Remove check-in"
+                        onClick={() => setDeletingId(row.id)}
+                      >
+                        <Undo2 className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </AnimatedTableBody>
           </Table>
         </Card>
         {serverPg.totalItems > 0 && (
@@ -457,8 +463,11 @@ export default function CheckInCorrectionsPage() {
             onPageChange={serverPg.setPage}
             onPageSizeChange={serverPg.setPageSize}
             loading={loading}
+            placement="bottom"
+            className="mt-4"
           />
         )}
+        </TableRevealProvider>
       </StaggerItem>
 
       <ConfirmDialog
