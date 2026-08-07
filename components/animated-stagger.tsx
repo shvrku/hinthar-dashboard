@@ -1,32 +1,25 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "motion/react"
+import gsap from "gsap"
+import { useGSAP } from "@gsap/react"
+import { durations, easeOutSoft, staggers } from "@/lib/gsap/easings"
+import { prefersReducedMotion } from "@/lib/gsap/reduced-motion"
+import { cn } from "@/lib/utils"
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.04,
-    },
-  },
-}
+gsap.registerPlugin(useGSAP)
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 14, scale: 0.988 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.45,
-      ease: [0.22, 1, 0.36, 1] as const,
-    },
-  },
-}
+type StaggerApi = { claimIndex: () => number }
 
+const StaggerContext = React.createContext<StaggerApi | null>(null)
+
+/** True when nested inside a StaggerItem (child Cards should not double-animate). */
+const NestedStaggerContext = React.createContext(false)
+
+/**
+ * Layout wrapper that enables staggered entrance for StaggerItems and Cards.
+ * Index only resets when this container remounts (e.g. route change).
+ */
 export function StaggerContainer({
   children,
   className = "space-y-6",
@@ -34,16 +27,66 @@ export function StaggerContainer({
   children: React.ReactNode
   className?: string
 }) {
+  const indexRef = React.useRef(0)
+  const api = React.useRef<StaggerApi>({
+    claimIndex: () => indexRef.current++,
+  }).current
+
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className={className}
-    >
-      {children}
-    </motion.div>
+    <StaggerContext.Provider value={api}>
+      <div className={className}>{children}</div>
+    </StaggerContext.Provider>
   )
+}
+
+/** Shared GSAP entrance used by StaggerItem and auto-staggering Cards. */
+export function useStaggerEntrance<T extends HTMLElement>(
+  enabled = true
+) {
+  const api = React.useContext(StaggerContext)
+  const nested = React.useContext(NestedStaggerContext)
+  const ref = React.useRef<T | null>(null)
+  const indexRef = React.useRef<number | null>(null)
+  const shouldAnimate = Boolean(enabled && api && !nested)
+
+  useGSAP(
+    () => {
+      const el = ref.current
+      if (!shouldAnimate || !el || el.hasAttribute("data-stagger-shown")) return
+
+      if (prefersReducedMotion()) {
+        el.setAttribute("data-stagger-shown", "")
+        gsap.set(el, { clearProps: "opacity,transform" })
+        return
+      }
+
+      if (indexRef.current === null) {
+        indexRef.current = api!.claimIndex()
+      }
+
+      const delay = 0.04 + indexRef.current * staggers.section
+
+      gsap.fromTo(
+        el,
+        { opacity: 0, y: 14 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: durations.reveal,
+          ease: easeOutSoft,
+          delay,
+          clearProps: "transform",
+          onComplete: () => {
+            el.setAttribute("data-stagger-shown", "")
+            gsap.set(el, { clearProps: "opacity" })
+          },
+        }
+      )
+    },
+    { scope: ref, dependencies: [shouldAnimate] }
+  )
+
+  return { ref, active: shouldAnimate }
 }
 
 export function StaggerItem({
@@ -53,9 +96,13 @@ export function StaggerItem({
   children: React.ReactNode
   className?: string
 }) {
+  const { ref } = useStaggerEntrance<HTMLDivElement>(true)
+
   return (
-    <motion.div variants={itemVariants} className={className}>
-      {children}
-    </motion.div>
+    <NestedStaggerContext.Provider value={true}>
+      <div ref={ref} data-stagger-item className={cn(className)}>
+        {children}
+      </div>
+    </NestedStaggerContext.Provider>
   )
 }

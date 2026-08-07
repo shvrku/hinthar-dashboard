@@ -14,28 +14,18 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
 import { QrCanvas } from "@/components/qr-canvas"
+import { TableSkeletonRows } from "@/components/page-skeletons"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
   TableCell,
 } from "@/components/ui/table"
-
-function RowSkeleton() {
-  return (
-    <TableRow>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <TableCell key={i}>
-          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
-        </TableCell>
-      ))}
-    </TableRow>
-  )
-}
 
 export default function CheckInManagementPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
@@ -203,9 +193,16 @@ export default function CheckInManagementPage() {
               ))}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {[1, 2, 3, 4, 5].map((i) => <RowSkeleton key={i} />)}
-          </TableBody>
+          <AnimatedTableBody
+            loading
+            hasData={false}
+            rowCount={5}
+            skeletonRowCount={5}
+            colSpan={4}
+            skeleton={<TableSkeletonRows columns={4} rows={5} />}
+          >
+            {null}
+          </AnimatedTableBody>
         </Table>
       </div>
     )
@@ -304,6 +301,22 @@ export default function CheckInManagementPage() {
       <div className="flex flex-col gap-6 lg:flex-row items-start">
         {/* Floating Student Table Card */}
         <StaggerItem className="min-w-0 flex-1 w-full">
+          <TableRevealProvider>
+          {tablePagination.totalItems > 0 && (
+            <StandardTablePagination
+              currentPage={tablePagination.currentPage}
+              totalPages={tablePagination.totalPages}
+              totalItems={tablePagination.totalItems}
+              startIndex={tablePagination.startIndex}
+              endIndex={tablePagination.endIndex}
+              pageSize={tablePagination.pageSize}
+              onPageChange={tablePagination.onPageChange}
+              onPageSizeChange={tablePagination.onPageSizeChange}
+              loading={loading}
+              placement="top"
+              className="mb-4"
+            />
+          )}
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
               <Table>
                 <TableHeader>
@@ -340,45 +353,49 @@ export default function CheckInManagementPage() {
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-                  ) : displayedStudents.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                        No students found.
+                <AnimatedTableBody
+                  loading={loading}
+                  hasData={displayedStudents.length > 0}
+                  rowCount={Math.min(serverPg.pageSize, 8)}
+                  skeletonRowCount={Math.min(serverPg.pageSize, 8)}
+                  colSpan={4}
+                  skeleton={
+                    <TableSkeletonRows
+                      columns={4}
+                      rows={Math.min(serverPg.pageSize, 8)}
+                    />
+                  }
+                  emptyTitle="No students found"
+                  emptyDescription="Try a different search or class filter."
+                >
+                  {displayedStudents.map((s) => (
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer"
+                      data-state={selected?.id === s.id ? "selected" : undefined}
+                      onClick={() => setSelected(s)}
+                    >
+                      <TableCell className="font-semibold text-foreground">{s.unique_code}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{s.school_code}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelected(s)
+                          }}
+                        >
+                          <Eye className="mr-1.5 size-3.5" />
+                          QR
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    displayedStudents.map((s) => (
-                      <TableRow
-                        key={s.id}
-                        className="cursor-pointer"
-                        data-state={selected?.id === s.id ? "selected" : undefined}
-                        onClick={() => setSelected(s)}
-                      >
-                        <TableCell className="font-semibold text-foreground">{s.unique_code}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{s.school_code}</Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">{s.name}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelected(s)
-                            }}
-                          >
-                            <Eye className="mr-1.5 size-3.5" />
-                            QR
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
+                  ))}
+                </AnimatedTableBody>
               </Table>
             </Card>
 
@@ -393,8 +410,11 @@ export default function CheckInManagementPage() {
                 onPageChange={tablePagination.onPageChange}
                 onPageSizeChange={tablePagination.onPageSizeChange}
                 loading={loading}
+                placement="bottom"
+                className="mt-4"
               />
             )}
+          </TableRevealProvider>
           </StaggerItem>
 
           {/* QR Detail Card */}

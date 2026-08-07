@@ -22,7 +22,6 @@ import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
@@ -46,13 +45,8 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { cn, toLocalDateString } from "@/lib/utils"
 import { StudentTableSkeletonRows } from "@/components/page-skeletons"
-
-// ---------------------------------------------------------------------------
-// Skeleton row (legacy export — use StudentTableSkeletonRows)
-// ---------------------------------------------------------------------------
-function TableSkeletonRow() {
-  return <StudentTableSkeletonRows rows={1} />
-}
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
 
 // ---------------------------------------------------------------------------
 // Truncated cell content with tooltip
@@ -629,6 +623,22 @@ export default function StudentsPage() {
 
       {/* Floating Table Card */}
       <StaggerItem>
+        <TableRevealProvider>
+        {tablePagination.totalItems > 0 && (
+          <StandardTablePagination
+            currentPage={tablePagination.currentPage}
+            totalPages={tablePagination.totalPages}
+            totalItems={tablePagination.totalItems}
+            startIndex={tablePagination.startIndex}
+            endIndex={tablePagination.endIndex}
+            pageSize={tablePagination.pageSize}
+            onPageChange={tablePagination.onPageChange}
+            onPageSizeChange={tablePagination.onPageSizeChange}
+            loading={loading}
+            placement="top"
+            className="mb-4"
+          />
+        )}
         <TooltipProvider>
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
             <Table>
@@ -715,17 +725,22 @@ export default function StudentsPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-                ) : displayedStudents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                      {lastLoaded === null ? 'Click "Load Data" to fetch students.' : 'No students found.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  displayedStudents.map((student) => {
+              <AnimatedTableBody
+                loading={loading}
+                hasData={displayedStudents.length > 0}
+                rowCount={Math.min(serverPg.pageSize, 8)}
+                skeletonRowCount={Math.min(serverPg.pageSize, 8)}
+                colSpan={9}
+                skeleton={
+                  <StudentTableSkeletonRows rows={Math.min(serverPg.pageSize, 8)} />
+                }
+                idle={lastLoaded === null}
+                idleTitle="No students loaded yet"
+                idleDescription="Use Load Data in the toolbar to fetch the student list."
+                emptyTitle="No students found"
+                emptyDescription="Try adjusting search or filters, then load again."
+              >
+                {displayedStudents.map((student) => {
                     const isSelected = selectedIds.includes(student.id)
                     return (
                       <TableRow key={student.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/students/${student.id}/`)}>
@@ -784,17 +799,12 @@ export default function StudentsPage() {
                         </TableCell>
                       </TableRow>
                     )
-                  })
-                )}
-              </TableBody>
+                  })}
+              </AnimatedTableBody>
             </Table>
           </Card>
         </TooltipProvider>
-      </StaggerItem>
-
-      {/* Standardized Table Pagination Footer */}
-      {tablePagination.totalItems > 0 && (
-        <StaggerItem>
+        {tablePagination.totalItems > 0 && (
           <StandardTablePagination
             currentPage={tablePagination.currentPage}
             totalPages={tablePagination.totalPages}
@@ -805,9 +815,12 @@ export default function StudentsPage() {
             onPageChange={tablePagination.onPageChange}
             onPageSizeChange={tablePagination.onPageSizeChange}
             loading={loading}
+            placement="bottom"
+            className="mt-4"
           />
-        </StaggerItem>
-      )}
+        )}
+        </TableRevealProvider>
+      </StaggerItem>
 
       {/* Form modal */}
       <StudentFormModal

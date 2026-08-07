@@ -14,6 +14,7 @@ import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
 import { TimetableWeekSnippet } from "@/components/timetable-week-snippet"
 import { AttendanceOverviewSkeleton, StudentDetailPageSkeleton } from "@/components/page-skeletons"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -181,9 +182,11 @@ function ClassDetailContent() {
   if (!isSignedIn) return <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">Please sign in to view this class.</div>
   if (!Number.isFinite(classId)) return <div className="container mx-auto py-16 text-center text-muted-foreground">Invalid class id.</div>
 
-  return <div className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
-    <Link href="/classes/" className={buttonVariants({ variant: "ghost", size: "sm" })}><ArrowLeft data-icon="inline-start" />Back to Classes</Link>
-    {error && <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+  return <StaggerContainer className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
+    <StaggerItem>
+      <Link href="/classes/" className={buttonVariants({ variant: "ghost", size: "sm" })}><ArrowLeft data-icon="inline-start" />Back to Classes</Link>
+    </StaggerItem>
+    {error && <StaggerItem><div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div></StaggerItem>}
     {loading ? <StudentDetailPageSkeleton /> : !classItem ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><GraduationCap /></EmptyMedia><EmptyTitle>Class not found</EmptyTitle><EmptyDescription>This class may have been removed.</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => router.push("/classes/")}>Back to Classes</Button></Empty> : <>
       <Card className="border-border/80"><CardContent className="p-6 md:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="space-y-3"><Badge variant="secondary">{classItem.education_level}</Badge><h1 className="text-2xl font-bold tracking-tight">{formatClassLabel(classItem)}</h1><dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Cohort</dt><dd className="font-medium">{classItem.cohort_identifier}</dd></div><div><dt className="text-muted-foreground">Sub-category</dt><dd className="font-medium">{classItem.cohort_sub_category ?? "—"}</dd></div></dl></div><Button variant="outline" size="sm" onClick={openEdit}><Pencil data-icon="inline-start" />Edit class</Button></div></CardContent></Card>
 
@@ -201,7 +204,7 @@ function ClassDetailContent() {
       </div>}</CardContent></Card>
       <Button onClick={() => router.push(`/attendance/class/${classItem.id}/`)}>Take roll</Button>
       <Dialog open={editOpen} onOpenChange={setEditOpen}><DialogContent onClose={() => setEditOpen(false)}><DialogHeader><DialogTitle>Edit class</DialogTitle><DialogDescription>Update this cohort&apos;s details.</DialogDescription></DialogHeader><div className="flex flex-col gap-4"><div><label className="text-sm font-medium">Education level</label><Select items={EDUCATION_LEVELS} value={educationLevel} onValueChange={(value) => setEducationLevel(value as ClassPayload["education_level"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{EDUCATION_LEVELS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div><div><label className="text-sm font-medium" htmlFor="cohort">Cohort identifier</label><Input id="cohort" value={cohort} onChange={(event) => setCohort(event.target.value)} maxLength={1} /></div><div><label className="text-sm font-medium" htmlFor="subcategory">Sub-category</label><Input id="subcategory" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} maxLength={1} /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button disabled={saving || !cohort.trim()} onClick={() => void saveClass()}>{saving && <Loader2 data-icon="inline-start" className="animate-spin" />}Save</Button></DialogFooter></DialogContent></Dialog>
-    </>}</div>
+    </>}</StaggerContainer>
 }
 
 export default function ClassDetailPage() {

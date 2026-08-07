@@ -14,12 +14,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
@@ -34,13 +35,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { SubjectTableSkeletonRows } from "@/components/page-skeletons"
-
-// ---------------------------------------------------------------------------
-// Skeleton row
-// ---------------------------------------------------------------------------
-function TableSkeletonRow() {
-  return <SubjectTableSkeletonRows rows={1} />
-}
 
 // ---------------------------------------------------------------------------
 // Subject form modal (create / edit)
@@ -425,6 +419,21 @@ export default function SubjectsPage() {
       )}
 
       {/* Floating Table Card */}
+      <TableRevealProvider>
+      {sortedSubjects && sortedSubjects.length > 0 && (
+        <StandardTablePagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.setCurrentPage}
+          onPageSizeChange={pagination.setPageSize}
+          placement="top"
+          className="mb-4"
+        />
+      )}
       <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
         <Table>
           <TableHeader>
@@ -459,55 +468,59 @@ export default function SubjectsPage() {
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {loading && !subjects ? (
-              Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-            ) : sortedSubjects && sortedSubjects.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                  {subjects === null ? 'Click "Load Data" to fetch subjects.' : 'No subjects found.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              pagination.paginatedItems.map((subject) => {
-                const isSelected = selectedIds.includes(subject.id)
-                return (
-                  <TableRow key={subject.id} data-state={isSelected ? "selected" : undefined}>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelectRow(subject.id)}
-                        aria-label={`Select subject ${subject.name}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
-                    <TableCell className="font-medium">{subject.name}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditModal(subject)}
-                          aria-label={`Edit ${subject.name}`}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeletingId(subject.id)}
-                          aria-label={`Delete ${subject.name}`}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
+          <AnimatedTableBody
+            loading={loading && !subjects}
+            hasData={!!(sortedSubjects && sortedSubjects.length > 0)}
+            rowCount={Math.min(pagination.pageSize, 8)}
+            skeletonRowCount={Math.min(pagination.pageSize, 8)}
+            colSpan={4}
+            skeleton={
+              <SubjectTableSkeletonRows rows={Math.min(pagination.pageSize, 8)} />
+            }
+            idle={subjects === null}
+            idleTitle="No subjects loaded yet"
+            idleDescription="Use Load Data in the toolbar to fetch the subject list."
+            emptyTitle="No subjects found"
+            emptyDescription="Try adjusting search, then load again."
+          >
+            {pagination.paginatedItems.map((subject) => {
+              const isSelected = selectedIds.includes(subject.id)
+              return (
+                <TableRow key={subject.id} data-state={isSelected ? "selected" : undefined}>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelectRow(subject.id)}
+                      aria-label={`Select subject ${subject.name}`}
+                    />
+                  </TableCell>
+                  <TableCell className="font-semibold text-foreground">{subject.id}</TableCell>
+                  <TableCell className="font-medium">{subject.name}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openEditModal(subject)}
+                        aria-label={`Edit ${subject.name}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeletingId(subject.id)}
+                        aria-label={`Delete ${subject.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </AnimatedTableBody>
         </Table>
       </Card>
 
@@ -522,8 +535,11 @@ export default function SubjectsPage() {
           pageSize={pagination.pageSize}
           onPageChange={pagination.setCurrentPage}
           onPageSizeChange={pagination.setPageSize}
+          placement="bottom"
+          className="mt-4"
         />
       )}
+      </TableRevealProvider>
 
       {/* Form modal */}
       <SubjectFormModal

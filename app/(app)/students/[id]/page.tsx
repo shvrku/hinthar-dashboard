@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/select"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { AttendanceOverviewSkeleton, StudentDetailPageSkeleton } from "@/components/page-skeletons"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
 const StudentLessonCharts = dynamic(
   () =>
@@ -371,29 +372,35 @@ function StudentDetailContent() {
   }
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/students/"
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "-ml-2 h-8 w-fit gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <ArrowLeft className="size-3.5" />
-          Back to Students
-        </Link>
-      </div>
+    <StaggerContainer className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
+      <StaggerItem>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/students/"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "-ml-2 h-8 w-fit gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ArrowLeft className="size-3.5" />
+            Back to Students
+          </Link>
+        </div>
+      </StaggerItem>
 
       {error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <StaggerItem>
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </StaggerItem>
       )}
       {success && (
-        <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-foreground">
-          {success}
-        </div>
+        <StaggerItem>
+          <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-foreground">
+            {success}
+          </div>
+        </StaggerItem>
       )}
 
       {loading ? (
@@ -793,7 +800,7 @@ function StudentDetailContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </StaggerContainer>
   )
 }
 

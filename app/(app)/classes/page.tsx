@@ -14,13 +14,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePagination } from "@/components/use-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
@@ -36,10 +37,6 @@ import {
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { ClassTableSkeletonRows } from "@/components/page-skeletons"
-
-function TableSkeletonRow() {
-  return <ClassTableSkeletonRows rows={1} />
-}
 
 export default function ClassesPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
@@ -399,6 +396,21 @@ export default function ClassesPage() {
           </Card>
 
           {/* Floating Table Card */}
+          <TableRevealProvider>
+          {filteredClasses.length > 0 && (
+            <StandardTablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+              placement="top"
+              className="mb-4"
+            />
+          )}
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
             <Table>
               <TableHeader>
@@ -452,71 +464,75 @@ export default function ClassesPage() {
                 </TableRow>
               </TableHeader>
 
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-                ) : sortedClasses.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                      {lastLoaded === null ? 'Click "Load Data" to fetch classes.' : "No classes found."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pagination.paginatedItems.map((cls) => {
-                    const isSelected = selectedIds.includes(cls.id)
-                    return (
-                      <TableRow key={cls.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/classes/${cls.id}/`)}>
-                        <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelectRow(cls.id)}
-                            aria-label={`Select class ${cls.cohort_identifier}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {EDUCATION_LEVELS.find((l) => l.value === cls.education_level)?.label ?? cls.education_level}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-semibold text-foreground">{cls.cohort_identifier}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {cls.cohort_sub_category || "—"}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => router.push(`/classes/${cls.id}/`)}
-                              title="Open class hub"
-                            >
-                              <Users className="size-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => openEditModal(cls)}
-                              title="Edit"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleteConfirmId(cls.id)}
-                              title="Delete"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
+              <AnimatedTableBody
+                loading={loading}
+                hasData={pagination.paginatedItems.length > 0}
+                rowCount={Math.min(pagination.pageSize, 8)}
+                skeletonRowCount={Math.min(pagination.pageSize, 8)}
+                colSpan={6}
+                skeleton={
+                  <ClassTableSkeletonRows rows={Math.min(pagination.pageSize, 8)} />
+                }
+                idle={lastLoaded === null}
+                idleTitle="No classes loaded yet"
+                idleDescription="Use Load Data in the toolbar to fetch the class list."
+                emptyTitle="No classes found"
+                emptyDescription="Try adjusting search or filters, then load again."
+              >
+                {pagination.paginatedItems.map((cls) => {
+                  const isSelected = selectedIds.includes(cls.id)
+                  return (
+                    <TableRow key={cls.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/classes/${cls.id}/`)}>
+                      <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelectRow(cls.id)}
+                          aria-label={`Select class ${cls.cohort_identifier}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{cls.id}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {EDUCATION_LEVELS.find((l) => l.value === cls.education_level)?.label ?? cls.education_level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{cls.cohort_identifier}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {cls.cohort_sub_category || "—"}
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => router.push(`/classes/${cls.id}/`)}
+                            title="Open class hub"
+                          >
+                            <Users className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditModal(cls)}
+                            title="Edit"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmId(cls.id)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </AnimatedTableBody>
             </Table>
           </Card>
 
@@ -531,8 +547,11 @@ export default function ClassesPage() {
               pageSize={pagination.pageSize}
               onPageChange={pagination.setCurrentPage}
               onPageSizeChange={pagination.setPageSize}
+              placement="bottom"
+              className="mt-4"
             />
           )}
+          </TableRevealProvider>
         </div>
 
       {/* Create / Edit Modal */}

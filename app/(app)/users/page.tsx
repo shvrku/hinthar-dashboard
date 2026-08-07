@@ -10,13 +10,14 @@ import { RequireRole } from "@/components/require-role"
 import { useCurrentUser } from "@/components/current-user-provider"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
 import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
 import { TableSkeletonRows } from "@/components/page-skeletons"
 import { Input } from "@/components/ui/input"
 import {
   Table,
-  TableBody,
   TableCell,
   TableHead,
   TableHeader,
@@ -177,86 +178,8 @@ function UsersAdminContent() {
       </StaggerItem>
 
       <StaggerItem>
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email / Username</TableHead>
-                <TableHead>Clerk ID</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Active</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableSkeletonRows
-                  rows={5}
-                  columns={4}
-                  cellClassNames={["h-4 w-40", "h-4 w-28", "h-8 w-32", "h-5 w-16 rounded-full"]}
-                />
-              ) : users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                    {lastLoaded === null
-                      ? 'Click "Load Data" to fetch users.'
-                      : "No users found."}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="font-medium">{user.email || "—"}</div>
-                      <div className="text-xs text-muted-foreground">{user.username}</div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {user.clerk_id}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={user.role}
-                          disabled={savingId === user.id}
-                          onValueChange={(value) => {
-                            if (value) void updateRole(user, value as Role)
-                          }}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ASSIGNABLE_ROLES.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {user.role === "pending" ? (
-                          <Badge variant="outline">Needs approval</Badge>
-                        ) : null}
-                        {savingId === user.id ? (
-                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.is_active ? (
-                        <Badge>Active</Badge>
-                      ) : (
-                        <Badge variant="secondary">Inactive</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </StaggerItem>
-
-      {serverPg.totalItems > 0 && (
-        <StaggerItem>
+        <TableRevealProvider>
+        {serverPg.totalItems > 0 && (
           <StandardTablePagination
             currentPage={serverPg.page}
             totalPages={serverPg.totalPages}
@@ -267,9 +190,105 @@ function UsersAdminContent() {
             onPageChange={serverPg.setPage}
             onPageSizeChange={serverPg.setPageSize}
             loading={loading}
+            placement="top"
+            className="mb-4"
           />
-        </StaggerItem>
-      )}
+        )}
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email / Username</TableHead>
+                <TableHead>Clerk ID</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Active</TableHead>
+              </TableRow>
+            </TableHeader>
+            <AnimatedTableBody
+              loading={loading}
+              hasData={users.length > 0}
+              rowCount={Math.min(serverPg.pageSize, 8)}
+              skeletonRowCount={Math.min(serverPg.pageSize, 8)}
+              colSpan={4}
+              skeleton={
+                <TableSkeletonRows
+                  rows={Math.min(serverPg.pageSize, 8)}
+                  columns={4}
+                  cellClassNames={["h-4 w-40", "h-4 w-28", "h-8 w-32", "h-5 w-16 rounded-full"]}
+                />
+              }
+              idle={lastLoaded === null}
+              idleTitle="No users loaded yet"
+              idleDescription="Use Load Data in the toolbar to fetch accounts."
+              emptyTitle="No users found"
+              emptyDescription="Try a different role filter or search."
+            >
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div className="font-medium">{user.email || "—"}</div>
+                    <div className="text-xs text-muted-foreground">{user.username}</div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {user.clerk_id}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={user.role}
+                        disabled={savingId === user.id}
+                        onValueChange={(value) => {
+                          if (value) void updateRole(user, value as Role)
+                        }}
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ASSIGNABLE_ROLES.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {role}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {user.role === "pending" ? (
+                        <Badge variant="outline">Needs approval</Badge>
+                      ) : null}
+                      {savingId === user.id ? (
+                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {user.is_active ? (
+                      <Badge>Active</Badge>
+                    ) : (
+                      <Badge variant="secondary">Inactive</Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </AnimatedTableBody>
+          </Table>
+        </div>
+        {serverPg.totalItems > 0 && (
+          <StandardTablePagination
+            currentPage={serverPg.page}
+            totalPages={serverPg.totalPages}
+            totalItems={serverPg.totalItems}
+            startIndex={serverPg.startIndex}
+            endIndex={serverPg.endIndex}
+            pageSize={serverPg.pageSize}
+            onPageChange={serverPg.setPage}
+            onPageSizeChange={serverPg.setPageSize}
+            loading={loading}
+            placement="bottom"
+            className="mt-4"
+          />
+        )}
+        </TableRevealProvider>
+      </StaggerItem>
     </StaggerContainer>
   )
 }

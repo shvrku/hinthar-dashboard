@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Search } from "lucide-react"
-import { motion } from "motion/react"
+import { useGsapEnter } from "@/lib/gsap/use-gsap-enter"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -16,6 +16,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { MotionToggle } from "@/components/motion-toggle"
 import { Button } from "@/components/ui/button"
 import { CommandSearchDialog } from "@/components/command-search-dialog"
 
@@ -31,6 +32,7 @@ export function SiteHeader() {
   const segments = pathname.split("/").filter(Boolean)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [isMac, setIsMac] = React.useState(false)
+  const headerRef = useGsapEnter<HTMLElement>({ y: -10, duration: 0.45 })
 
   React.useEffect(() => {
     setIsMac(typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform || ""))
@@ -50,10 +52,9 @@ export function SiteHeader() {
 
   return (
     <>
-      <motion.header
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      <header
+        ref={headerRef}
+        data-gsap-enter
         className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-4 backdrop-blur-sm"
       >
         <div className="flex items-center gap-2 overflow-hidden">
@@ -105,9 +106,10 @@ export function SiteHeader() {
             </kbd>
           </Button>
 
+          <MotionToggle />
           <ThemeToggle />
         </div>
-      </motion.header>
+      </header>
 
       <CommandSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </>

@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { motion, AnimatePresence } from "motion/react"
 import { AlertTriangle, Check, X, Camera, Loader2, Search, User as UserIcon } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { CheckInLookup } from "@/lib/types"
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { GsapEnter } from "@/components/animation/gsap-enter"
 
 type TerminalLookupCard =
   | {
@@ -336,41 +336,33 @@ export default function TerminalPage() {
         </StandardPageHeader>
       </StaggerItem>
 
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      {error ? (
+        <GsapEnter
+          key="terminal-error"
+          className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <span>{error}</span>
+          <button
+            onClick={() => {
+              setError(null)
+              scannerRef.current?.resetScanLock()
+            }}
+            className="ml-2 text-destructive hover:opacity-80 transition-opacity"
           >
-            <span>{error}</span>
-            <button
-              onClick={() => {
-                setError(null)
-                scannerRef.current?.resetScanLock()
-              }}
-              className="ml-2 text-destructive hover:opacity-80 transition-opacity"
-            >
-              <X className="size-4" />
-            </button>
-          </motion.div>
-        )}
+            <X className="size-4" />
+          </button>
+        </GsapEnter>
+      ) : null}
 
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="mb-4 flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
-          >
-            <Check className="size-5 text-success shrink-0" />
-            <span>{success}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {success ? (
+        <GsapEnter
+          key="terminal-success"
+          className="mb-4 flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
+        >
+          <Check className="size-5 text-success shrink-0" />
+          <span>{success}</span>
+        </GsapEnter>
+      ) : null}
 
       <StaggerItem>
         <div className="flex flex-col gap-6 lg:flex-row">
@@ -391,14 +383,10 @@ export default function TerminalPage() {
           <div className="w-full lg:w-96 space-y-6">
             <div>
               <h2 className="mb-4 text-lg font-semibold tracking-tight">Confirmation</h2>
-              <AnimatePresence mode="wait">
-                {lookupCard?.kind === "confirm" ? (
-                  <motion.div
+              {lookupCard?.kind === "confirm" ? (
+                  <GsapEnter
                     key={`${lookupCard.student.id}-${lookupCard.pendingToken ?? "manual"}`}
-                    initial={{ opacity: 0, scale: 0.93, y: 14 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.93, y: -10 }}
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    y={14}
                     className="rounded-xl border border-primary/30 bg-card p-6 shadow-md"
                   >
                     <div className="mb-6 flex items-center gap-4">
@@ -454,14 +442,11 @@ export default function TerminalPage() {
                         Cancel
                       </Button>
                     </div>
-                  </motion.div>
+                  </GsapEnter>
                 ) : lookupCard?.kind === "deactivated" ? (
-                  <motion.div
+                  <GsapEnter
                     key={`deactivated-${lookupCard.student?.id ?? "unknown"}`}
-                    initial={{ opacity: 0, scale: 0.93, y: 14 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.93, y: -10 }}
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    y={14}
                     className="rounded-xl border border-warning/35 bg-warning/10 p-6 shadow-md"
                   >
                     <div className="mb-4 flex items-start gap-3">
@@ -492,13 +477,11 @@ export default function TerminalPage() {
                       <X className="size-4" />
                       Scan Next
                     </Button>
-                  </motion.div>
+                  </GsapEnter>
                 ) : (
-                  <motion.div
+                  <GsapEnter
                     key="empty-match"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    y={0}
                     className="flex h-56 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"
                   >
                     <div className="flex size-12 items-center justify-center rounded-full bg-muted/50 mb-3">
@@ -508,9 +491,8 @@ export default function TerminalPage() {
                     <p className="text-xs text-muted-foreground/70 mt-1">
                       Scan a QR code or enter a student code below
                     </p>
-                  </motion.div>
+                  </GsapEnter>
                 )}
-              </AnimatePresence>
             </div>
 
             <div>

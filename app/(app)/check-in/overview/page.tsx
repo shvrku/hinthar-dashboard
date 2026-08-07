@@ -65,9 +65,9 @@ import {
 } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TableSkeletonRows } from "@/components/page-skeletons"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
 import {
   Table,
-  TableBody,
   TableCell,
   TableHead,
   TableHeadSortable,
@@ -175,10 +175,17 @@ function ClassStudentTable({
               )}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {loading && <TableSkeletonRows columns={columnCount} />}
-            {!loading &&
-              items.map((row) => (
+          <AnimatedTableBody
+            loading={loading}
+            hasData={items.length > 0}
+            rowCount={8}
+            skeletonRowCount={8}
+            colSpan={columnCount}
+            skeleton={<TableSkeletonRows columns={columnCount} rows={8} />}
+            emptyTitle="No students found"
+            emptyDescription="Nothing to show for this view."
+          >
+            {items.map((row) => (
                 <TableRow key={row.studentId}>
                   <TableCell className="truncate font-medium">
                     {row.studentCode || `#${row.studentId}`}
@@ -270,7 +277,7 @@ function ClassStudentTable({
                   )}
                 </TableRow>
               ))}
-          </TableBody>
+          </AnimatedTableBody>
         </Table>
       </div>
 
@@ -351,41 +358,53 @@ function SearchResultsTable({
             <TableHead className="w-[130px] text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          {loading && <TableSkeletonRows columns={5} rows={6} />}
-          {!loading &&
-            (data?.results ?? []).map((row) => (
-              <TableRow key={`${row.class_id}-${row.student_id}`}>
-                <TableCell className="font-medium">
-                  {row.unique_code || `#${row.student_id}`}
-                </TableCell>
-                <TableCell>{row.name}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {row.class_label}
-                </TableCell>
-                <TableCell>
-                  {row.check_in ? (
-                    <Badge variant="success">
-                      {formatCheckInTime(row.check_in.timestamp)} ·{" "}
-                      {row.check_in.check_in_type === "qr" ? "QR" : "Manual"}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Missing</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    onClick={() => onSelectClass(row.class_id)}
-                    aria-label="View class"
-                  >
-                    <Eye className="size-3.5" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-        </TableBody>
+        <AnimatedTableBody
+          loading={loading}
+          hasData={(data?.results ?? []).length > 0}
+          rowCount={8}
+          skeletonRowCount={8}
+          colSpan={5}
+          skeleton={
+            <TableSkeletonRows
+              columns={5}
+              rows={8}
+            />
+          }
+          emptyTitle="No students matched"
+          emptyDescription="Try a different name or student code."
+        >
+          {(data?.results ?? []).map((row) => (
+            <TableRow key={`${row.class_id}-${row.student_id}`}>
+              <TableCell className="font-medium">
+                {row.unique_code || `#${row.student_id}`}
+              </TableCell>
+              <TableCell>{row.name}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {row.class_label}
+              </TableCell>
+              <TableCell>
+                {row.check_in ? (
+                  <Badge variant="success">
+                    {formatCheckInTime(row.check_in.timestamp)} ·{" "}
+                    {row.check_in.check_in_type === "qr" ? "QR" : "Manual"}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">Missing</Badge>
+                )}
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  onClick={() => onSelectClass(row.class_id)}
+                  aria-label="View class"
+                >
+                  <Eye className="size-3.5" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </AnimatedTableBody>
       </Table>
     </div>
   )

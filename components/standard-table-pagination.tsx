@@ -18,6 +18,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { cn } from "@/lib/utils"
+import { useTableReveal } from "@/components/animation/table-reveal-context"
 
 interface StandardTablePaginationProps {
   currentPage: number
@@ -30,6 +31,12 @@ interface StandardTablePaginationProps {
   onPageSizeChange: (pageSize: number) => void
   /** True while the current page of rows is being fetched. */
   loading?: boolean
+  className?: string
+  /**
+   * Which bar this is — used to reverse table row entrance when the user
+   * paginates from the bottom control.
+   */
+  placement?: "top" | "bottom"
 }
 
 export function StandardTablePagination({
@@ -42,7 +49,32 @@ export function StandardTablePagination({
   onPageChange,
   onPageSizeChange,
   loading = false,
+  className,
+  placement,
 }: StandardTablePaginationProps) {
+  const reveal = useTableReveal()
+
+  const markOrigin = React.useCallback(() => {
+    if (placement === "bottom") reveal.markBottom()
+    else if (placement === "top") reveal.markTop()
+  }, [placement, reveal])
+
+  const handlePageChange = React.useCallback(
+    (page: number) => {
+      markOrigin()
+      onPageChange(page)
+    },
+    [markOrigin, onPageChange]
+  )
+
+  const handlePageSizeChange = React.useCallback(
+    (size: number) => {
+      markOrigin()
+      onPageSizeChange(size)
+    },
+    [markOrigin, onPageSizeChange]
+  )
+
   const pageNumbers = React.useMemo(() => {
     const pages: number[] = []
     const maxVisible = 5
@@ -62,8 +94,9 @@ export function StandardTablePagination({
   return (
     <div
       className={cn(
-        "mt-4 flex w-full flex-col items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs sm:flex-row sm:gap-4",
-        loading && "opacity-90"
+        "flex w-full flex-col items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs sm:flex-row sm:gap-4",
+        loading && "opacity-90",
+        className
       )}
       aria-busy={loading}
     >
@@ -87,7 +120,7 @@ export function StandardTablePagination({
           <span className="whitespace-nowrap">Rows per page</span>
           <Select
             value={pageSize.toString()}
-            onValueChange={(val) => onPageSizeChange(Number(val))}
+            onValueChange={(val) => handlePageSizeChange(Number(val))}
             disabled={loading}
           >
             <SelectTrigger className="h-8 w-16 bg-background text-xs">
@@ -108,7 +141,7 @@ export function StandardTablePagination({
           <PaginationContent className="gap-1">
             <PaginationItem>
               <PaginationPrevious
-                onClick={() => onPageChange(currentPage - 1)}
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={loading || currentPage <= 1}
               />
             </PaginationItem>
@@ -125,7 +158,7 @@ export function StandardTablePagination({
                 >
                   <PaginationButton
                     isActive={isCurrent}
-                    onClick={() => onPageChange(page)}
+                    onClick={() => handlePageChange(page)}
                     disabled={loading}
                   >
                     {page}
@@ -136,7 +169,7 @@ export function StandardTablePagination({
 
             <PaginationItem>
               <PaginationNext
-                onClick={() => onPageChange(currentPage + 1)}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={loading || currentPage >= totalPages}
               />
             </PaginationItem>

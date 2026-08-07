@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { createApi, ApiError } from "@/lib/api"
 import type { Class, Teacher, Subject, TimetableSlot } from "@/lib/types"
-import { motion, AnimatePresence } from "motion/react"
 import {
   Search,
   BookOpen,
@@ -911,11 +910,10 @@ export default function TimetableClassPage() {
                 {listDayLessons.map((lesson) => {
                   const durationStr = getDurationMinutes(lesson.start_time, lesson.end_time)
                   return (
-                    <motion.div
+                    <div
                       key={lesson.id}
-                      whileHover={{ scale: 1.005 }}
                       onClick={() => setModal({ mode: "edit", lesson })}
-                      className="group relative flex flex-col md:flex-row md:items-center justify-between rounded-2xl border border-border/80 bg-card p-4 md:p-5 shadow-xs transition-all hover:bg-muted/40 hover:border-primary/40 cursor-pointer"
+                      className="group relative flex flex-col md:flex-row md:items-center justify-between rounded-2xl border border-border/80 bg-card p-4 md:p-5 shadow-xs transition-all hover:bg-muted/40 hover:border-primary/40 hover:scale-[1.005] cursor-pointer"
                     >
                       {/* Left: Subject & Teacher Info */}
                       <div className="flex items-center gap-4 min-w-0 mb-3 md:mb-0">
@@ -976,7 +974,7 @@ export default function TimetableClassPage() {
                           </Button>
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   )
                 })}
               </div>

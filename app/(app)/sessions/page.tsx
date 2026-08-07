@@ -18,10 +18,15 @@ import { cn, toLocalDateString, toSessionDateString, parseBackendDateTime, forma
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
+import {
+  AdhocSessionTableSkeletonRows,
+  SessionTableSkeletonRows,
+} from "@/components/page-skeletons"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
@@ -109,18 +114,6 @@ function renderStatusBadge(status: SessionStatus | null) {
     default:
       return <Badge variant="secondary">{statusLabel(status)}</Badge>
   }
-}
-
-function RowSkeleton() {
-  return (
-    <TableRow>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <TableCell key={i}>
-          <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
-        </TableCell>
-      ))}
-    </TableRow>
-  )
 }
 
 export default function SessionsPage() {
@@ -855,7 +848,18 @@ export default function SessionsPage() {
 
       {/* Table Card — Regular Sessions */}
       {sessionMode === "regular" && (
-        <>
+        <TableRevealProvider>
+          {tablePagination.totalItems > 0 && (
+            <StandardTablePagination
+              currentPage={tablePagination.currentPage} totalPages={tablePagination.totalPages}
+              totalItems={tablePagination.totalItems} startIndex={tablePagination.startIndex}
+              endIndex={tablePagination.endIndex} pageSize={tablePagination.pageSize}
+              onPageChange={tablePagination.onPageChange} onPageSizeChange={tablePagination.onPageSizeChange}
+              loading={loading}
+              placement="top"
+              className="mb-4"
+            />
+          )}
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
             <Table>
               <TableHeader>
@@ -876,60 +880,66 @@ export default function SessionsPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-                ) : lastLoaded === null ? (
-                  <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch sessions.</TableCell></TableRow>
-                ) : displayedSessions.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No sessions found.</TableCell></TableRow>
-                ) : (
-                  displayedSessions.map((session) => {
-                    const isSelected = selectedIds.includes(session.id)
-                    return (
-                      <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
-                        <TableCell className="text-center">
-                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select session #${session.id}`} />
-                        </TableCell>
-                        <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
-                        <TableCell className="max-w-[220px]">
-                          <SessionTeacherCell
-                            teacher={session.teacher}
-                            actualTeacher={session.actual_teacher}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {session.class_obj ? (
-                            <Badge variant="outline">{session.class_obj.education_level} {session.class_obj.cohort_identifier}</Badge>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.start_time)}</TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.end_time)}</TableCell>
-                        <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {(() => {
-                              const href = takeRollHrefForSession(session)
-                              if (!href) return null
-                              return (
-                                <Link
-                                  href={href}
-                                  title="Take roll"
-                                  className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
-                                >
-                                  <ClipboardList className="size-4" />
-                                </Link>
-                              )
-                            })()}
-                            <Button variant="ghost" size="icon-sm" onClick={() => openEditModal(session)} title="Edit"><Pencil className="size-4" /></Button>
-                            <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
+              <AnimatedTableBody
+                loading={loading}
+                hasData={displayedSessions.length > 0}
+                rowCount={Math.min(tablePagination.pageSize, 8)}
+                skeletonRowCount={Math.min(tablePagination.pageSize, 8)}
+                colSpan={8}
+                skeleton={
+                  <SessionTableSkeletonRows rows={Math.min(tablePagination.pageSize, 8)} />
+                }
+                idle={lastLoaded === null}
+                idleTitle="No sessions loaded yet"
+                idleDescription="Use Load Data in the toolbar to fetch class sessions."
+                emptyTitle="No sessions found"
+                emptyDescription="Try adjusting search or filters, then load again."
+              >
+                {displayedSessions.map((session) => {
+                  const isSelected = selectedIds.includes(session.id)
+                  return (
+                    <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
+                      <TableCell className="text-center">
+                        <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select session #${session.id}`} />
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
+                      <TableCell className="max-w-[220px]">
+                        <SessionTeacherCell
+                          teacher={session.teacher}
+                          actualTeacher={session.actual_teacher}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {session.class_obj ? (
+                          <Badge variant="outline">{session.class_obj.education_level} {session.class_obj.cohort_identifier}</Badge>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.start_time)}</TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.end_time)}</TableCell>
+                      <TableCell className="text-center">{renderStatusBadge(session.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {(() => {
+                            const href = takeRollHrefForSession(session)
+                            if (!href) return null
+                            return (
+                              <Link
+                                href={href}
+                                title="Take roll"
+                                className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                              >
+                                <ClipboardList className="size-4" />
+                              </Link>
+                            )
+                          })()}
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEditModal(session)} title="Edit"><Pencil className="size-4" /></Button>
+                          <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </AnimatedTableBody>
             </Table>
           </Card>
           {tablePagination.totalItems > 0 && (
@@ -939,14 +949,27 @@ export default function SessionsPage() {
               endIndex={tablePagination.endIndex} pageSize={tablePagination.pageSize}
               onPageChange={tablePagination.onPageChange} onPageSizeChange={tablePagination.onPageSizeChange}
               loading={loading}
+              placement="bottom"
+              className="mt-4"
             />
           )}
-        </>
+        </TableRevealProvider>
       )}
 
       {/* Table Card — Ad-Hoc Sessions */}
       {sessionMode === "adhoc" && (
-        <>
+        <TableRevealProvider>
+          {adhocTablePagination.totalItems > 0 && (
+            <StandardTablePagination
+              currentPage={adhocTablePagination.currentPage} totalPages={adhocTablePagination.totalPages}
+              totalItems={adhocTablePagination.totalItems} startIndex={adhocTablePagination.startIndex}
+              endIndex={adhocTablePagination.endIndex} pageSize={adhocTablePagination.pageSize}
+              onPageChange={adhocTablePagination.onPageChange} onPageSizeChange={adhocTablePagination.onPageSizeChange}
+              loading={loading}
+              placement="top"
+              className="mb-4"
+            />
+          )}
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
             <Table>
               <TableHeader>
@@ -968,46 +991,54 @@ export default function SessionsPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-                ) : adhocSessions === null ? (
-                  <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">Click &quot;Load Data&quot; to fetch ad-hoc sessions.</TableCell></TableRow>
-                ) : adhocSessions.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">No ad-hoc sessions found.</TableCell></TableRow>
-                ) : (
-                  adhocSessions.map((session) => {
-                    const isSelected = selectedIds.includes(session.id)
-                    return (
-                      <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
-                        <TableCell className="text-center">
-                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select #${session.id}`} />
-                        </TableCell>
-                        <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
-                        <TableCell>{session.teacher?.name ?? "—"}</TableCell>
-                        <TableCell>{session.subject?.name ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{session.date ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{session.start_time ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{session.end_time ?? "—"}</TableCell>
-                        <TableCell className="text-center">{renderStatusBadge(session.status as SessionStatus | null)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link
-                              href={takeRollHrefForAdHoc(session)}
-                              title="Take roll"
-                              className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
-                            >
-                              <ClipboardList className="size-4" />
-                            </Link>
-                            <Button variant="ghost" size="icon-sm" title="Edit"><Pencil className="size-4" /></Button>
-                            <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
+              <AnimatedTableBody
+                loading={loading}
+                hasData={(adhocSessions?.length ?? 0) > 0}
+                rowCount={Math.min(adhocTablePagination.pageSize, 8)}
+                skeletonRowCount={Math.min(adhocTablePagination.pageSize, 8)}
+                colSpan={9}
+                skeleton={
+                  <AdhocSessionTableSkeletonRows
+                    rows={Math.min(adhocTablePagination.pageSize, 8)}
+                  />
+                }
+                idle={adhocSessions === null}
+                idleTitle="No ad-hoc sessions loaded yet"
+                idleDescription="Use Load Data in the toolbar to fetch ad-hoc sessions."
+                emptyTitle="No ad-hoc sessions found"
+                emptyDescription="Create an ad-hoc session or adjust filters, then load again."
+              >
+                {(adhocSessions ?? []).map((session) => {
+                  const isSelected = selectedIds.includes(session.id)
+                  return (
+                    <TableRow key={session.id} data-state={isSelected ? "selected" : undefined}>
+                      <TableCell className="text-center">
+                        <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(session.id)} aria-label={`Select #${session.id}`} />
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{session.id}</TableCell>
+                      <TableCell>{session.teacher?.name ?? "—"}</TableCell>
+                      <TableCell>{session.subject?.name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{session.date ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{session.start_time ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{session.end_time ?? "—"}</TableCell>
+                      <TableCell className="text-center">{renderStatusBadge(session.status as SessionStatus | null)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={takeRollHrefForAdHoc(session)}
+                            title="Take roll"
+                            className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                          >
+                            <ClipboardList className="size-4" />
+                          </Link>
+                          <Button variant="ghost" size="icon-sm" title="Edit"><Pencil className="size-4" /></Button>
+                          <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => setDeletingId(session.id)} title="Delete"><Trash2 className="size-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </AnimatedTableBody>
             </Table>
           </Card>
           {adhocTablePagination.totalItems > 0 && (
@@ -1017,9 +1048,11 @@ export default function SessionsPage() {
               endIndex={adhocTablePagination.endIndex} pageSize={adhocTablePagination.pageSize}
               onPageChange={adhocTablePagination.onPageChange} onPageSizeChange={adhocTablePagination.onPageSizeChange}
               loading={loading}
+              placement="bottom"
+              className="mt-4"
             />
           )}
-        </>
+        </TableRevealProvider>
       )}
 
       {/* Form modal */}

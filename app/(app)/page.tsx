@@ -15,6 +15,7 @@ import type { Stats } from "@/lib/types"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DashboardStatGridSkeleton } from "@/components/page-skeletons"
+import { StableBlock } from "@/components/animation/stable-block"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { RequireRole } from "@/components/require-role"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
@@ -54,6 +55,8 @@ function OverviewContent() {
     void loadStats()
   }, [loadStats])
 
+  const showSkeleton = loading && !stats
+
   return (
     <StaggerContainer className="space-y-6">
       <StaggerItem>
@@ -81,15 +84,16 @@ function OverviewContent() {
         </StaggerItem>
       ) : null}
 
-      {loading && !stats ? (
-        <StaggerItem>
+      <StableBlock lock={showSkeleton}>
+        {showSkeleton ? (
           <DashboardStatGridSkeleton />
-        </StaggerItem>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {statCards.map((card) => (
-            <StaggerItem key={card.key}>
-              <Card className="border border-border bg-card shadow-xs">
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {statCards.map((card) => (
+              <Card
+                key={card.key}
+                className="border border-border bg-card shadow-xs"
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-3">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {card.label}
@@ -108,10 +112,10 @@ function OverviewContent() {
                   )}
                 </CardContent>
               </Card>
-            </StaggerItem>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </StableBlock>
     </StaggerContainer>
   )
 }

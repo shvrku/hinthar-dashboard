@@ -4,10 +4,11 @@ import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCheck, Upload } from "lucide-react"
-import { motion, AnimatePresence } from "motion/react"
 import { createApi, ApiError } from "@/lib/api"
 import { BulkImportModal } from "@/components/bulk-import-modal"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AnimatedTableBody } from "@/components/animation/animated-table-body"
+import { TableRevealProvider } from "@/components/animation/table-reveal-context"
 import {
   type Teacher,
   type TeacherPayload,
@@ -28,7 +29,6 @@ import { StandardTablePagination } from "@/components/standard-table-pagination"
 import {
   Table,
   TableHeader,
-  TableBody,
   TableRow,
   TableHead,
   TableHeadSortable,
@@ -45,13 +45,6 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { cn, toLocalDateString } from "@/lib/utils"
 import { TeacherTableSkeletonRows } from "@/components/page-skeletons"
-
-// ---------------------------------------------------------------------------
-// Skeleton row
-// ---------------------------------------------------------------------------
-function TableSkeletonRow() {
-  return <TeacherTableSkeletonRows rows={1} />
-}
 
 // ---------------------------------------------------------------------------
 // Truncated cell content with tooltip
@@ -660,6 +653,22 @@ export default function TeachersPage() {
 
       {/* Floating Table Card */}
       <StaggerItem>
+        <TableRevealProvider>
+        {tablePagination.totalItems > 0 && (
+          <StandardTablePagination
+            currentPage={tablePagination.currentPage}
+            totalPages={tablePagination.totalPages}
+            totalItems={tablePagination.totalItems}
+            startIndex={tablePagination.startIndex}
+            endIndex={tablePagination.endIndex}
+            pageSize={tablePagination.pageSize}
+            onPageChange={tablePagination.onPageChange}
+            onPageSizeChange={tablePagination.onPageSizeChange}
+            loading={loading}
+            placement="top"
+            className="mb-4"
+          />
+        )}
         <TooltipProvider>
           <Card className="rounded-xl border border-border/80 bg-card shadow-2xs overflow-hidden">
             <Table>
@@ -726,76 +735,76 @@ export default function TeachersPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => <TableSkeletonRow key={i} />)
-                ) : displayedTeachers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                      {lastLoaded === null ? 'Click "Load Data" to fetch teachers.' : "No teachers found."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  displayedTeachers.map((t) => {
-                    const isSelected = selectedIds.includes(t.id)
-                    return (
-                      <TableRow key={t.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/teachers/${t.id}/`)}>
-                        <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelectRow(t.id)}
-                            aria-label={`Select teacher ${t.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{t.school_code}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[180px]">
-                          <TruncatedContent value={t.name} className="font-semibold text-foreground" />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[140px]">
-                          <TruncatedContent value={t.contact} />
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => openEditModal(t)}
-                              title="Edit"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleting(t)}
-                              title="Delete"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
+              <AnimatedTableBody
+                loading={loading}
+                hasData={displayedTeachers.length > 0}
+                rowCount={Math.min(serverPg.pageSize, 8)}
+                skeletonRowCount={Math.min(serverPg.pageSize, 8)}
+                colSpan={7}
+                skeleton={
+                  <TeacherTableSkeletonRows rows={Math.min(serverPg.pageSize, 8)} />
+                }
+                idle={lastLoaded === null}
+                idleTitle="No teachers loaded yet"
+                idleDescription="Use Load Data in the toolbar to fetch the teacher list."
+                emptyTitle="No teachers found"
+                emptyDescription="Try adjusting search or filters, then load again."
+              >
+                {displayedTeachers.map((t) => {
+                  const isSelected = selectedIds.includes(t.id)
+                  return (
+                    <TableRow key={t.id} data-state={isSelected ? "selected" : undefined} className="cursor-pointer" onClick={() => router.push(`/teachers/${t.id}/`)}>
+                      <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelectRow(t.id)}
+                          aria-label={`Select teacher ${t.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{t.unique_code}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{t.school_code}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <TruncatedContent value={t.name} className="font-semibold text-foreground" />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {EMPLOYMENT_TYPES.find((et) => et.value === t.employment_type)?.label ?? t.employment_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[140px]">
+                        <TruncatedContent value={t.contact} />
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditModal(t)}
+                            title="Edit"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleting(t)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </AnimatedTableBody>
             </Table>
           </Card>
         </TooltipProvider>
-      </StaggerItem>
-
-      {/* Standardized Table Pagination Footer */}
-      {tablePagination.totalItems > 0 && (
-        <StaggerItem>
+        {tablePagination.totalItems > 0 && (
           <StandardTablePagination
             currentPage={tablePagination.currentPage}
             totalPages={tablePagination.totalPages}
@@ -806,9 +815,12 @@ export default function TeachersPage() {
             onPageChange={tablePagination.onPageChange}
             onPageSizeChange={tablePagination.onPageSizeChange}
             loading={loading}
+            placement="bottom"
+            className="mt-4"
           />
-        </StaggerItem>
-      )}
+        )}
+        </TableRevealProvider>
+      </StaggerItem>
 
       {/* Form modal */}
       {showForm && (
