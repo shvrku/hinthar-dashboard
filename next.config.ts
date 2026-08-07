@@ -7,12 +7,9 @@ const nextConfig: NextConfig = {
   // Django uses APPEND_SLASH=True — all endpoints require trailing slashes.
   // The route handler at app/api/[...slug]/route.ts normalizes the path before proxying.
   trailingSlash: true,
-  // Next.js 16 streams metadata by default (injected via JS after page load).
-  // Only a default bot whitelist gets blocking/static metadata. Telegram is NOT
-  // in that list. Set to /.*/ to serve blocking metadata to ALL user agents so
-  // OG tags are always present in the initial HTML for social previews.
-  // PERF-M5: intentional tradeoff (slightly worse TTFB) for social OG reliability.
-  htmlLimitedBots: /.*/,
+  // PERF: serve blocking metadata only to known social/link preview bots
+  // (not every user agent — htmlLimitedBots: /.*/ was costing TTFB/CPU).
+  htmlLimitedBots: /bot|crawl|spider|slurp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Discordbot|TelegramBot|WhatsApp|SkypeUriPreview|Slackbot|embedly|Quora Link Preview|Showyoubot|outbrain|pinterest|vkShare|W3C_Validator/i,
   // Same-origin /api proxy — no cross-origin CORS headers required.
   async headers() {
     return [

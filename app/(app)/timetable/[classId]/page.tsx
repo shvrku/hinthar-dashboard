@@ -483,7 +483,7 @@ export default function TimetableClassPage() {
       const [classesData, teachersData, subjectsData, lessonsData] =
         await Promise.all([
           api.listClasses(),
-          api.listTeachers(),
+          api.listTeachersForSelect(),
           api.listSubjects(),
           api.listTimetableSlots(),
         ])

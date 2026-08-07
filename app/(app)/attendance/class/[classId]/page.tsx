@@ -266,7 +266,7 @@ function ClassAttendanceContent() {
       const [classesData, subjectsData, teachersData] = await Promise.all([
         api.listClasses({ summary: "true" }),
         api.listSubjects({ summary: "true" }),
-        api.listTeachers({ summary: "true" }),
+        api.listTeachersForSelect(),
       ])
       setClasses(classesData || [])
       setSubjects(subjectsData || [])

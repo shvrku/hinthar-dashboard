@@ -698,10 +698,9 @@ export default function CheckInOverviewPage() {
 
   const loadSchool = React.useCallback(
     async (nextMissingPage = 1, nextArrivedPage = 1) => {
-      await Promise.all([
-        loadSchoolSide("missing", nextMissingPage),
-        loadSchoolSide("arrived", nextArrivedPage),
-      ])
+      // Load missing first (primary ops view), then arrived — halves concurrent burst.
+      await loadSchoolSide("missing", nextMissingPage)
+      await loadSchoolSide("arrived", nextArrivedPage)
     },
     [loadSchoolSide]
   )

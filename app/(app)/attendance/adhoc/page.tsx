@@ -244,7 +244,7 @@ function AdHocAttendanceContent() {
       const api = createApi(token)
       const [subjectsData, teachersData] = await Promise.all([
         api.listSubjects({ summary: "true" }),
-        api.listTeachers({ summary: "true" }),
+        api.listTeachersForSelect(),
       ])
       setSubjects(subjectsData || [])
       setTeachers(teachersData || [])

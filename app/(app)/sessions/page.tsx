@@ -201,7 +201,7 @@ export default function SessionsPage() {
       if (!token) return
       const api = createApi(token)
       const [teachersData, classesData, subjectsData, slotsData] = await Promise.all([
-        api.listTeachers(),
+        api.listTeachersForSelect(),
         api.listClasses(),
         api.listSubjects(),
         api.listTimetableSlots(),

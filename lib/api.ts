@@ -9,9 +9,24 @@ export class ApiError extends Error {
   }
 }
 
-// Always use a relative path — Next.js proxies to the backend via rewrites.
-// This keeps all browser requests same-origin, avoiding CORS entirely.
-const API_BASE = "/api/v1"
+// Prefer browser → Django (NEXT_PUBLIC_API_ORIGIN) to avoid Vercel serverless
+// invocations on every API call. Falls back to same-origin /api proxy.
+function resolveApiBase(): string {
+  const origin = (process.env.NEXT_PUBLIC_API_ORIGIN || "").replace(/\/+$/, "")
+  if (origin) return `${origin}/api/v1`
+  return "/api/v1"
+}
+
+const API_BASE = resolveApiBase()
+
+export function getApiBase(): string {
+  return API_BASE
+}
+
+/** True when the browser talks to Django directly (CORS required on SMS). */
+export function isDirectApiMode(): boolean {
+  return Boolean((process.env.NEXT_PUBLIC_API_ORIGIN || "").trim())
+}
 
 /** Builds a query string. The value `"all"` is omitted (UI filter sentinel =
  * "no filter"). Callers that need a literal `all` (e.g. overview `class_id`)
@@ -47,9 +62,13 @@ async function request<T>(
     })
   } catch (err) {
     const detail = err instanceof Error ? err.message : "Network error"
+    const corsHint =
+      typeof window !== "undefined" && isDirectApiMode()
+        ? ` If this is a CORS failure, add this dashboard origin to SMS CORS_ALLOWED_ORIGINS (and optionally CORS_ALLOWED_ORIGIN_REGEXES for Vercel previews). API base: ${API_BASE}.`
+        : ""
     throw new ApiError(
       0,
-      `Unable to connect to API server (${API_BASE}). Details: ${detail}`
+      `Unable to connect to API server (${API_BASE}). Details: ${detail}.${corsHint}`
     )
   }
 
@@ -515,6 +534,23 @@ export function createApi(token: string) {
       const data = await fetchAllPages<import("./types").Teacher>(`/teachers/`, token, params)
       apiCache.set(cacheKey, { data, timestamp: Date.now() })
       return data
+    },
+
+    /** Dropdown/select helper — single page, no multi-page walk. */
+    listTeachersForSelect: async (forceRefresh = false) => {
+      const cacheKey = `${token}:/teachers/:select`
+      if (!forceRefresh) {
+        const cached = apiCache.get(cacheKey)
+        if (cached && Date.now() - cached.timestamp < DEFAULT_TTL_MS) {
+          return cached.data as import("./types").Teacher[]
+        }
+      }
+      const page = await fetchPage<import("./types").Teacher>(`/teachers/`, token, {
+        page: 1,
+        page_size: 200,
+      })
+      apiCache.set(cacheKey, { data: page.results, timestamp: Date.now() })
+      return page.results
     },
 
     listTeachersPage: (params?: Record<string, string | number | undefined | null>) =>

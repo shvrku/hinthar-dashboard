@@ -143,15 +143,17 @@ function FindSlotSessionsContent() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const [cls, classSlots, allTeachers, slotSessions] = await Promise.all([
+      const [cls, classSlots, allTeachers, sessionsPage] = await Promise.all([
         api.getClass(classId),
         api.listTimetableSlots({ class_id: classId }, true),
-        api.listTeachers(),
-        api.listSessions({
+        api.listTeachersForSelect(),
+        api.listSessionsPage({
           class_id: classId,
           timetable_slot_id: slotId,
           date_from: dateFrom,
           date_to: dateTo,
+          page: 1,
+          page_size: 200,
         }),
       ])
       const foundSlot =
@@ -161,7 +163,7 @@ function FindSlotSessionsContent() {
       setClassObj(cls)
       setSlot(foundSlot)
       setTeachers(allTeachers || [])
-      const list = Array.isArray(slotSessions) ? slotSessions : []
+      const list = sessionsPage.results || []
       list.sort((a, b) => {
         const ta = parseBackendDateTime(a.start_time).getTime()
         const tb = parseBackendDateTime(b.start_time).getTime()

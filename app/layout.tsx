@@ -6,6 +6,7 @@ import { MotionPreferenceProvider } from "@/components/motion-preference-provide
 import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
 import { FocusProvider } from "@/components/focus-context";
 import { CurrentUserProvider } from "@/components/current-user-provider";
+import { QueryProvider } from "@/components/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -119,9 +120,11 @@ export default function RootLayout({
           <ThemeProvider>
             <MotionPreferenceProvider>
               <ClerkThemeProvider>
-                <CurrentUserProvider>
-                  <TooltipProvider>{children}</TooltipProvider>
-                </CurrentUserProvider>
+                <QueryProvider>
+                  <CurrentUserProvider>
+                    <TooltipProvider>{children}</TooltipProvider>
+                  </CurrentUserProvider>
+                </QueryProvider>
               </ClerkThemeProvider>
             </MotionPreferenceProvider>
           </ThemeProvider>
