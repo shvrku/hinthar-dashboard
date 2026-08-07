@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { downloadQrPng, downloadQrZip } from "@/lib/qr-download"
+import { downloadQrPng, downloadQrZip, qrDownloadFilename } from "@/lib/qr-download"
 import { cn } from "@/lib/utils"
 
 function classDisplay(s: Student): string {
@@ -344,7 +344,7 @@ export default function CheckInManagementPage() {
     try {
       await downloadQrPng(
         selected.check_in_token,
-        `check-in-${selected.unique_code || selected.name}.png`
+        qrDownloadFilename(selected)
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to download QR")
@@ -433,7 +433,9 @@ export default function CheckInManagementPage() {
             if (!check_in_token) continue
             items.push({
               token: check_in_token,
-              filename: `check-in-${student?.unique_code || id}.png`,
+              filename: qrDownloadFilename(
+                student ?? { id, unique_code: null, name: null }
+              ),
             })
           }
           if (items.length === 0) throw new Error("No QR tokens available for the selection.")
@@ -808,7 +810,9 @@ export default function CheckInManagementPage() {
                     Regenerate Token
                   </Button>
                   <Button
-                    variant="outline"
+                    variant={
+                      !bulkBusy && selectionStats.canActivate ? "default" : "outline"
+                    }
                     className="w-full justify-start"
                     disabled={bulkBusy || !selectionStats.canActivate}
                     onClick={() => void runBulk("activate")}
@@ -821,7 +825,7 @@ export default function CheckInManagementPage() {
                     Activate
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     className="w-full justify-start"
                     disabled={bulkBusy || !selectionStats.canDeactivate}
                     onClick={() => void runBulk("deactivate")}
@@ -895,7 +899,13 @@ export default function CheckInManagementPage() {
                     Regenerate Token
                   </Button>
                   <Button
-                    variant="outline"
+                    variant={
+                      !actionBusy &&
+                      !!selected.check_in_token &&
+                      selected.check_in_token_active === false
+                        ? "default"
+                        : "outline"
+                    }
                     className="w-full justify-start"
                     onClick={() => void toggleActive(true)}
                     disabled={
@@ -908,7 +918,7 @@ export default function CheckInManagementPage() {
                     Activate
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     className="w-full justify-start"
                     onClick={() => void toggleActive(false)}
                     disabled={

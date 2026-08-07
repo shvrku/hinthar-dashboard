@@ -330,7 +330,7 @@ export default function TerminalPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Check-In Terminal"
-          description="Scan a QR code or enter a student code, confirm the student, then check them in. Lookups are validated on the server"
+          description="Scan a QR code or enter a student code. Scanned tags auto present all the classes for the rest of the day."
         >
           <Clock />
         </StandardPageHeader>

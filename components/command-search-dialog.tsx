@@ -14,17 +14,33 @@ import {
   Search,
   LayoutDashboard,
   Monitor,
+  Palette,
+  type LucideIcon,
 } from "lucide-react"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
+import { useCurrentUser } from "@/components/current-user-provider"
+import { isAdmin } from "@/lib/roles"
 
-const navigationItems = [
+type NavigationItem = {
+  title: string
+  href: string
+  group: string
+  icon: LucideIcon
+  /** When true, only admins see this row in search (not in the sidebar). */
+  adminOnly?: boolean
+  keywords?: string[]
+}
+
+const navigationItems: NavigationItem[] = [
   { title: "Dashboard", href: "/", group: "Overview", icon: LayoutDashboard },
   { title: "Classes Roster", href: "/classes", group: "Management", icon: GraduationCap },
   { title: "Student Directory", href: "/students", group: "Management", icon: Users },
@@ -37,6 +53,14 @@ const navigationItems = [
   { title: "Check-In Overview", href: "/check-in/overview", group: "Operations", icon: LayoutDashboard },
   { title: "Check-In Management", href: "/check-in/management", group: "Operations", icon: QrCode },
   { title: "Check-In Terminal", href: "/check-in/terminal", group: "Operations", icon: Monitor },
+  {
+    title: "Design System",
+    href: "/design-system",
+    group: "Administration",
+    icon: Palette,
+    adminOnly: true,
+    keywords: ["tokens", "theme", "standards", "components", "motion", "ui"],
+  },
 ]
 
 interface CommandSearchDialogProps {
@@ -46,76 +70,62 @@ interface CommandSearchDialogProps {
 
 export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogProps) {
   const router = useRouter()
-  const [query, setQuery] = React.useState("")
+  const { role } = useCurrentUser()
 
-  const filteredItems = React.useMemo(() => {
-    if (!query.trim()) return navigationItems
-    const q = query.toLowerCase().trim()
-    return navigationItems.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        item.group.toLowerCase().includes(q) ||
-        item.href.toLowerCase().includes(q)
-    )
-  }, [query])
+  const visibleItems = React.useMemo(() => {
+    const admin = isAdmin(role)
+    return navigationItems.filter((item) => !item.adminOnly || admin)
+  }, [role])
 
-  const handleSelect = (href: string) => {
-    onOpenChange(false)
-    setQuery("")
-    router.push(href)
-  }
+  const groupedItems = React.useMemo(() => {
+    const groups = new Map<string, NavigationItem[]>()
+    for (const item of visibleItems) {
+      const list = groups.get(item.group) ?? []
+      list.push(item)
+      groups.set(item.group, list)
+    }
+    return Array.from(groups.entries())
+  }, [visibleItems])
+
+  const runCommand = React.useCallback(
+    (href: string) => {
+      onOpenChange(false)
+      router.push(href)
+    },
+    [onOpenChange, router]
+  )
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)} className="p-0 sm:max-w-lg overflow-hidden">
-        <DialogHeader className="px-4 pt-4 pb-2 border-b border-border/50">
-          <DialogTitle className="text-base font-semibold flex items-center gap-2">
-            <Search className="size-4 text-muted-foreground" />
-            <span>Search Hinthar</span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="p-3">
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search modules, management, check-in..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9 h-10 text-sm"
-              autoFocus
-            />
-          </div>
-
-          <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
-            {filteredItems.length === 0 ? (
-              <p className="py-8 text-center text-xs text-muted-foreground">
-                No matching Hinthar module found.
-              </p>
-            ) : (
-              filteredItems.map((item) => (
-                <button
-                  key={item.href}
-                  type="button"
-                  onClick={() => handleSelect(item.href)}
-                  className="w-full flex items-center justify-between rounded-lg p-2.5 text-left text-xs hover:bg-muted/70 transition-colors group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex size-7 items-center justify-center rounded-md border bg-background text-foreground group-hover:border-foreground/30">
-                      <item.icon className="size-3.5" />
-                    </div>
-                    <span className="font-medium text-foreground">{item.title}</span>
-                  </div>
-                  <Badge variant="secondary" className="text-[10px]">
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Search Hinthar"
+      description="Search modules, management, check-in, and admin tools."
+    >
+      <CommandInput placeholder="Type a command or search..." />
+      <CommandList>
+        <CommandEmpty>No matching Hinthar module found.</CommandEmpty>
+        {groupedItems.map(([group, items]) => (
+          <CommandGroup key={group} heading={group}>
+            {items.map((item) => (
+              <CommandItem
+                key={item.href}
+                value={`${item.title} ${item.group} ${item.href} ${item.keywords?.join(" ") ?? ""}`}
+                keywords={item.keywords}
+                onSelect={() => runCommand(item.href)}
+              >
+                <item.icon />
+                <span>{item.title}</span>
+                <CommandShortcut className="tracking-normal">
+                  <Badge variant="secondary" className="text-[10px] font-medium">
                     {item.group}
                   </Badge>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+                </CommandShortcut>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+      </CommandList>
+    </CommandDialog>
   )
 }

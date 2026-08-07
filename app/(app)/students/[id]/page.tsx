@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
 import { QrCanvas } from "@/components/qr-canvas"
+import { qrDownloadFilename } from "@/lib/qr-download"
 import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -595,7 +596,6 @@ function StudentDetailContent() {
                   )}
                 </div>
                 <Button
-                  variant="ghost"
                   size="sm"
                   className="w-full gap-1.5"
                   disabled={!student.check_in_token}
@@ -603,7 +603,7 @@ function StudentDetailContent() {
                     const canvas = document.querySelector("canvas")
                     if (!canvas || !student) return
                     const link = document.createElement("a")
-                    link.download = `check-in-${student.unique_code}.png`
+                    link.download = qrDownloadFilename(student)
                     link.href = canvas.toDataURL("image/png")
                     link.click()
                   }}
