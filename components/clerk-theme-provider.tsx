@@ -246,6 +246,10 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
       appearance={{
         cssLayerName: "clerk",
         theme: isDark ? dark : undefined,

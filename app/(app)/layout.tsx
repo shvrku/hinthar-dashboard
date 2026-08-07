@@ -7,13 +7,16 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 /**
  * Authenticated app shell. Resource-level Clerk gate replaces
  * middleware createRouteMatcher + auth.protect().
+ *
+ * unauthenticatedUrl keeps redirects on our /sign-in/ (with app OG meta)
+ * instead of Clerk Account Portal (*.accounts.dev).
  */
 export default async function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  await auth.protect()
+  await auth.protect({ unauthenticatedUrl: "/sign-in/" })
 
   return (
     <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
