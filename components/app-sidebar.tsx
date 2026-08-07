@@ -16,7 +16,6 @@ import {
   Monitor,
   LayoutDashboard,
   ChevronRight,
-  ChevronsUpDown,
   UserCog,
   LogOut,
   LogIn,
@@ -25,6 +24,7 @@ import {
   Undo2,
   Search,
   Settings,
+  MoreVertical,
 } from "lucide-react"
 
 import {
@@ -67,7 +67,6 @@ import { Badge } from "@/components/ui/badge"
 
 const overviewItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Settings", url: "/settings", icon: Settings },
 ]
 
 const managementItems = [
@@ -320,7 +319,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <span className="truncate font-semibold">{userName}</span>
                         <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
                       </div>
-                      <ChevronsUpDown className="ml-auto size-4" />
+                      <MoreVertical className="ml-auto size-4" />
                     </SidebarMenuButton>
                   }
                 />
@@ -341,6 +340,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      render={<Link href="/settings" onClick={handleNavClick} />}
+                    >
+                      <Settings className="mr-2 size-4 text-primary" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => openUserProfile()} className="cursor-pointer">
                       <UserCog className="mr-2 size-4 text-primary" />
                       <span>Manage Account</span>

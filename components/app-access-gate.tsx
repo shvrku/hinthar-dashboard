@@ -14,11 +14,17 @@ function normalizePath(pathname: string): string {
   return pathname
 }
 
+/** Client-only appearance prefs — available to every signed-in role. */
+function isSettingsPath(pathname: string): boolean {
+  return pathname === "/settings"
+}
+
 /**
  * Global access gate after Clerk sign-in:
- * - pending → /pending
- * - terminal → /check-in/terminal only
- * - student/teacher → /pending (no portal yet)
+ * - /settings → all signed-in roles (appearance is client-local)
+ * - pending → /pending (or settings)
+ * - terminal → /check-in/terminal only (or settings)
+ * - student/teacher → /pending (or settings; no portal yet)
  * - staff/admin → full app
  */
 export function AppAccessGate({ children }: { children: React.ReactNode }) {
@@ -29,6 +35,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (!authLoaded || loading || !isSignedIn || !role) return
+    if (isSettingsPath(pathname)) return
 
     if (role === "pending") {
       if (pathname !== "/pending") router.replace("/pending/")
@@ -71,6 +78,10 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
         Unable to load your account profile.
       </div>
     )
+  }
+
+  if (isSettingsPath(pathname)) {
+    return <>{children}</>
   }
 
   if (role === "pending" || role === "student" || role === "teacher") {
