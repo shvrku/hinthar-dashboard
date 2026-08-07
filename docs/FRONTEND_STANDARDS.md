@@ -229,7 +229,8 @@ Teacher fields: **Assigned** (generation teacher) vs **Substitute** (`actual_tea
 
 ## 7. Design system & color tokens
 
-- Follow shadcn skill / CLI; project style is **base-vega** with **zinc** base (`components.json`).
+- Follow shadcn skill / CLI; project style is **base-vega** with **zinc** base (`components.json`). Preset code: **`bd1haIy0`**.
+- App palettes (orthogonal to light/dark): **`emerald`** (default) and **`mono`** via `data-palette` — pick on **Settings** (`/settings`). Static shell previews live in `public/themes/{palette}-{mode}.png` (regenerate with `npx tsx scripts/generate-theme-previews.ts`).
 - **Do not invent one-off palette colors** (`emerald-*`, `rose-*`, `amber-*`, `sky-*`) in page CSS.
 - Use semantic tokens from `app/globals.css` (wired in `@theme inline`):
 

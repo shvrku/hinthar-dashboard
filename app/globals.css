@@ -145,6 +145,35 @@
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+/* Dashboard-01 inspired monochrome palette (keeps attendance/status semantics). */
+html[data-palette="mono"] {
+  --primary: oklch(0.21 0.006 285.885);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.552 0.016 285.938);
+  --sidebar-primary: oklch(0.21 0.006 285.885);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --chart-1: oklch(0.55 0.01 286);
+  --chart-2: oklch(0.45 0.01 286);
+  --chart-3: oklch(0.35 0.01 286);
+  --chart-4: oklch(0.28 0.008 286);
+  --chart-5: oklch(0.22 0.006 286);
+}
+
+html[data-palette="mono"].dark {
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.21 0.006 285.885);
+  --ring: oklch(0.705 0.015 286.067);
+  --sidebar-primary: oklch(0.985 0 0);
+  --sidebar-primary-foreground: oklch(0.21 0.006 285.885);
+  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --chart-1: oklch(0.87 0.006 286);
+  --chart-2: oklch(0.7 0.01 286);
+  --chart-3: oklch(0.55 0.01 286);
+  --chart-4: oklch(0.42 0.01 286);
+  --chart-5: oklch(0.32 0.008 286);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
