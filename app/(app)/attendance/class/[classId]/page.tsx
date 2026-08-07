@@ -221,7 +221,7 @@ function ClassAttendanceContent() {
     (newClassId: string) => {
       if (!newClassId || newClassId === classId) return
       const qs = searchParams.toString()
-      router.push(`/attendance/class/${newClassId}/${qs ? `?${qs}` : ""}`)
+      router.push(qs ? `/attendance/class/${newClassId}/?${qs}` : `/attendance/class/${newClassId}/`)
     },
     [classId, searchParams, router]
   )

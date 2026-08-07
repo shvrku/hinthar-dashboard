@@ -1,3 +1,4 @@
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -184,6 +185,104 @@ html[data-palette="mono"].dark {
   html {
     @apply font-sans;
   }
+}
+
+/* Clerk UserProfile: keep mono/dark nav + section actions readable */
+.cl-navbarButton,
+.cl-navbarButton svg {
+  color: var(--foreground) !important;
+}
+.cl-navbarButton[data-active="true"],
+.cl-navbarButton.cl-active,
+.cl-navbarButton[aria-current="page"] {
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+}
+.cl-navbarButton[data-active="true"] svg,
+.cl-navbarButton.cl-active svg,
+.cl-navbarButton[aria-current="page"] svg {
+  color: var(--foreground) !important;
+}
+.cl-profileSectionPrimaryButton__profile,
+.cl-profileSectionPrimaryButton__username,
+.cl-profileSectionPrimaryButton__password,
+.cl-profileSection__profile .cl-profileSectionPrimaryButton,
+.cl-profileSection__username .cl-profileSectionPrimaryButton,
+.cl-profileSection__password .cl-profileSectionPrimaryButton {
+  color: var(--foreground) !important;
+  background-color: transparent !important;
+  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent) !important;
+  border-radius: 0.5rem !important;
+  padding: 0.25rem 0.625rem !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+.cl-profileSectionPrimaryButton__profile:hover,
+.cl-profileSectionPrimaryButton__username:hover,
+.cl-profileSectionPrimaryButton__password:hover,
+.cl-profileSection__profile .cl-profileSectionPrimaryButton:hover,
+.cl-profileSection__username .cl-profileSectionPrimaryButton:hover,
+.cl-profileSection__password .cl-profileSectionPrimaryButton:hover {
+  background-color: color-mix(in oklch, var(--muted) 70%, transparent) !important;
+  border-color: var(--border) !important;
+}
+.cl-profileSectionPrimaryButton__emailAddresses,
+.cl-profileSection__emailAddresses .cl-profileSectionPrimaryButton,
+.cl-profileSectionPrimaryButton__phoneNumbers,
+.cl-profileSection__phoneNumbers .cl-profileSectionPrimaryButton {
+  color: var(--muted-foreground) !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0.5rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+}
+.cl-profileSectionPrimaryButton__emailAddresses:hover,
+.cl-profileSection__emailAddresses .cl-profileSectionPrimaryButton:hover,
+.cl-profileSectionPrimaryButton__phoneNumbers:hover,
+.cl-profileSection__phoneNumbers .cl-profileSectionPrimaryButton:hover {
+  color: var(--foreground) !important;
+  background-color: var(--muted) !important;
+  text-decoration: none !important;
+}
+.cl-profileSectionPrimaryButton__connectedAccounts,
+.cl-profileSection__connectedAccounts .cl-profileSectionPrimaryButton {
+  color: var(--foreground) !important;
+  background-color: var(--muted) !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0.5rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+}
+.cl-profileSectionPrimaryButton__connectedAccounts:hover,
+.cl-profileSection__connectedAccounts .cl-profileSectionPrimaryButton:hover {
+  color: var(--foreground) !important;
+  background-color: var(--border) !important;
+  text-decoration: none !important;
+}
+.cl-profileSectionPrimaryButton__danger,
+.cl-profileSection__danger .cl-profileSectionPrimaryButton,
+.cl-profileSectionPrimaryButton[data-color="danger"],
+.cl-profileSectionPrimaryButton.cl-button__danger {
+  color: var(--destructive) !important;
+  background-color: transparent !important;
+  border: 1px solid color-mix(in oklch, var(--destructive) 60%, transparent) !important;
+  border-radius: 0.5rem !important;
+  padding: 0.25rem 0.625rem !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+}
+.cl-profileSectionPrimaryButton__danger:hover,
+.cl-profileSection__danger .cl-profileSectionPrimaryButton:hover,
+.cl-profileSectionPrimaryButton[data-color="danger"]:hover,
+.cl-profileSectionPrimaryButton.cl-button__danger:hover {
+  background-color: color-mix(in oklch, var(--destructive) 12%, transparent) !important;
+  border-color: var(--destructive) !important;
+  text-decoration: none !important;
 }
 
 .no-scrollbar::-webkit-scrollbar {
