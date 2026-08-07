@@ -163,19 +163,7 @@ export function StandardTablePagination({
                   className={isHiddenOnMobile ? "hidden sm:inline-block" : ""}
                 >
                   <PaginationButton
-                    isActive={isCurrent && !isMono}
-                    variant={
-                      isCurrent
-                        ? isMono
-                          ? "outline"
-                          : "default"
-                        : "outline"
-                    }
-                    className={cn(
-                      isCurrent &&
-                        isMono &&
-                        "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background"
-                    )}
+                    isActive={isCurrent}
                     onClick={() => handlePageChange(page)}
                     disabled={loading}
                   >
