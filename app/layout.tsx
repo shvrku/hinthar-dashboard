@@ -53,10 +53,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "Hinthar — School Management Dashboard";
+const title = "Hinthar | School Management Dashboard";
 const description =
   "Manage classes, students, teachers, sessions, and attendance in one place. Built for schools and education centres.";
-const ogImage = "/opengraph-image";
+const ogImage = "/og.png";
 const siteUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
@@ -65,6 +65,9 @@ export const metadata: Metadata = {
   title,
   description,
   metadataBase: new URL(siteUrl),
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
   openGraph: {
     title,
     description,
