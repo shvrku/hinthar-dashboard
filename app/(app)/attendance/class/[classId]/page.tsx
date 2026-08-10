@@ -39,6 +39,7 @@ import {
   type SessionAttendance,
   type SessionAttendanceStatus,
 } from "@/lib/types"
+import { formatClassLabel } from "@/lib/format-class"
 import { RequireRole } from "@/components/require-role"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -514,21 +515,14 @@ function ClassAttendanceContent() {
 
   const currentClassLabel = React.useMemo(() => {
     if (!currentClass) return null
-    return (
-      `${currentClass.education_level || ""} - ${currentClass.cohort_identifier || ""} ${
-        currentClass.cohort_sub_category ? `(${currentClass.cohort_sub_category})` : ""
-      }`.trim() || `Class #${currentClass.id}`
-    )
+    return formatClassLabel(currentClass)
   }, [currentClass])
 
   const classItems = React.useMemo(() => {
-    return classes.map((c) => {
-      const nameStr = `${c.education_level || ""} - ${c.cohort_identifier || ""} ${c.cohort_sub_category ? `(${c.cohort_sub_category})` : ""}`.trim() || `Class #${c.id}`
-      return {
-        value: c.id.toString(),
-        label: nameStr,
-      }
-    })
+    return classes.map((c) => ({
+      value: c.id.toString(),
+      label: formatClassLabel(c),
+    }))
   }, [classes])
 
   const subjectItems = React.useMemo(() => {

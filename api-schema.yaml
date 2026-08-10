@@ -3020,7 +3020,7 @@ components:
         cohort_sub_category:
           type: string
           nullable: true
-          maxLength: 1
+          maxLength: 10
       required:
       - cohort_identifier
       - education_level
@@ -3488,7 +3488,7 @@ components:
         cohort_sub_category:
           type: string
           nullable: true
-          maxLength: 1
+          maxLength: 10
     PatchedClassStudent:
       type: object
       properties:

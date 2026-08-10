@@ -7,13 +7,27 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { ArrowLeft, CalendarDays, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { ApiError, createApi } from "@/lib/api"
-import { formatClassLabel } from "@/lib/format-class"
+import {
+  formatClassLabel,
+  COHORT_IDENTIFIER_MAX_LENGTH,
+  COHORT_SUB_CATEGORY_MAX_LENGTH,
+  COHORT_IDENTIFIER_PLACEHOLDER,
+  COHORT_SUB_CATEGORY_PLACEHOLDER,
+  COHORT_IDENTIFIER_HINT,
+  COHORT_SUB_CATEGORY_HINT,
+  sanitizeCohortIdentifierInput,
+  sanitizeCohortSubCategoryInput,
+} from "@/lib/format-class"
 import { formatBackendDate } from "@/lib/utils"
 import type { AnalyticsRange, Class, ClassAttendanceSummary, ClassPayload, ClassStudent, Student, TimetableSlot } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
 import { TimetableWeekSnippet } from "@/components/timetable-week-snippet"
-import { AttendanceOverviewSkeleton, StudentDetailPageSkeleton } from "@/components/page-skeletons"
+import {
+  AttendanceOverviewSkeleton,
+  CLASS_DETAIL_PAGE_LAYOUT,
+  PageSkeleton,
+} from "@/components/page-skeletons"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -187,8 +201,8 @@ function ClassDetailContent() {
       <Link href="/classes/" className={buttonVariants({ variant: "ghost", size: "sm" })}><ArrowLeft data-icon="inline-start" />Back to Classes</Link>
     </StaggerItem>
     {error && <StaggerItem><div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div></StaggerItem>}
-    {loading ? <StudentDetailPageSkeleton /> : !classItem ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><GraduationCap /></EmptyMedia><EmptyTitle>Class not found</EmptyTitle><EmptyDescription>This class may have been removed.</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => router.push("/classes/")}>Back to Classes</Button></Empty> : <>
-      <Card className="border-border/80"><CardContent className="p-6 md:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="space-y-3"><Badge variant="secondary">{classItem.education_level}</Badge><h1 className="text-2xl font-bold tracking-tight">{formatClassLabel(classItem)}</h1><dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Cohort</dt><dd className="font-medium">{classItem.cohort_identifier}</dd></div><div><dt className="text-muted-foreground">Sub-category</dt><dd className="font-medium">{classItem.cohort_sub_category ?? "—"}</dd></div></dl></div><Button variant="outline" size="sm" onClick={openEdit}><Pencil data-icon="inline-start" />Edit class</Button></div></CardContent></Card>
+    {loading ? <PageSkeleton blocks={CLASS_DETAIL_PAGE_LAYOUT} /> : !classItem ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><GraduationCap /></EmptyMedia><EmptyTitle>Class not found</EmptyTitle><EmptyDescription>This class may have been removed.</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => router.push("/classes/")}>Back to Classes</Button></Empty> : <>
+      <Card className="border-border/80"><CardContent className="p-6 md:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="space-y-3"><Badge variant="secondary">{classItem.education_level}</Badge><h1 className="text-2xl font-bold tracking-tight">{formatClassLabel(classItem)}</h1><dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Identifier (letter)</dt><dd className="font-medium">{classItem.cohort_identifier}</dd></div><div><dt className="text-muted-foreground">Sub-category</dt><dd className="font-medium">{classItem.cohort_sub_category ?? "—"}</dd></div></dl></div><Button variant="outline" size="sm" onClick={openEdit}><Pencil data-icon="inline-start" />Edit class</Button></div></CardContent></Card>
 
       <div className="grid gap-6">
         <Card><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><CalendarDays />Weekly timetable</CardTitle><CardDescription>Snippet of this class week — open the full editor to add or change slots.</CardDescription></div></CardHeader><CardContent><TimetableWeekSnippet slots={slots} classId={classItem.id} /></CardContent></Card>
@@ -203,7 +217,37 @@ function ClassDetailContent() {
         <section className="flex flex-col gap-4"><div><h3 className="font-semibold">Lesson roll</h3><p className="text-xs text-muted-foreground">Marks recorded during class sessions.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(["present", "late", "absent", "excused"] as const).map((key) => <div key={key} className="rounded-xl border bg-muted/30 p-3 text-center"><p className="text-xl font-bold">{summary.lesson[key]}</p><p className="text-[10px] uppercase text-muted-foreground">{STATUS_LABELS[key]}</p></div>)}</div><ClassLessonCharts statusData={statusData} subjectData={subjectData} /></section>
       </div>}</CardContent></Card>
       <Button onClick={() => router.push(`/attendance/class/${classItem.id}/`)}>Take roll</Button>
-      <Dialog open={editOpen} onOpenChange={setEditOpen}><DialogContent onClose={() => setEditOpen(false)}><DialogHeader><DialogTitle>Edit class</DialogTitle><DialogDescription>Update this cohort&apos;s details.</DialogDescription></DialogHeader><div className="flex flex-col gap-4"><div><label className="text-sm font-medium">Education level</label><Select items={EDUCATION_LEVELS} value={educationLevel} onValueChange={(value) => setEducationLevel(value as ClassPayload["education_level"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{EDUCATION_LEVELS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div><div><label className="text-sm font-medium" htmlFor="cohort">Cohort identifier</label><Input id="cohort" value={cohort} onChange={(event) => setCohort(event.target.value)} maxLength={1} /></div><div><label className="text-sm font-medium" htmlFor="subcategory">Sub-category</label><Input id="subcategory" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} maxLength={1} /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button disabled={saving || !cohort.trim()} onClick={() => void saveClass()}>{saving && <Loader2 data-icon="inline-start" className="animate-spin" />}Save</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent onClose={() => setEditOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Edit class</DialogTitle>
+            <DialogDescription>Update this cohort&apos;s identifier and sub-category.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-sm font-medium">Education level</label>
+              <Select items={EDUCATION_LEVELS} value={educationLevel} onValueChange={(value) => setEducationLevel(value as ClassPayload["education_level"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{EDUCATION_LEVELS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium" htmlFor="cohort">Identifier (letter)</label>
+              <Input id="cohort" value={cohort} onChange={(event) => setCohort(sanitizeCohortIdentifierInput(event.target.value))} maxLength={COHORT_IDENTIFIER_MAX_LENGTH} placeholder={COHORT_IDENTIFIER_PLACEHOLDER} />
+              <p className="mt-1 text-xs text-muted-foreground">{COHORT_IDENTIFIER_HINT}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium" htmlFor="subcategory">Sub-category</label>
+              <Input id="subcategory" value={subcategory} onChange={(event) => setSubcategory(sanitizeCohortSubCategoryInput(event.target.value))} maxLength={COHORT_SUB_CATEGORY_MAX_LENGTH} placeholder={COHORT_SUB_CATEGORY_PLACEHOLDER} />
+              <p className="mt-1 text-xs text-muted-foreground">{COHORT_SUB_CATEGORY_HINT}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button disabled={saving || !cohort.trim()} onClick={() => void saveClass()}>{saving && <Loader2 data-icon="inline-start" className="animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>}</StaggerContainer>
 }
 

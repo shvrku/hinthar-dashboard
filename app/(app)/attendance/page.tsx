@@ -7,6 +7,7 @@ import { useAuth } from "@clerk/nextjs"
 import { CalendarCheck, GraduationCap, Loader2, ArrowRight, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Class } from "@/lib/types"
+import { formatClassLabel } from "@/lib/format-class"
 import { RequireRole } from "@/components/require-role"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { SearchableSelect } from "@/components/searchable-select"
@@ -60,13 +61,10 @@ function AttendanceLandingContent() {
 
   const classItems = React.useMemo(
     () =>
-      classes.map((c) => {
-        const label =
-          `${c.education_level || ""} ${c.cohort_identifier || ""}${
-            c.cohort_sub_category ? c.cohort_sub_category : ""
-          }`.trim() || `Class #${c.id}`
-        return { value: c.id.toString(), label }
-      }),
+      classes.map((c) => ({
+        value: c.id.toString(),
+        label: formatClassLabel(c),
+      })),
     [classes]
   )
 

@@ -6,7 +6,17 @@ import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, GraduationCap, Users } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { Class, ClassPayload, EDUCATION_LEVELS } from "@/lib/types"
-import { formatClassLabel } from "@/lib/format-class"
+import {
+  formatClassLabel,
+  COHORT_IDENTIFIER_MAX_LENGTH,
+  COHORT_SUB_CATEGORY_MAX_LENGTH,
+  COHORT_IDENTIFIER_PLACEHOLDER,
+  COHORT_SUB_CATEGORY_PLACEHOLDER,
+  COHORT_IDENTIFIER_HINT,
+  COHORT_SUB_CATEGORY_HINT,
+  sanitizeCohortIdentifierInput,
+  sanitizeCohortSubCategoryInput,
+} from "@/lib/format-class"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -137,16 +147,16 @@ export default function ClassesPage() {
 
       const payload: ClassPayload = {
         education_level: formEducationLevel,
-        cohort_identifier: formCohortIdentifier,
-        cohort_sub_category: formCohortSubCategory || null,
+        cohort_identifier: formCohortIdentifier.trim(),
+        cohort_sub_category: formCohortSubCategory.trim() || null,
       }
 
       if (editingClass) {
         await api.updateClass(editingClass.id, payload)
-        setSuccessMessage(`Class "${editingClass.cohort_identifier}" updated successfully.`)
+        setSuccessMessage(`Class "${formatClassLabel(payload)}" updated successfully.`)
       } else {
         await api.createClass(payload)
-        setSuccessMessage(`Class "${payload.cohort_identifier}" created successfully.`)
+        setSuccessMessage(`Class "${formatClassLabel(payload)}" created successfully.`)
       }
 
       closeModal()
@@ -224,7 +234,8 @@ export default function ClassesPage() {
       return (
         c.education_level.toLowerCase().includes(q) ||
         c.cohort_identifier.toLowerCase().includes(q) ||
-        (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(q))
+        (c.cohort_sub_category && c.cohort_sub_category.toLowerCase().includes(q)) ||
+        `${c.cohort_identifier}${c.cohort_sub_category ?? ""}`.toLowerCase().includes(q)
       )
     })
   }, [classes, levelFilter, searchQuery])
@@ -285,7 +296,7 @@ export default function ClassesPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Classes"
-          description="Manage education levels, cohort identifiers, sub-categories, and student enrollments."
+          description="Manage education levels and class codes: one-letter identifier (e.g. K) plus optional sub-category (e.g. 2A)."
           primaryAction={{
             label: "Add Class",
             onClick: openAddModal,
@@ -449,7 +460,7 @@ export default function ClassesPage() {
                     currentSortOrder={sortConfig.order}
                     onSort={requestSort}
                   >
-                    Cohort Identifier
+                    Identifier (letter)
                   </TableHeadSortable>
 
                   <TableHeadSortable
@@ -458,7 +469,7 @@ export default function ClassesPage() {
                     currentSortOrder={sortConfig.order}
                     onSort={requestSort}
                   >
-                    Sub Category
+                    Sub-category (e.g. 2A)
                   </TableHeadSortable>
 
                   <TableHead className="text-right">Actions</TableHead>
@@ -588,28 +599,30 @@ export default function ClassesPage() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Cohort Identifier</label>
+              <label className="mb-1.5 block text-sm font-medium">Identifier (letter)</label>
               <Input
                 type="text"
                 value={formCohortIdentifier}
-                onChange={(e) => setFormCohortIdentifier(e.target.value)}
-                maxLength={1}
-                placeholder="e.g. A"
+                onChange={(e) => setFormCohortIdentifier(sanitizeCohortIdentifierInput(e.target.value))}
+                maxLength={COHORT_IDENTIFIER_MAX_LENGTH}
+                placeholder={COHORT_IDENTIFIER_PLACEHOLDER}
                 required
               />
+              <p className="mt-1 text-xs text-muted-foreground">{COHORT_IDENTIFIER_HINT}</p>
             </div>
 
             <div>
               <label className="mb-1.5 block text-sm font-medium">
-                Sub Category <span className="text-muted-foreground font-normal">(optional)</span>
+                Sub-category <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
               <Input
                 type="text"
                 value={formCohortSubCategory}
-                onChange={(e) => setFormCohortSubCategory(e.target.value)}
-                maxLength={1}
-                placeholder="e.g. 1"
+                onChange={(e) => setFormCohortSubCategory(sanitizeCohortSubCategoryInput(e.target.value))}
+                maxLength={COHORT_SUB_CATEGORY_MAX_LENGTH}
+                placeholder={COHORT_SUB_CATEGORY_PLACEHOLDER}
               />
+              <p className="mt-1 text-xs text-muted-foreground">{COHORT_SUB_CATEGORY_HINT}</p>
             </div>
 
             <DialogFooter className="pt-2">

@@ -62,7 +62,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { AttendanceOverviewSkeleton, StudentDetailPageSkeleton } from "@/components/page-skeletons"
+import {
+  AttendanceOverviewSkeleton,
+  PageSkeleton,
+  STUDENT_DETAIL_PAGE_LAYOUT,
+} from "@/components/page-skeletons"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 
 const StudentLessonCharts = dynamic(
@@ -405,7 +409,7 @@ function StudentDetailContent() {
       )}
 
       {loading ? (
-        <StudentDetailPageSkeleton />
+        <PageSkeleton blocks={STUDENT_DETAIL_PAGE_LAYOUT} />
       ) : !student ? (
         <Empty className="border">
           <EmptyHeader>

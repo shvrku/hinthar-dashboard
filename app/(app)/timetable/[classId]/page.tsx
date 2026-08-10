@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { createApi, ApiError } from "@/lib/api"
 import type { Class, Teacher, Subject, TimetableSlot } from "@/lib/types"
+import { formatClassLabel } from "@/lib/format-class"
 import {
   Search,
   BookOpen,
@@ -59,9 +60,7 @@ const timeToMins = (t: string) => {
   return h * 60 + m
 }
 
-const getClassName = (cls: Class) => {
-  return `${cls.education_level} - ${cls.cohort_identifier} ${cls.cohort_sub_category ? `(${cls.cohort_sub_category})` : ""}`.trim()
-}
+const getClassName = (cls: Class) => formatClassLabel(cls)
 
 const getDurationMinutes = (start: string, end: string) => {
   const diff = timeToMins(end) - timeToMins(start)

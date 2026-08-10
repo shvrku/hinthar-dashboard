@@ -937,7 +937,7 @@ export default function SessionsPage() {
                       </TableCell>
                       <TableCell>
                         {session.class_obj ? (
-                          <Badge variant="outline">{session.class_obj.education_level} {session.class_obj.cohort_identifier}</Badge>
+                          <Badge variant="outline">{formatClassLabel(session.class_obj)}</Badge>
                         ) : "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground whitespace-nowrap">{formatBackendDateTime(session.start_time)}</TableCell>
@@ -1327,22 +1327,17 @@ export default function SessionsPage() {
                     {genClassId
                       ? (() => {
                           const found = classes.find((c) => c.id.toString() === genClassId)
-                          return found
-                            ? `${found.education_level} ${found.cohort_identifier}${found.cohort_sub_category ? ` (${found.cohort_sub_category})` : ""}`
-                            : "Select class..."
+                          return found ? formatClassLabel(found) : "Select class..."
                         })()
                       : "Select class..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="z-50 min-w-48">
-                  {classes.map((c) => {
-                    const label = `${c.education_level} ${c.cohort_identifier}${c.cohort_sub_category ? ` (${c.cohort_sub_category})` : ""}`
-                    return (
+                  {classes.map((c) => (
                       <SelectItem key={c.id} value={c.id.toString()}>
-                        {label}
+                        {formatClassLabel(c)}
                       </SelectItem>
-                    )
-                  })}
+                    ))}
                 </SelectContent>
               </Select>
             </div>
