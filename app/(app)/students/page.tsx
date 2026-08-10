@@ -260,7 +260,7 @@ export default function StudentsPage() {
   const [schoolCode, setSchoolCode] = React.useState<string>("HIS")
 
   // Delete confirmation
-  const [deletingId, setDeletingId] = React.useState<number | null>(null)
+  const [deletingStudent, setDeletingStudent] = React.useState<Student | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
   // Auto-dismiss success message
@@ -451,15 +451,15 @@ export default function StudentsPage() {
   )
 
   const handleDelete = React.useCallback(async () => {
-    if (deletingId === null) return
+    if (!deletingStudent) return
     setDeleting(true)
     setError(null)
     try {
       const api = await getApi()
-      await api.deleteStudent(deletingId)
+      await api.deleteStudent(deletingStudent.id)
       setSuccess("Student deleted successfully.")
-      setDeletingId(null)
-      setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
+      setDeletingStudent(null)
+      setSelectedIds((prev) => prev.filter((id) => id !== deletingStudent.id))
       await fetchPage()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -470,7 +470,7 @@ export default function StudentsPage() {
     } finally {
       setDeleting(false)
     }
-  }, [getApi, deletingId, fetchPage])
+  }, [getApi, deletingStudent, fetchPage])
 
   const openCreateModal = () => {
     setEditingStudent(null)
@@ -565,15 +565,15 @@ export default function StudentsPage() {
       <StaggerItem>
       <Card className="p-4 mb-6 shadow-2xs border-border/80 bg-card">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex flex-1 items-center gap-3 max-w-lg">
-            <div className="relative flex-1">
+          <div className="flex flex-1 items-center gap-3 min-w-0 max-w-3xl">
+            <div className="relative min-w-0 flex-[2]">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search students by name, code, ID..."
+                placeholder="Search students..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 w-full"
               />
             </div>
 
@@ -847,7 +847,7 @@ export default function StudentsPage() {
                               variant="ghost"
                               size="icon-sm"
                               className="text-destructive hover:text-destructive"
-                              onClick={() => setDeletingId(student.id)}
+                              onClick={() => setDeletingStudent(student)}
                               aria-label={`Delete ${student.name}`}
                             >
                               <Trash2 className="size-4" />
@@ -893,15 +893,15 @@ export default function StudentsPage() {
 
       {/* Single delete confirmation */}
       <ConfirmDialog
-        open={deletingId !== null}
+        open={deletingStudent !== null}
         title="Delete Student"
         description={
-          deletingId !== null
-            ? `Are you sure you want to delete student #${deletingId}? This action cannot be undone.`
+          deletingStudent
+            ? `Are you sure you want to delete ${deletingStudent.name}? This action cannot be undone.`
             : ""
         }
         onConfirm={handleDelete}
-        onCancel={() => setDeletingId(null)}
+        onCancel={() => setDeletingStudent(null)}
         loading={deleting}
       />
 

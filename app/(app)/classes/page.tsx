@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, GraduationCap, Users } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { Class, ClassPayload, EDUCATION_LEVELS } from "@/lib/types"
+import { formatClassLabel } from "@/lib/format-class"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -63,7 +64,7 @@ export default function ClassesPage() {
   const [formSubmitting, setFormSubmitting] = React.useState(false)
 
   // Delete confirmation
-  const [deleteConfirmId, setDeleteConfirmId] = React.useState<number | null>(null)
+  const [deleteConfirmClass, setDeleteConfirmClass] = React.useState<Class | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false)
 
   // Form state
@@ -161,7 +162,7 @@ export default function ClassesPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (cls: Class) => {
     if (deleteSubmitting) return
     setDeleteSubmitting(true)
     setError(null)
@@ -170,10 +171,10 @@ export default function ClassesPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      await api.deleteClass(id)
+      await api.deleteClass(cls.id)
       setSuccessMessage("Class deleted successfully.")
-      setSelectedIds((prev) => prev.filter((item) => item !== id))
-      setDeleteConfirmId(null)
+      setSelectedIds((prev) => prev.filter((item) => item !== cls.id))
+      setDeleteConfirmClass(null)
       await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -522,7 +523,7 @@ export default function ClassesPage() {
                             variant="ghost"
                             size="icon-sm"
                             className="text-destructive hover:text-destructive"
-                            onClick={() => setDeleteConfirmId(cls.id)}
+                            onClick={() => setDeleteConfirmClass(cls)}
                             title="Delete"
                           >
                             <Trash2 className="size-4" />
@@ -625,11 +626,15 @@ export default function ClassesPage() {
       </Dialog>
 
       <ConfirmDialog
-        open={deleteConfirmId !== null}
+        open={deleteConfirmClass !== null}
         title="Confirm Delete"
-        description="Are you sure you want to delete this class? This action cannot be undone."
-        onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
-        onCancel={() => setDeleteConfirmId(null)}
+        description={
+          deleteConfirmClass
+            ? `Are you sure you want to delete ${formatClassLabel(deleteConfirmClass)}? This action cannot be undone.`
+            : ""
+        }
+        onConfirm={() => deleteConfirmClass && handleDelete(deleteConfirmClass)}
+        onCancel={() => setDeleteConfirmClass(null)}
         loading={deleteSubmitting}
       />
 

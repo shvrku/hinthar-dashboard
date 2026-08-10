@@ -226,10 +226,6 @@ function ClassAttendanceContent() {
     [classId, searchParams, router]
   )
 
-  const goToAdHoc = React.useCallback(() => {
-    router.push("/attendance/adhoc/")
-  }, [router])
-
   const handleRangeModeChange = (mode: RangeMode) => {
     if (mode === rangeMode) return
     if (mode === "session") {
@@ -661,19 +657,8 @@ function ClassAttendanceContent() {
       {/* Main Unified Control Bar */}
       <StaggerItem>
         <Card className="p-4 border-border/80 bg-card shadow-xs space-y-4">
-        {/* Top Control Bar: Range/Layout Mode Switchers + Ad-Hoc shortcut */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border/60 pb-4">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-fit"
-            onClick={goToAdHoc}
-          >
-            <BookOpen className="size-3.5" />
-            <span>Ad-Hoc / Tutoring Sessions</span>
-          </Button>
-
-          {/* Right Group: Layout Mode & Date Range Mode Switchers */}
+        {/* Top Control Bar: Layout Mode & Date Range Mode Switchers */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-end gap-4 border-b border-border/60 pb-4">
           <div className="flex items-center gap-3 flex-wrap">
             {/* Range Mode Switcher */}
             <div className="flex rounded-lg border border-border bg-muted/40 p-1">
