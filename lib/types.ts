@@ -62,7 +62,7 @@ export interface Student {
   school_code: string
   contact: string | null
   exam_candidate_number: string | null
-  user_id: number
+  user_id: number | null
   /** Present on student detail / token endpoints only — omitted from list responses. */
   check_in_token?: string
   check_in_token_active?: boolean

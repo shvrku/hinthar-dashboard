@@ -353,6 +353,17 @@ export function createApi(token: string) {
         token
       ),
 
+    linkStudentUser: (studentId: number, userId: number) =>
+      request<import("./types").Student>(`/students/${studentId}/link_user/`, token, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
+
+    unlinkStudentUser: (studentId: number) =>
+      request<import("./types").Student>(`/students/${studentId}/unlink_user/`, token, {
+        method: "POST",
+      }),
+
     // --- Check-Ins ---
     listCheckIns: (params?: Record<string, string | number | undefined | null>) =>
       fetchAllPages<import("./types").CheckIn>(`/check-ins/`, token, params),
@@ -795,6 +806,14 @@ export function createApi(token: string) {
       fetchPage<import("./types").User>(`/users/`, token, params),
 
     getMe: () => request<import("./types").User>(`/me/`, token),
+
+    getMyStudent: () => request<import("./types").Student>(`/me/student/`, token),
+
+    getMyAttendanceSummary: (range: import("./types").StudentAnalyticsRange) =>
+      request<import("./types").StudentAttendanceSummary>(
+        `/me/attendance-summary/?range=${encodeURIComponent(range)}`,
+        token
+      ),
 
     updateUser: (
       id: number,

@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   ChevronRight,
   UserCog,
+  Link2,
   LogOut,
   LogIn,
   School,
@@ -85,6 +86,7 @@ const operationsItems = [
 
 const adminItems = [
   { title: "Users", url: "/users", icon: UserCog },
+  { title: "Match students", url: "/users/matching", icon: Link2 },
 ]
 
 const checkInSubItemsStaff = [
@@ -108,8 +110,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const showStaffNav = isStaffOrAbove(role)
   const showAdminNav = isAdmin(role)
+  const showStudentNav = role === "student"
   const showTerminalNav = canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
+  const homeHref = showStudentNav ? "/student/" : "/"
 
   const closeMobileSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile(false)
@@ -165,7 +169,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" render={<Link href="/" onClick={handleNavClick} />}>
+            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" render={<Link href={homeHref} onClick={handleNavClick} />}>
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold">
                 <School className="size-4" />
               </div>
@@ -272,7 +276,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarGroupLabel>Administration</SidebarGroupLabel>
                 <SidebarMenu>
                   {adminItems.map((item) => {
-                    const isActive = pathname === item.url
+                    const isActive =
+                      item.url === "/users"
+                        ? pathname === "/users" || pathname === "/users/"
+                        : pathname === item.url ||
+                          pathname === `${item.url}/` ||
+                          pathname.startsWith(`${item.url}/`)
                     return (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
@@ -302,6 +311,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : showStudentNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Student</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Home"
+                  isActive={pathname === "/student" || pathname.startsWith("/student/")}
+                  render={<Link href="/student/" onClick={handleNavClick} />}
+                >
+                  <QrCode />
+                  <span>Home</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
         ) : role ? (

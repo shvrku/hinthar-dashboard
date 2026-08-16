@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   Monitor,
   Palette,
+  Link2,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import { useCurrentUser } from "@/components/current-user-provider"
-import { isAdmin } from "@/lib/roles"
+import { isAdmin, isStaffOrAbove } from "@/lib/roles"
 
 type NavigationItem = {
   title: string
@@ -37,6 +38,8 @@ type NavigationItem = {
   icon: LucideIcon
   /** When true, only admins see this row in search (not in the sidebar). */
   adminOnly?: boolean
+  /** When true, only student-role accounts see this row. */
+  studentOnly?: boolean
   keywords?: string[]
 }
 
@@ -54,12 +57,28 @@ const navigationItems: NavigationItem[] = [
   { title: "Check-In Management", href: "/check-in/management", group: "Operations", icon: QrCode },
   { title: "Check-In Terminal", href: "/check-in/terminal", group: "Operations", icon: Monitor },
   {
+    title: "Match students",
+    href: "/users/matching",
+    group: "Administration",
+    icon: Link2,
+    adminOnly: true,
+    keywords: ["link", "account", "matching", "portal"],
+  },
+  {
     title: "Design System",
     href: "/design-system",
     group: "Administration",
     icon: Palette,
     adminOnly: true,
     keywords: ["tokens", "theme", "standards", "components", "motion", "ui"],
+  },
+  {
+    title: "My QR and attendance",
+    href: "/student",
+    group: "Student",
+    icon: QrCode,
+    studentOnly: true,
+    keywords: ["qr", "stats", "attendance", "check-in"],
   },
 ]
 
@@ -73,8 +92,16 @@ export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogP
   const { role } = useCurrentUser()
 
   const visibleItems = React.useMemo(() => {
+    if (role === "student") {
+      return navigationItems.filter((item) => item.studentOnly)
+    }
+    if (!isStaffOrAbove(role)) {
+      return []
+    }
     const admin = isAdmin(role)
-    return navigationItems.filter((item) => !item.adminOnly || admin)
+    return navigationItems.filter(
+      (item) => !item.studentOnly && (!item.adminOnly || admin)
+    )
   }, [role])
 
   const groupedItems = React.useMemo(() => {

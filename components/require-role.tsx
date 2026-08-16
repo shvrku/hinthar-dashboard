@@ -12,7 +12,7 @@ import {
 } from "@/lib/roles"
 import { Button } from "@/components/ui/button"
 
-type GateMode = "staff" | "admin" | "checkin" | "any"
+type GateMode = "staff" | "admin" | "checkin" | "any" | "student"
 
 function allowed(role: Role | null, mode: GateMode): boolean {
   if (!role) return false
@@ -20,6 +20,7 @@ function allowed(role: Role | null, mode: GateMode): boolean {
   if (mode === "admin") return isAdmin(role)
   if (mode === "staff") return isStaffOrAbove(role)
   if (mode === "checkin") return canCheckIn(role)
+  if (mode === "student") return role === "student"
   return false
 }
 
@@ -42,6 +43,12 @@ export function RequireRole({
     if (loading) return
     if (role === "pending" && pathname !== "/pending") {
       router.replace("/pending/")
+      return
+    }
+    if (role === "student" && mode !== "student" && mode !== "any") {
+      if (pathname !== "/student") {
+        router.replace("/student/")
+      }
       return
     }
     if (role === "terminal" && mode !== "checkin" && mode !== "any") {
@@ -81,7 +88,7 @@ export function RequireRole({
         <p className="text-sm text-muted-foreground">
           Your account does not have permission to view this page.
         </p>
-        <Button variant="outline" render={<Link href={role === "terminal" ? "/check-in/terminal" : "/"} />}>
+        <Button variant="outline" render={<Link href={role === "terminal" ? "/check-in/terminal" : role === "student" ? "/student" : "/"} />}>
           Go back
         </Button>
       </div>

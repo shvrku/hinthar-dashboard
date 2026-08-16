@@ -26,19 +26,12 @@ export default function PendingApprovalPage() {
             "Your teacher account is active, but the teacher workspace is not enabled in this release. Ask an administrator if you need staff access for now.",
           statusNote: "Teacher role assigned — portal not available yet",
         }
-      : role === "student"
-        ? {
-            title: "Student portal coming soon",
-            description:
-              "Your student account is active, but self-service is not enabled in this release. Campus check-in still works via the school terminal.",
-            statusNote: "Student role assigned — portal not available yet",
-          }
-        : {
-            title: "Awaiting approval",
-            description:
-              "Your account was created successfully. An administrator must assign a role before you can use the dashboard.",
-            statusNote: "Waiting for admin approval",
-          }
+      : {
+          title: "Awaiting approval",
+          description:
+            "Your account was created successfully. An administrator must assign a role before you can use the dashboard.",
+          statusNote: "Waiting for admin approval",
+        }
 
   return (
     <div className="mx-auto max-w-lg space-y-6 py-8">

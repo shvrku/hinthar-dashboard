@@ -19,12 +19,18 @@ function isSettingsPath(pathname: string): boolean {
   return pathname === "/settings"
 }
 
+/** Student portal home. Must not match staff `/students`. */
+function isStudentPortalPath(pathname: string): boolean {
+  return pathname === "/student"
+}
+
 /**
  * Global access gate after Clerk sign-in:
  * - /settings → all signed-in roles (appearance is client-local)
  * - pending → /pending (or settings)
  * - terminal → /check-in/terminal only (or settings)
- * - student/teacher → /pending (or settings; no portal yet)
+ * - student → /student (or settings)
+ * - teacher → /pending (or settings; no portal yet)
  * - staff/admin → full app
  */
 export function AppAccessGate({ children }: { children: React.ReactNode }) {
@@ -49,7 +55,12 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
       return
     }
 
-    if (role === "student" || role === "teacher") {
+    if (role === "student") {
+      if (!isStudentPortalPath(pathname)) router.replace("/student/")
+      return
+    }
+
+    if (role === "teacher") {
       if (pathname !== "/pending") router.replace("/pending/")
       return
     }
@@ -84,8 +95,13 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  if (role === "pending" || role === "student" || role === "teacher") {
+  if (role === "pending" || role === "teacher") {
     if (pathname !== "/pending") return null
+    return <>{children}</>
+  }
+
+  if (role === "student") {
+    if (!isStudentPortalPath(pathname)) return null
     return <>{children}</>
   }
 
