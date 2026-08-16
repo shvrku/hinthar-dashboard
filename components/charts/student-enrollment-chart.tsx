@@ -26,7 +26,11 @@ export function StudentEnrollmentChart({ data }: { data: StudentSeriesPoint[] })
         <ChartExportMenu
           filenameBase="student-enrollment"
           chartRef={ref}
-          csvRows={data}
+          csvRows={data.map(({ date, count, new: added }) => ({
+            date,
+            count,
+            ...(added != null ? { new: added } : {}),
+          }))}
           disabled={data.length === 0}
         />
       </div>
