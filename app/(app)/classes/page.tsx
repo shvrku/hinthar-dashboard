@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, GraduationCap, Users } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import { Class, ClassPayload, EDUCATION_LEVELS } from "@/lib/types"
+import { apiQueryKeys, useClassesQuery } from "@/hooks/use-api-queries"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   formatClassLabel,
   COHORT_IDENTIFIER_MAX_LENGTH,
@@ -52,13 +54,23 @@ import { ClassTableSkeletonRows } from "@/components/page-skeletons"
 export default function ClassesPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
 
-  // Data
-  const [classes, setClasses] = React.useState<Class[]>([])
-  const [loading, setLoading] = React.useState(false)
+  const classes = classesQuery.data ?? []
+  const loading = classesQuery.isFetching
+  const lastLoaded = classesQuery.dataUpdatedAt
+    ? new Date(classesQuery.dataUpdatedAt).toLocaleTimeString()
+    : null
+  const queryError =
+    classesQuery.error instanceof ApiError
+      ? classesQuery.error.userMessage
+      : classesQuery.error instanceof Error
+        ? classesQuery.error.message
+        : null
+
   const [error, setError] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
-  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   // Selection state
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
@@ -91,27 +103,10 @@ export default function ClassesPage() {
   }, [successMessage])
 
   const loadData = React.useCallback(async () => {
-    if (!isSignedIn) return
-    setLoading(true)
     setError(null)
     setSelectedIds([])
-    try {
-      const token = await getToken()
-      if (!token) throw new Error("No auth token available")
-      const api = createApi(token)
-      const classesData = await api.listClasses()
-      setClasses(classesData)
-      setLastLoaded(new Date().toLocaleTimeString())
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.userMessage)
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to load data")
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [getToken, isSignedIn])
+    await queryClient.invalidateQueries({ queryKey: apiQueryKeys.classes() })
+  }, [queryClient])
 
   const openAddModal = () => {
     setEditingClass(null)
@@ -340,9 +335,9 @@ export default function ClassesPage() {
         </div>
       )}
 
-      {error && (
+      {(error || queryError) && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <span>{error}</span>
+          <span>{error || queryError}</span>
           <Button size="xs" variant="ghost" onClick={() => setError(null)}>
             Dismiss
           </Button>

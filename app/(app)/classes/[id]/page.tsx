@@ -95,12 +95,12 @@ function ClassDetailContent() {
         api.getClass(classId),
         api.listClassStudentsPage({ class_id: classId, page_size: 200 }),
         api.listStudentsPage({ page_size: 200 }),
-        api.listTimetableSlots(),
+        api.listTimetableSlots({ class_id: classId }),
       ])
       setClassItem(foundClass)
       setRoster(rosterPage.results)
       setStudents(studentPage.results)
-      setSlots(timetable.filter((slot) => slot.class_obj?.id === classId))
+      setSlots(timetable)
     } catch (err) {
       setError(err instanceof ApiError ? err.userMessage : err instanceof Error ? err.message : "Failed to load class")
     } finally {

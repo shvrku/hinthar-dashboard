@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { SearchableSelect } from "@/components/searchable-select"
 import { useAuth } from "@clerk/nextjs"
@@ -14,23 +15,11 @@ import {
   BookOpen,
   Users,
   LayoutGrid,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Sparkles,
-  Percent,
-  ChevronDown,
-  CalendarOff,
   Clock,
   UserPlus,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import {
-  parseBackendDateTime,
-  parseDateAndClock,
-  toLocalDateString,
-  toSessionDateString,
-} from "@/lib/utils"
+import { toLocalDateString } from "@/lib/utils"
 import {
   type Subject,
   type Student,
@@ -47,14 +36,13 @@ import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { AttendanceKpis } from "@/components/attendance/attendance-kpis"
+import { AttendanceViewSkeleton } from "@/components/attendance/attendance-view-skeleton"
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table"
+  monthSelectItems,
+  rosterSessionSelectItems,
+  yearSelectItems,
+} from "@/components/attendance/attendance-shared"
 import {
   Select,
   SelectContent,
@@ -70,66 +58,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 
-const MONTHS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
-]
-
-function getSessionStartTime(session: AttendanceMatrixSession): Date {
-  if (session.date) {
-    return parseDateAndClock(session.date, session.start_time)
-  }
-  return parseBackendDateTime(session.start_time)
-}
-
-function formatSessionMeta(session: AttendanceMatrixSession) {
-  const d = getSessionStartTime(session)
-  const valid = !isNaN(d.getTime())
-  return {
-    subject: session.subject?.trim() || "—",
-    teacher: session.teacher_name?.trim() || "—",
-    dateStr: valid
-      ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", weekday: "short" })
-      : "—",
-    timeStr: valid
-      ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
-      : "—",
-  }
-}
-
-function getSelectStyles(status?: string): string {
-  switch (status) {
-    case "present":
-      return "bg-attendance-present/15 text-attendance-present border-attendance-present/30 focus:ring-attendance-present/50 font-semibold"
-    case "late":
-      return "bg-attendance-late/15 text-attendance-late border-attendance-late/30 focus:ring-attendance-late/40 font-medium"
-    case "absent":
-      return "bg-muted text-muted-foreground border-border/80 focus:ring-ring font-medium"
-    case "excused":
-      return "bg-attendance-excused/15 text-attendance-excused border-attendance-excused/30 focus:ring-attendance-excused/40 font-medium"
-    default:
-      return "bg-card text-muted-foreground/70 border-border/50 focus:ring-ring/30 text-center font-normal"
-  }
-}
+const AttendanceMatrixView = dynamic(
+  () => import("@/components/attendance/attendance-matrix").then((m) => m.AttendanceMatrixView),
+  { loading: () => <AttendanceViewSkeleton /> }
+)
+const AttendanceRosterView = dynamic(
+  () => import("@/components/attendance/attendance-roster").then((m) => m.AttendanceRosterView),
+  { loading: () => <AttendanceViewSkeleton /> }
+)
 
 const PICKER_PAGE_SIZE = 25
-
-const statusItems = [
-  { value: "present", label: "Present" },
-  { value: "late", label: "Late" },
-  { value: "absent", label: "Absent" },
-  { value: "excused", label: "Excused" },
-]
 
 function AdHocAttendanceContent() {
   const searchParams = useSearchParams()
@@ -346,12 +284,6 @@ function AdHocAttendanceContent() {
     }
   }, [viewLayout, adhocSessions, rosterSessionId])
 
-  // Selected session object for Roster view
-  const selectedRosterSession = React.useMemo(() => {
-    if (!rosterSessionId) return null
-    return adhocSessions.find((s) => s.id === rosterSessionId) ?? null
-  }, [adhocSessions, rosterSessionId])
-
   // Fast O(1) Map lookups for attendance records to avoid O(N*M) array.find scans
   const adhocAttendanceMap = React.useMemo(() => {
     const map = new Map<string, AdHocSessionAttendance>()
@@ -567,22 +499,16 @@ function AdHocAttendanceContent() {
     }
   }
 
-  // Metric Summaries — exclude future sessions (pregenerated absent defaults)
+  // Metric Summaries — real attendance rows in the loaded range.
+  // Missing rows are unmarked and are not counted. Future sessions stay in
+  // so a date view still matches the matrix on screen.
   const stats = React.useMemo(() => {
     let presentCount = 0
     let lateCount = 0
     let absentCount = 0
     let excusedCount = 0
-    const today = toLocalDateString()
 
-    const countableSessionIds = new Set(
-      adhocSessions
-        .filter((s) => {
-          const day = s.date ? toSessionDateString(s.date) : toSessionDateString(s.start_time)
-          return day <= today
-        })
-        .map((s) => s.id)
-    )
+    const loadedSessionIds = new Set(adhocSessions.map((s) => s.id))
 
     adhocAttendances.forEach((a) => {
       const sessId =
@@ -591,7 +517,7 @@ function AdHocAttendanceContent() {
           : a.ad_hoc_session && typeof a.ad_hoc_session === "object"
             ? a.ad_hoc_session.id
             : (a.adhoc_session_id ?? a.ad_hoc_session_id ?? a.adhoc_session)
-      if (!countableSessionIds.has(Number(sessId))) return
+      if (!loadedSessionIds.has(Number(sessId))) return
       if (a.status === "present") presentCount++
       else if (a.status === "late") lateCount++
       else if (a.status === "absent") absentCount++
@@ -604,7 +530,7 @@ function AdHocAttendanceContent() {
 
     return {
       totalStudents: students.length,
-      totalSessions: countableSessionIds.size,
+      totalSessions: adhocSessions.length,
       presentCount,
       lateCount,
       absentCount,
@@ -623,26 +549,12 @@ function AdHocAttendanceContent() {
     return [{ value: "all", label: "All Teachers" }, ...list]
   }, [teachers])
 
-  const monthItems = React.useMemo(() => {
-    return MONTHS.map((m) => ({ value: m.value.toString(), label: m.label }))
-  }, [])
-
-  const yearItems = React.useMemo(() => {
-    return Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((y) => ({
-      value: y.toString(),
-      label: y.toString(),
-    }))
-  }, [currentYear])
-
-  const rosterSessionItems = React.useMemo(() => {
-    return adhocSessions.map((session) => {
-      const { subject, teacher, dateStr, timeStr } = formatSessionMeta(session)
-      return {
-        value: session.id.toString(),
-        label: `${subject} · ${teacher} · ${dateStr} (${timeStr})`,
-      }
-    })
-  }, [adhocSessions])
+  const monthItems = React.useMemo(() => monthSelectItems(), [])
+  const yearItems = React.useMemo(() => yearSelectItems(currentYear), [currentYear])
+  const rosterSessionItems = React.useMemo(
+    () => rosterSessionSelectItems(adhocSessions),
+    [adhocSessions]
+  )
 
   if (!mounted || !isLoaded) {
     return (
@@ -665,11 +577,6 @@ function AdHocAttendanceContent() {
       </div>
     )
   }
-
-  // Filtered roster students for Session Roster View
-  const rosterStudentsFiltered = rowStudents.filter((s) =>
-    s.name.toLowerCase().includes(rosterSearch.toLowerCase())
-  )
 
   return (
     <StaggerContainer className="space-y-6">
@@ -712,51 +619,7 @@ function AdHocAttendanceContent() {
 
       {/* Summary KPI Strip */}
       <StaggerItem>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="p-4 bg-card border-border/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Students</span>
-              <Users className="size-4 text-primary" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-extrabold text-foreground">{stats.totalStudents}</span>
-              <span className="text-[11px] text-muted-foreground">{stats.totalSessions} Sessions</span>
-            </div>
-          </Card>
-
-          <Card className="p-4 bg-card border-border/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-attendance-present uppercase tracking-wider">Present</span>
-              <CheckCircle2 className="size-4 text-attendance-present" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-extrabold text-attendance-present">{stats.presentCount}</span>
-              <span className="text-[11px] text-muted-foreground">{stats.lateCount} Late</span>
-            </div>
-          </Card>
-
-          <Card className="p-4 bg-card border-border/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Absent</span>
-              <XCircle className="size-4 text-muted-foreground/70" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-extrabold text-muted-foreground">{stats.absentCount}</span>
-              <span className="text-[11px] text-muted-foreground">{stats.excusedCount} Excused</span>
-            </div>
-          </Card>
-
-          <Card className="p-4 bg-card border-border/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attendance Rate</span>
-              <Percent className="size-4 text-primary" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-extrabold text-foreground">{stats.attendanceRate}%</span>
-              <span className="text-[11px] text-muted-foreground">Average</span>
-            </div>
-          </Card>
-        </div>
+        <AttendanceKpis stats={stats} />
       </StaggerItem>
 
       {/* Main Unified Control Bar */}
@@ -1204,301 +1067,38 @@ function AdHocAttendanceContent() {
         </DialogContent>
       </Dialog>
 
-      {/* ── MAIN CONTENT DISPLAY ── */}
+      {/* Main content */}
       <StaggerItem>
         {viewLayout === "roster" ? (
-        /* ── SESSION ROSTER VIEW ── */
-        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
-            <div className="space-y-1">
-              <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-                <Users className="size-5 text-primary" />
-                Session Roster View
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Target a single session and log attendance with 1-tap quick actions
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="w-64 sm:w-72">
-                <SearchableSelect
-                  options={rosterSessionItems}
-                  value={rosterSessionId?.toString() ?? ""}
-                  onValueChange={(val) => setRosterSessionId(val ? Number(val) : null)}
-                  placeholder="Select Session Date…"
-                  searchPlaceholder="Search session date..."
-                />
-              </div>
-
-              {selectedRosterSession && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkMarkSession(selectedRosterSession.id, "present")}
-                    disabled={rowStudents.length === 0 || loading}
-                    className="h-9 text-xs font-semibold gap-1 text-attendance-present border-attendance-present/30 hover:bg-attendance-present/10 cursor-pointer"
-                  >
-                    <Sparkles className="size-3.5 text-attendance-present" />
-                    <span>Mark All Present</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkMarkSession(selectedRosterSession.id, "absent")}
-                    disabled={rowStudents.length === 0 || loading}
-                    className="h-9 text-xs font-semibold gap-1 text-attendance-absent border-attendance-absent/30 hover:bg-attendance-absent/10 cursor-pointer"
-                  >
-                    <XCircle className="size-3.5 text-attendance-absent" />
-                    <span>Mark All Absent</span>
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {selectedRosterSession ? (
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Filter student roster..."
-                  value={rosterSearch}
-                  onChange={(e) => setRosterSearch(e.target.value)}
-                  className="pl-10 h-10 text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {rosterStudentsFiltered.map((student) => {
-                  const record = getAttendanceRecord(student.id, selectedRosterSession.id)
-                  const currentStatus = record?.status ?? "unmarked"
-                  const isPending = pendingCells[`${student.id}-${selectedRosterSession.id}`]
-
-                  return (
-                    <div
-                      key={student.id}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
-                        currentStatus === "present"
-                          ? "bg-attendance-present/5 border-attendance-present/30"
-                          : currentStatus === "late"
-                          ? "bg-attendance-late/5 border-attendance-late/30"
-                          : currentStatus === "absent"
-                          ? "bg-attendance-absent/5 border-attendance-absent/30"
-                          : currentStatus === "excused"
-                          ? "bg-attendance-excused/5 border-attendance-excused/30"
-                          : "bg-muted/30 border-border"
-                      }`}
-                    >
-                      <div className="grid gap-0.5">
-                        <span className="font-semibold text-sm text-foreground">{student.name}</span>
-                        <span className="text-[11px] text-muted-foreground">{student.unique_code ?? "No ID"}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        {isPending ? (
-                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "present")}
-                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                                currentStatus === "present"
-                                  ? "bg-attendance-present text-white border-attendance-present shadow-xs"
-                                  : "border-border bg-background text-muted-foreground hover:text-attendance-present hover:bg-attendance-present/10"
-                              }`}
-                              title="Present"
-                            >
-                              <CheckCircle2 className="size-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "late")}
-                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                                currentStatus === "late"
-                                  ? "bg-attendance-late text-white border-attendance-late shadow-xs"
-                                  : "border-border bg-background text-muted-foreground hover:text-attendance-late hover:bg-attendance-late/10"
-                              }`}
-                              title="Late"
-                            >
-                              <AlertTriangle className="size-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "absent")}
-                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                                currentStatus === "absent"
-                                  ? "bg-attendance-absent text-white border-attendance-absent shadow-xs"
-                                  : "border-border bg-background text-muted-foreground hover:text-attendance-absent hover:bg-attendance-absent/10"
-                              }`}
-                              title="Absent"
-                            >
-                              <XCircle className="size-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(student.id, selectedRosterSession.id, "excused")}
-                              className={`flex size-8 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                                currentStatus === "excused"
-                                  ? "bg-attendance-excused text-white border-attendance-excused shadow-xs"
-                                  : "border-border bg-background text-muted-foreground hover:text-attendance-excused hover:bg-attendance-excused/10"
-                              }`}
-                              title="Excused"
-                            >
-                              <CalendarOff className="size-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="py-12 text-center text-muted-foreground">
-              <p>No session selected. Please select a session from the dropdown above.</p>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* ── MATRIX GRID VIEW ── */
-        <Card className="rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
-          <div className="overflow-x-auto hinthar-scrollbar">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="sticky left-0 z-20 w-56 font-bold text-foreground text-xs uppercase tracking-wider bg-card shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                    Student Name
-                  </TableHead>
-                  {adhocSessions.map((session) => {
-                    const { subject, teacher, dateStr, timeStr } = formatSessionMeta(session)
-
-                    return (
-                      <TableHead key={session.id} className="min-w-40 text-center text-xs">
-                        <div className="flex flex-col items-center gap-0.5 py-1">
-                          <span
-                            className="max-w-[9.5rem] truncate font-semibold text-foreground leading-tight"
-                            title={subject}
-                          >
-                            {subject}
-                          </span>
-                          <span
-                            className="max-w-[9.5rem] truncate text-[10px] text-muted-foreground"
-                            title={teacher}
-                          >
-                            {teacher}
-                          </span>
-                          <span className="text-[11px] font-medium text-muted-foreground">{dateStr}</span>
-                          <span className="text-[10px] text-muted-foreground/80">{timeStr}</span>
-                        </div>
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="sticky left-0 z-10 w-56 bg-card shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                        <div className="h-4 w-36 animate-pulse rounded bg-muted" />
-                      </TableCell>
-                      {Array.from({ length: 4 }).map((_, j) => (
-                        <TableCell key={j}>
-                          <div className="mx-auto h-8 w-24 animate-pulse rounded-lg bg-muted" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : rowStudents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={adhocSessions.length + 1} className="h-36 text-center text-muted-foreground">
-                      {adhocSessions.length === 0
-                        ? "No students found matching the selected filters."
-                        : "No students in these sessions yet — use Add Students to build the list."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rowStudents.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell className="sticky left-0 z-10 w-56 font-semibold text-foreground text-xs bg-card shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                        <div className="flex flex-col">
-                          <span>{student.name}</span>
-                          <span className="text-[10px] font-normal text-muted-foreground">{student.unique_code ?? "No ID"}</span>
-                        </div>
-                      </TableCell>
-
-                      {adhocSessions.map((session) => {
-                        const record = getAttendanceRecord(student.id, session.id)
-                        const key = `${student.id}-${session.id}`
-                        const isPending = pendingCells[key]
-                        const isEditing = editingCellKey === key
-
-                        return (
-                          <TableCell key={session.id} className="text-center p-2">
-                            {isPending ? (
-                              <div className="flex h-9 items-center justify-center">
-                                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                              </div>
-                            ) : isEditing ? (
-                              <Select
-                                value={record?.status ?? undefined}
-                                defaultOpen={true}
-                                onOpenChange={(open) => {
-                                  if (!open) setEditingCellKey(null)
-                                }}
-                                onValueChange={(val) => {
-                                  setEditingCellKey(null)
-                                  if (val) {
-                                    handleStatusChange(student.id, session.id, val as SessionAttendanceStatus)
-                                  }
-                                }}
-                              >
-                                <SelectTrigger
-                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold shadow-xs transition-all outline-hidden focus:ring-2 focus:ring-offset-2 ${getSelectStyles(record?.status ?? undefined)}`}
-                                  size="sm"
-                                >
-                                  <SelectValue placeholder="—" />
-                                </SelectTrigger>
-                                <SelectContent align="center" className="min-w-28">
-                                  <SelectItem value="present" className="text-attendance-present font-semibold">Present</SelectItem>
-                                  <SelectItem value="late" className="text-attendance-late font-semibold">Late</SelectItem>
-                                  <SelectItem value="absent" className="text-attendance-absent font-semibold">Absent</SelectItem>
-                                  <SelectItem value="excused" className="text-attendance-excused font-semibold">Excused</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingCellKey(key)}
-                                  className={`mx-auto flex h-9 w-28 items-center justify-between rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSelectStyles(record?.status ?? undefined)}`}
-                                >
-                                  <span>
-                                    {record?.status
-                                      ? (statusItems.find((st) => st.value === record.status)?.label ?? record.status)
-                                      : "—"}
-                                  </span>
-                                  <ChevronDown className="size-3 opacity-60" />
-                                </button>
-                              )}
-                            </TableCell>
-                          )
-                        })}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+          <AttendanceRosterView
+            students={rowStudents}
+            sessions={adhocSessions}
+            selectedSessionId={rosterSessionId}
+            rosterSearch={rosterSearch}
+            loading={loading}
+            pendingCells={pendingCells}
+            getAttendanceRecord={getAttendanceRecord}
+            onSelectSessionId={(val) => setRosterSessionId(val ? Number(val) : null)}
+            onRosterSearchChange={setRosterSearch}
+            onStatusChange={handleStatusChange}
+            onBulkMark={handleBulkMarkSession}
+          />
+        ) : (
+          <AttendanceMatrixView
+            students={rowStudents}
+            sessions={adhocSessions}
+            loading={loading}
+            pendingCells={pendingCells}
+            editingCellKey={editingCellKey}
+            emptyMessage={
+              adhocSessions.length === 0
+                ? "No students found matching the selected filters."
+                : "No students in these sessions yet — use Add Students to build the list."
+            }
+            getAttendanceRecord={getAttendanceRecord}
+            onEditingCellKeyChange={setEditingCellKey}
+            onStatusChange={handleStatusChange}
+          />
         )}
       </StaggerItem>
     </StaggerContainer>

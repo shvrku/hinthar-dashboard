@@ -4,7 +4,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MotionPreferenceProvider } from "@/components/motion-preference-provider";
 import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
-import { FocusProvider } from "@/components/focus-context";
 import { CurrentUserProvider } from "@/components/current-user-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -120,22 +119,20 @@ export default function RootLayout({
         />
       </head>
       <body className="h-full flex flex-col bg-background text-foreground overflow-hidden" suppressHydrationWarning>
-        <FocusProvider>
-          <ThemeProvider>
-            <MotionPreferenceProvider>
-              <ClerkThemeProvider>
-                <QueryProvider>
-                  <CurrentUserProvider>
-                    <TooltipProvider>
-                      {children}
-                      <Toaster />
-                    </TooltipProvider>
-                  </CurrentUserProvider>
-                </QueryProvider>
-              </ClerkThemeProvider>
-            </MotionPreferenceProvider>
-          </ThemeProvider>
-        </FocusProvider>
+        <ThemeProvider>
+          <MotionPreferenceProvider>
+            <ClerkThemeProvider>
+              <QueryProvider>
+                <CurrentUserProvider>
+                  <TooltipProvider>
+                    {children}
+                    <Toaster />
+                  </TooltipProvider>
+                </CurrentUserProvider>
+              </QueryProvider>
+            </ClerkThemeProvider>
+          </MotionPreferenceProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

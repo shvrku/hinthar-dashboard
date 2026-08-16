@@ -64,7 +64,7 @@ function MatchingContent() {
     if (!token) return
     const api = createApi(token)
     const [usersUnlinked, studentsUnlinked, usersLinked, studentsLinked] = await Promise.all([
-      api.listUsers({ linked: "false" }),
+      api.listUsers({ linked: "false", linkable: "true" }),
       api.listStudents({ linked: "false" }),
       api.listUsers({ linked: "true" }),
       api.listStudents({ linked: "true" }),

@@ -1,11 +1,11 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import { useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCheck, Upload } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { BulkImportModal } from "@/components/bulk-import-modal"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { AnimatedTableBody } from "@/components/animation/animated-table-body"
 import { TableRevealProvider } from "@/components/animation/table-reveal-context"
@@ -45,6 +45,10 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { cn, toLocalDateString } from "@/lib/utils"
 import { TeacherTableSkeletonRows } from "@/components/page-skeletons"
+
+const BulkImportModal = dynamic(
+  () => import("@/components/bulk-import-modal").then((m) => m.BulkImportModal)
+)
 
 // ---------------------------------------------------------------------------
 // Truncated cell content with tooltip
@@ -858,20 +862,21 @@ export default function TeachersPage() {
         loading={bulkDeleting}
       />
 
-      {/* CSV Bulk Import Modal */}
-      <BulkImportModal
-        open={bulkModalOpen}
-        onClose={() => setBulkModalOpen(false)}
-        entityType="teacher"
-        onImport={async (items) => {
-          const api = await getApi()
-          return api.bulkCreateTeachers(items)
-        }}
-        onSuccess={(count) => {
-          setSuccess(`Successfully imported ${count} teacher(s).`)
-          loadTeachers()
-        }}
-      />
+      {bulkModalOpen ? (
+        <BulkImportModal
+          open={bulkModalOpen}
+          onClose={() => setBulkModalOpen(false)}
+          entityType="teacher"
+          onImport={async (items) => {
+            const api = await getApi()
+            return api.bulkCreateTeachers(items)
+          }}
+          onSuccess={(count) => {
+            setSuccess(`Successfully imported ${count} teacher(s).`)
+            loadTeachers()
+          }}
+        />
+      ) : null}
     </StaggerContainer>
   )
 }

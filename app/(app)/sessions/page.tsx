@@ -5,7 +5,8 @@ import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import { Plus, Pencil, Trash2, Loader2, Check, Search, CalendarCheck, Sparkles, BookOpen, ClipboardList } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type Teacher, type Class, type TimetableSlot, type AdHocSession, type AdHocSessionPayload, type Subject } from "@/lib/types"
+import { SESSION_STATUSES, type Session, type SessionPayload, type SessionStatus, type TimetableSlot, type AdHocSession, type AdHocSessionPayload } from "@/lib/types"
+import { useClassesQuery, useSubjectsQuery, useTeachersSelectQuery } from "@/hooks/use-api-queries"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -141,14 +142,17 @@ function renderStatusBadge(status: SessionStatus | null) {
 
 export default function SessionsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
+  const subjectsQuery = useSubjectsQuery(!!isLoaded && !!isSignedIn)
+  const teachersQuery = useTeachersSelectQuery(!!isLoaded && !!isSignedIn)
+  const classes = classesQuery.data ?? []
+  const subjects = subjectsQuery.data ?? []
+  const teachers = teachersQuery.data ?? []
 
   // Current server page of regular sessions — always driven by listSessionsPage.
   const [pageSessions, setPageSessions] = React.useState<Session[]>([])
   // Ad-hoc sessions have no filters, so this always holds the current server page.
   const [adhocSessions, setAdHocSessions] = React.useState<AdHocSession[] | null>(null)
-  const [teachers, setTeachers] = React.useState<Teacher[]>([])
-  const [classes, setClasses] = React.useState<Class[]>([])
-  const [subjects, setSubjects] = React.useState<Subject[]>([])
   const [timetableSlots, setTimetableSlots] = React.useState<TimetableSlot[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -216,27 +220,6 @@ export default function SessionsPage() {
     setSuccess(msg)
     successTimer.current = setTimeout(() => setSuccess(null), 3000)
   }, [])
-
-  const loadInitialData = React.useCallback(async () => {
-    if (!isSignedIn) return
-    try {
-      const token = await getToken()
-      if (!token) return
-      const api = createApi(token)
-      const [teachersData, classesData, subjectsData, slotsData] = await Promise.all([
-        api.listTeachersForSelect(),
-        api.listClasses(),
-        api.listSubjects(),
-        api.listTimetableSlots(),
-      ])
-      setTeachers(teachersData)
-      setClasses(classesData)
-      setSubjects(subjectsData)
-      setTimetableSlots(slotsData)
-    } catch {
-      // silent
-    }
-  }, [getToken, isSignedIn])
 
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
 
@@ -345,10 +328,25 @@ export default function SessionsPage() {
   }, [isSignedIn, sessionMode, fetchAdhocPage, fetchSessionsPage])
 
   React.useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      loadInitialData()
+    if (!isSignedIn || !formClassId) {
+      setTimetableSlots([])
+      return
     }
-  }, [isLoaded, isSignedIn, loadInitialData])
+    let cancelled = false
+    void (async () => {
+      try {
+        const token = await getToken()
+        if (!token || cancelled) return
+        const slotsData = await createApi(token).listTimetableSlots({ class_id: formClassId })
+        if (!cancelled) setTimetableSlots(slotsData)
+      } catch {
+        if (!cancelled) setTimetableSlots([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [formClassId, getToken, isSignedIn])
 
   // Once data has been loaded at least once, keep the regular-session server
   // page in sync: reset to page 1 when search/filter changes, and refetch

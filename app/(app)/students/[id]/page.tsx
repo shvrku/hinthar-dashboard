@@ -23,6 +23,7 @@ import {
   User,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
+import { useClassesQuery } from "@/hooks/use-api-queries"
 import { ATTENDANCE_STATUS_COLORS } from "@/lib/chart-colors"
 import { formatClassLabel } from "@/lib/format-class"
 import {
@@ -38,7 +39,7 @@ import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
 import { QrCanvas } from "@/components/qr-canvas"
-import { qrDownloadFilename } from "@/lib/qr-download"
+import { qrDownloadFilename } from "@/lib/qr-filename"
 import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -97,11 +98,12 @@ function StudentDetailContent() {
   const params = useParams()
   const router = useRouter()
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
+  const allClasses = classesQuery.data ?? []
   const studentId = Number(params.id)
 
   const [student, setStudent] = React.useState<Student | null>(null)
   const [enrollments, setEnrollments] = React.useState<ClassStudent[]>([])
-  const [allClasses, setAllClasses] = React.useState<Class[]>([])
   const [summary, setSummary] = React.useState<StudentAttendanceSummary | null>(null)
   const [range, setRange] = React.useState<StudentAnalyticsRange>("month")
 
@@ -138,14 +140,12 @@ function StudentDetailContent() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
-      const [studentRes, enrollmentRes, classesRes] = await Promise.all([
+      const [studentRes, enrollmentRes] = await Promise.all([
         api.getStudent(studentId),
         api.listClassStudentsPage({ student_id: studentId, page_size: 200 }),
-        api.listClasses(),
       ])
       setStudent(studentRes)
       setEnrollments(enrollmentRes.results)
-      setAllClasses(classesRes)
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
       else setError(err instanceof Error ? err.message : "Failed to load student")

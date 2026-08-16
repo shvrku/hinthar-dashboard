@@ -73,15 +73,16 @@ export function useTeachersSelectQuery(enabled = true) {
   })
 }
 
-export function useTimetableSlotsQuery(enabled = true) {
+export function useTimetableSlotsQuery(classId?: number | string | null, enabled = true) {
   const { getToken, isSignedIn, isLoaded } = useApiToken()
+  const id = classId != null && classId !== "" ? String(classId) : ""
   return useQuery({
-    queryKey: apiQueryKeys.timetableSlots(),
-    enabled: enabled && isLoaded && isSignedIn,
+    queryKey: apiQueryKeys.timetableSlots(id),
+    enabled: enabled && isLoaded && isSignedIn && Boolean(id),
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error("No session token")
-      return createApi(token).listTimetableSlots()
+      return createApi(token).listTimetableSlots({ class_id: id })
     },
   })
 }

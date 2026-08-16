@@ -277,7 +277,7 @@ export interface AttendanceMatrixStudent {
   name: string
   unique_code: string | null
   user_id: number | null
-  records?: Record<string, string>
+  records?: Record<string, string | null>
 }
 
 /** Flattened session row from /attendance/matrix/ and /adhoc-attendance/matrix/. */

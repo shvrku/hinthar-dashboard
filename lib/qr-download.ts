@@ -1,34 +1,9 @@
-import QRCode from "qrcode"
-import JSZip from "jszip"
 import { downloadBlob } from "@/lib/export-utils"
 
-/** Strip characters that are unsafe or awkward in download filenames. */
-function sanitizeFilenamePart(value: string): string {
-  return value
-    .trim()
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^[.-]+|[.-]+$/g, "")
-}
-
-/**
- * QR download basename: unique code + student name.
- * Example: `STU-1042_Aung-Min.png`
- */
-export function qrDownloadFilename(student: {
-  name?: string | null
-  unique_code?: string | null
-  id?: number | null
-}): string {
-  const code =
-    sanitizeFilenamePart(student.unique_code ?? "") ||
-    (student.id != null ? `id-${student.id}` : "unknown")
-  const name = sanitizeFilenamePart(student.name ?? "") || "student"
-  return `${code}_${name}.png`
-}
+export { qrDownloadFilename } from "@/lib/qr-filename"
 
 export async function downloadQrPng(token: string, filename: string, size = 256) {
+  const { default: QRCode } = await import("qrcode")
   const dataUrl = await QRCode.toDataURL(token, { width: size, margin: 2 })
   const link = document.createElement("a")
   link.download = filename
@@ -41,6 +16,10 @@ export async function downloadQrZip(
   zipName: string,
   size = 256
 ) {
+  const [{ default: QRCode }, { default: JSZip }] = await Promise.all([
+    import("qrcode"),
+    import("jszip"),
+  ])
   const zip = new JSZip()
   const folder = zip.folder("qr-codes") ?? zip
   const usedNames = new Set<string>()

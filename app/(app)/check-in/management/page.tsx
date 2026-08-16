@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import type { Class, Student } from "@/lib/types"
+import type { Student } from "@/lib/types"
+import { useClassesQuery } from "@/hooks/use-api-queries"
 import { formatClassLabel, formatClassLabelText } from "@/lib/format-class"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { useServerPagination } from "@/components/use-server-pagination"
@@ -132,8 +133,9 @@ const ACTION_STACK = "mt-auto flex shrink-0 flex-col gap-2"
 
 export default function CheckInManagementPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
+  const classes = classesQuery.data ?? []
   const [pageStudents, setPageStudents] = React.useState<Student[]>([])
-  const [classes, setClasses] = React.useState<Class[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [selected, setSelected] = React.useState<Student | null>(null)
@@ -178,19 +180,12 @@ export default function CheckInManagementPage() {
     setTokenLoading(false)
   }, [getToken, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, classFilter])
 
-  const loadMeta = React.useCallback(async () => {
-    const token = await getToken()
-    if (!token) return
-    const data = await createApi(token).listClasses()
-    setClasses(data)
-  }, [getToken])
-
   const loadStudents = React.useCallback(async () => {
     if (!isSignedIn) return
     setLoading(true)
     setError(null)
     try {
-      await Promise.all([fetchPage(), loadMeta()])
+      await fetchPage()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
@@ -198,7 +193,7 @@ export default function CheckInManagementPage() {
     } finally {
       setLoading(false)
     }
-  }, [isSignedIn, fetchPage, loadMeta])
+  }, [isSignedIn, fetchPage])
 
   const filterKeyRef = React.useRef<string | null>(null)
   React.useEffect(() => {

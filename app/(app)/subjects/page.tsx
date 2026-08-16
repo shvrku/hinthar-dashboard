@@ -5,6 +5,8 @@ import { useAuth } from "@clerk/nextjs"
 import { Plus, Pencil, Trash2, Loader2, Search, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Subject, SubjectPayload } from "@/lib/types"
+import { apiQueryKeys, useSubjectsQuery } from "@/hooks/use-api-queries"
+import { useQueryClient } from "@tanstack/react-query"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -112,13 +114,24 @@ function SubjectFormModal({
 // ===========================================================================
 export default function SubjectsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const queryClient = useQueryClient()
+  const subjectsQuery = useSubjectsQuery(!!isLoaded && !!isSignedIn)
 
-  const [subjects, setSubjects] = React.useState<Subject[] | null>(null)
-  const [loading, setLoading] = React.useState(false)
+  const subjects = subjectsQuery.data ?? null
+  const loading = subjectsQuery.isFetching
+  const lastLoaded = subjectsQuery.dataUpdatedAt
+    ? new Date(subjectsQuery.dataUpdatedAt).toLocaleTimeString()
+    : null
+  const queryError =
+    subjectsQuery.error instanceof ApiError
+      ? subjectsQuery.error.userMessage
+      : subjectsQuery.error instanceof Error
+        ? subjectsQuery.error.message
+        : null
+
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
 
   // Selection state
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
@@ -149,24 +162,10 @@ export default function SubjectsPage() {
   }, [getToken])
 
   const loadData = React.useCallback(async () => {
-    setLoading(true)
     setError(null)
     setSelectedIds([])
-    try {
-      const api = await getApi()
-      const data = await api.listSubjects()
-      setSubjects(data)
-      setLastLoaded(new Date().toLocaleTimeString())
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.userMessage)
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to load subjects")
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [getApi])
+    await queryClient.invalidateQueries({ queryKey: apiQueryKeys.subjects() })
+  }, [queryClient])
 
   const filteredSubjects = React.useMemo(() => {
     if (!subjects) return []
@@ -217,8 +216,7 @@ export default function SubjectsPage() {
       setSuccess(`Successfully deleted ${res.deleted_count} subject(s).`)
       setSelectedIds([])
       setBulkConfirmOpen(false)
-      const data = await api.listSubjects()
-      setSubjects(data)
+      await queryClient.invalidateQueries({ queryKey: apiQueryKeys.subjects() })
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -228,7 +226,7 @@ export default function SubjectsPage() {
     } finally {
       setBulkDeleting(false)
     }
-  }, [getApi, selectedIds])
+  }, [getApi, selectedIds, queryClient])
 
   const handleSave = React.useCallback(
     async (payload: SubjectPayload) => {
@@ -245,8 +243,7 @@ export default function SubjectsPage() {
         }
         setModalOpen(false)
         setEditingSubject(null)
-        const data = await api.listSubjects()
-        setSubjects(data)
+        await queryClient.invalidateQueries({ queryKey: apiQueryKeys.subjects() })
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.userMessage)
@@ -257,7 +254,7 @@ export default function SubjectsPage() {
         setSaving(false)
       }
     },
-    [getApi, editingSubject],
+    [getApi, editingSubject, queryClient],
   )
 
   const handleDelete = React.useCallback(async () => {
@@ -270,8 +267,7 @@ export default function SubjectsPage() {
       setSuccess("Subject deleted successfully.")
       setSelectedIds((prev) => prev.filter((id) => id !== deletingId))
       setDeletingId(null)
-      const data = await api.listSubjects()
-      setSubjects(data)
+      await queryClient.invalidateQueries({ queryKey: apiQueryKeys.subjects() })
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.userMessage)
@@ -281,7 +277,7 @@ export default function SubjectsPage() {
     } finally {
       setDeleting(false)
     }
-  }, [getApi, deletingId])
+  }, [getApi, deletingId, queryClient])
 
   const openCreateModal = () => {
     setEditingSubject(null)
@@ -399,9 +395,9 @@ export default function SubjectsPage() {
       </Card>
 
       {/* Banners */}
-      {error && (
+      {(error || queryError) && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <span>{error}</span>
+          <span>{error || queryError}</span>
           <Button size="xs" variant="ghost" onClick={() => setError(null)}>
             Dismiss
           </Button>

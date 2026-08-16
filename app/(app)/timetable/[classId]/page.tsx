@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { createApi, ApiError } from "@/lib/api"
 import type { Class, Teacher, Subject, TimetableSlot } from "@/lib/types"
+import { useClassesQuery, useSubjectsQuery, useTeachersSelectQuery } from "@/hooks/use-api-queries"
 import { formatClassLabel } from "@/lib/format-class"
 import {
   Search,
@@ -435,10 +436,13 @@ export default function TimetableClassPage() {
   const router = useRouter()
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const routeClassId = Number(params.classId)
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
+  const teachersQuery = useTeachersSelectQuery(!!isLoaded && !!isSignedIn)
+  const subjectsQuery = useSubjectsQuery(!!isLoaded && !!isSignedIn)
+  const classes = classesQuery.data ?? []
+  const teachers = teachersQuery.data ?? []
+  const subjects = subjectsQuery.data ?? []
 
-  const [classes, setClasses] = useState<Class[]>([])
-  const [teachers, setTeachers] = useState<Teacher[]>([])
-  const [subjects, setSubjects] = useState<Subject[]>([])
   const [lessons, setLessons] = useState<TimetableSlot[]>([])
 
   const [selectedClassId, setSelectedClassId] = useState<number | null>(
@@ -478,25 +482,19 @@ export default function TimetableClassPage() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       const api = createApi(token)
+      const slotClassId = Number.isFinite(routeClassId) ? routeClassId : undefined
+      const lessonsData = slotClassId
+        ? await api.listTimetableSlots({ class_id: slotClassId })
+        : []
 
-      const [classesData, teachersData, subjectsData, lessonsData] =
-        await Promise.all([
-          api.listClasses(),
-          api.listTeachersForSelect(),
-          api.listSubjects(),
-          api.listTimetableSlots(),
-        ])
-
-      setClasses(classesData)
-      setTeachers(teachersData)
-      setSubjects(subjectsData)
       setLessons(lessonsData)
 
+      const classesData = classesQuery.data ?? []
       if (Number.isFinite(routeClassId) && classesData.some((c) => c.id === routeClassId)) {
         setSelectedClassId(routeClassId)
       } else if (classesData.length > 0 && !Number.isFinite(routeClassId)) {
         router.replace(`/timetable/${classesData[0].id}/`)
-      } else if (Number.isFinite(routeClassId) && !classesData.some((c) => c.id === routeClassId)) {
+      } else if (Number.isFinite(routeClassId) && classesData.length > 0 && !classesData.some((c) => c.id === routeClassId)) {
         setError("Class not found.")
       }
       setLastLoaded(new Date().toLocaleTimeString())
@@ -509,7 +507,7 @@ export default function TimetableClassPage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, isSignedIn, routeClassId, router])
+  }, [getToken, isSignedIn, routeClassId, router, classesQuery.data])
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {

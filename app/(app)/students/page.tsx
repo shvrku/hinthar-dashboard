@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import { useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCheck, Upload, Eye } from "lucide-react"
 import Link from "next/link"
 import { createApi, ApiError } from "@/lib/api"
-import { SCHOOL_CODES, type Class, type Student, StudentPayload } from "@/lib/types"
+import { SCHOOL_CODES, type Student, StudentPayload } from "@/lib/types"
+import { useClassesQuery } from "@/hooks/use-api-queries"
 import { formatClassLabel, formatClassLabelText } from "@/lib/format-class"
 import { useSortableData } from "@/lib/use-sortable-data"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -16,7 +18,6 @@ import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { ConfirmDialog } from "@/components/confirm-dialog"
-import { BulkImportModal } from "@/components/bulk-import-modal"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { useServerPagination } from "@/components/use-server-pagination"
 import { StandardTablePagination } from "@/components/standard-table-pagination"
@@ -48,6 +49,10 @@ import { cn, toLocalDateString } from "@/lib/utils"
 import { StudentTableSkeletonRows } from "@/components/page-skeletons"
 import { AnimatedTableBody } from "@/components/animation/animated-table-body"
 import { TableRevealProvider } from "@/components/animation/table-reveal-context"
+
+const BulkImportModal = dynamic(
+  () => import("@/components/bulk-import-modal").then((m) => m.BulkImportModal)
+)
 
 // ---------------------------------------------------------------------------
 // Truncated cell content with tooltip
@@ -230,6 +235,8 @@ function StudentFormModal({
 export default function StudentsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const router = useRouter()
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
+  const classes = classesQuery.data ?? []
 
   // Current server page of students — always driven by listStudentsPage.
   const [pageStudents, setPageStudents] = React.useState<Student[]>([])
@@ -280,7 +287,6 @@ export default function StudentsPage() {
   const [schoolFilter, setSchoolFilter] = React.useState<string>("all")
   const [classFilter, setClassFilter] = React.useState<string>("all")
   const [groupByClass, setGroupByClass] = React.useState(false)
-  const [classes, setClasses] = React.useState<Class[]>([])
 
   const fetchPage = React.useCallback(async () => {
     const api = await getApi()
@@ -300,9 +306,7 @@ export default function StudentsPage() {
     setError(null)
     setSelectedIds([])
     try {
-      const api = await getApi()
-      const [, classList] = await Promise.all([fetchPage(), api.listClasses()])
-      setClasses(classList)
+      await fetchPage()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
       if (err instanceof ApiError) {
@@ -313,7 +317,7 @@ export default function StudentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [fetchPage, getApi])
+  }, [fetchPage])
 
   // Once data has been loaded at least once, keep the server page in sync:
   // reset to page 1 when search/filter changes, and refetch whenever
@@ -914,20 +918,21 @@ export default function StudentsPage() {
         loading={bulkDeleting}
       />
 
-      {/* CSV Bulk Import Modal */}
-      <BulkImportModal
-        open={bulkModalOpen}
-        onClose={() => setBulkModalOpen(false)}
-        entityType="student"
-        onImport={async (items) => {
-          const api = await getApi()
-          return api.bulkCreateStudents(items)
-        }}
-        onSuccess={(count) => {
-          setSuccess(`Successfully imported ${count} student(s).`)
-          loadData()
-        }}
-      />
+      {bulkModalOpen ? (
+        <BulkImportModal
+          open={bulkModalOpen}
+          onClose={() => setBulkModalOpen(false)}
+          entityType="student"
+          onImport={async (items) => {
+            const api = await getApi()
+            return api.bulkCreateStudents(items)
+          }}
+          onSuccess={(count) => {
+            setSuccess(`Successfully imported ${count} student(s).`)
+            loadData()
+          }}
+        />
+      ) : null}
     </StaggerContainer>
   )
 }
