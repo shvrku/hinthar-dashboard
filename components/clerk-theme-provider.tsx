@@ -20,7 +20,7 @@ const BRAND = {
       mutedForeground: "#71717A",
       border: "#E4E4E7",
       neutral: "#3F3F46",
-      danger: "#DC2626",
+      danger: "#F6465D",
     },
     dark: {
       primary: "#2E9B7A",
@@ -33,7 +33,7 @@ const BRAND = {
       mutedForeground: "#A1A1AA",
       border: "#3F3F46",
       neutral: "#E4E4E7",
-      danger: "#F87171",
+      danger: "#F6465D",
     },
   },
   mono: {
@@ -48,7 +48,7 @@ const BRAND = {
       mutedForeground: "#71717A",
       border: "#E4E4E7",
       neutral: "#3F3F46",
-      danger: "#DC2626",
+      danger: "#F6465D",
     },
     dark: {
       // Avoid pure white as colorPrimary — Clerk chrome can wash out.
@@ -62,7 +62,35 @@ const BRAND = {
       mutedForeground: "#A1A1AA",
       border: "#52525B",
       neutral: "#E4E4E7",
-      danger: "#F87171",
+      danger: "#F6465D",
+    },
+  },
+  amoled: {
+    light: {
+      primary: "#27272A",
+      primaryForeground: "#FAFAFA",
+      background: "#FFFFFF",
+      card: "#FFFFFF",
+      muted: "#F4F4F5",
+      input: "#F4F4F5",
+      foreground: "#18181B",
+      mutedForeground: "#71717A",
+      border: "#E4E4E7",
+      neutral: "#3F3F46",
+      danger: "#F6465D",
+    },
+    dark: {
+      primary: "#D4D4D8",
+      primaryForeground: "#18181B",
+      background: "#000000",
+      card: "#0A0A0A",
+      muted: "#121212",
+      input: "#121212",
+      foreground: "#FAFAFA",
+      mutedForeground: "#A1A1AA",
+      border: "#1A1A1A",
+      neutral: "#E4E4E7",
+      danger: "#F6465D",
     },
   },
 } as const

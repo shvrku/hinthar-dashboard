@@ -522,7 +522,7 @@ export default function CheckInManagementPage() {
 
   if (!isLoaded) {
     return (
-      <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8 md:py-8">
+      <div className="container mx-auto max-w-7xl px-4 pb-6 sm:px-6 md:px-8 md:pb-8">
         <div className="mb-6 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <Table>
           <TableHeader>

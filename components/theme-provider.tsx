@@ -25,7 +25,7 @@ function applyPalette(palette: ThemePalette) {
 }
 
 function isPalette(value: string | null): value is ThemePalette {
-  return value === "emerald" || value === "mono"
+  return value === "emerald" || value === "mono" || value === "amoled"
 }
 
 function isTheme(value: string | null): value is ThemeMode {

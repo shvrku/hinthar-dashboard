@@ -35,6 +35,44 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
   downloadBlob(filename, new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" }))
 }
 
+function isTransparent(color: string) {
+  return color === "transparent" || color === "rgba(0, 0, 0, 0)" || color === "rgba(0,0,0,0)"
+}
+
+/** First non-transparent background from the chart up through its parents. */
+function resolvedSurfaceColor(start: HTMLElement): string {
+  let node: HTMLElement | null = start
+  while (node) {
+    const bg = getComputedStyle(node).backgroundColor
+    if (bg && !isTransparent(bg)) return bg
+    node = node.parentElement
+  }
+  return "#ffffff"
+}
+
+/** Copy computed paint onto a cloned SVG so CSS variables still resolve off-document. */
+function inlineComputedSvgPaint(source: SVGElement, clone: SVGElement) {
+  const from = [source, ...source.querySelectorAll("*")]
+  const to = [clone, ...clone.querySelectorAll("*")]
+  const count = Math.min(from.length, to.length)
+
+  for (let i = 0; i < count; i++) {
+    const cs = getComputedStyle(from[i])
+    const dest = to[i]
+    if (from[i] === source) continue
+    dest.setAttribute("fill", cs.fill)
+    dest.setAttribute("stroke", cs.stroke)
+    dest.setAttribute("stop-color", cs.stopColor)
+    dest.setAttribute("opacity", cs.opacity)
+    dest.setAttribute("fill-opacity", cs.fillOpacity)
+    dest.setAttribute("stroke-opacity", cs.strokeOpacity)
+    dest.setAttribute("stroke-width", cs.strokeWidth)
+    dest.setAttribute("font-size", cs.fontSize)
+    dest.setAttribute("font-family", cs.fontFamily)
+    dest.setAttribute("font-weight", cs.fontWeight)
+  }
+}
+
 /** Export the first SVG inside a container as PNG. */
 export async function exportContainerChartPng(
   container: HTMLElement | null,
@@ -45,6 +83,8 @@ export async function exportContainerChartPng(
   if (!svg) return false
 
   const cloned = svg.cloneNode(true) as SVGElement
+  inlineComputedSvgPaint(svg, cloned)
+
   const bbox = svg.getBoundingClientRect()
   const width = Math.max(1, Math.ceil(bbox.width))
   const height = Math.max(1, Math.ceil(bbox.height))
@@ -68,17 +108,7 @@ export async function exportContainerChartPng(
     canvas.height = height * 2
     const ctx = canvas.getContext("2d")
     if (!ctx) return false
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--background")
-      ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue("--background").trim()})`
-      : "#ffffff"
-    // Fallback solid fill if CSS var parsing fails
-    ctx.fillStyle = window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? document.documentElement.classList.contains("dark")
-        ? "#09090b"
-        : "#ffffff"
-      : document.documentElement.classList.contains("dark")
-        ? "#09090b"
-        : "#ffffff"
+    ctx.fillStyle = resolvedSurfaceColor(container)
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.scale(2, 2)
     ctx.drawImage(img, 0, 0, width, height)

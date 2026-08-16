@@ -1,2 +1,2 @@
 export type ThemeMode = "light" | "dark"
-export type ThemePalette = "emerald" | "mono"
+export type ThemePalette = "emerald" | "mono" | "amoled"

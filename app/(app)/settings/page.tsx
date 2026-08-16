@@ -26,6 +26,11 @@ const PALETTES: {
     label: "Monochrome",
     description: "Dashboard-style greys with quiet table chrome.",
   },
+  {
+    id: "amoled",
+    label: "AMOLED",
+    description: "Monochrome chrome on a true-black page in dark mode.",
+  },
 ]
 
 export default function SettingsPage() {
@@ -33,7 +38,7 @@ export default function SettingsPage() {
   const { reducedMotion, toggleReducedMotion } = useMotionPreference()
 
   return (
-    <StaggerContainer className="container mx-auto max-w-5xl px-4 py-6 sm:px-6 md:px-8 md:py-8">
+    <StaggerContainer className="container mx-auto max-w-5xl px-4 pb-6 sm:px-6 md:px-8 md:pb-8">
       <StaggerItem>
         <StandardPageHeader
           title="Settings"
@@ -51,7 +56,7 @@ export default function SettingsPage() {
                 Preview matches your current light or dark mode.
               </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {PALETTES.map((item) => (
                 <ThemePaletteCard
                   key={item.id}

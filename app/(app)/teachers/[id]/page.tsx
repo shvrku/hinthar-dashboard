@@ -9,6 +9,7 @@ import { ArrowLeft, CalendarDays, Loader2, Pencil, UserCheck } from "lucide-reac
 import { ApiError, createApi } from "@/lib/api"
 import type { AnalyticsRange, Teacher, TeacherAttendanceSummary, TeacherPayload } from "@/lib/types"
 import { EMPLOYMENT_TYPES, SCHOOL_CODES } from "@/lib/types"
+import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/require-role"
 import {
   AttendanceOverviewSkeleton,
@@ -122,9 +123,9 @@ function TeacherDetailContent() {
   if (!isSignedIn) return <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">Please sign in to view this teacher.</div>
   if (!Number.isFinite(teacherId)) return <div className="container mx-auto py-16 text-center text-muted-foreground">Invalid teacher id.</div>
 
-  return <StaggerContainer className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
+  return <StaggerContainer className="container mx-auto max-w-6xl px-4 space-y-6">
     <StaggerItem>
-      <Link href="/teachers/" className={buttonVariants({ variant: "ghost", size: "sm" })}><ArrowLeft data-icon="inline-start" />Back to Teachers</Link>
+      <Link href="/teachers/" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2 h-8 w-fit gap-1.5 px-2 text-muted-foreground hover:text-foreground")}><ArrowLeft className="size-3.5" />Back to Teachers</Link>
     </StaggerItem>
     {error && <StaggerItem><div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div></StaggerItem>}
     {loading ? <PageSkeleton blocks={TEACHER_DETAIL_PAGE_LAYOUT} /> : !teacher ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><UserCheck /></EmptyMedia><EmptyTitle>Teacher not found</EmptyTitle><EmptyDescription>This teacher may have been removed.</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => router.push("/teachers/")}>Back to Teachers</Button></Empty> : <>

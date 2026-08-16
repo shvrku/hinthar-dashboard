@@ -21,9 +21,9 @@ const statusConfig = {
 } satisfies ChartConfig
 
 const outcomeConfig = {
-  unmarked: { label: "Unmarked", color: "var(--chart-1)" },
-  present: { label: "Present", color: "var(--chart-2)" },
-  covered: { label: "Covered", color: "var(--chart-3)" },
+  unmarked: { label: "Unmarked", color: "var(--muted-foreground)" },
+  present: { label: "Present", color: "var(--chart-1)" },
+  covered: { label: "Covered", color: "var(--chart-2)" },
   cover_taught: { label: "Cover taught", color: "var(--chart-4)" },
   no_show: { label: "No show", color: "var(--chart-5)" },
   cancelled: { label: "Cancelled", color: "var(--muted-foreground)" },

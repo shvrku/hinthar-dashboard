@@ -56,6 +56,26 @@ const COLORS: Record<ThemePalette, Record<ThemeMode, PreviewColors>> = {
       sidebar: "#27272a",
     },
   },
+  amoled: {
+    light: {
+      background: "#ffffff",
+      foreground: "#18181b",
+      card: "#ffffff",
+      muted: "#f4f4f5",
+      border: "#e4e4e7",
+      primary: "#18181b",
+      sidebar: "#fafafa",
+    },
+    dark: {
+      background: "#000000",
+      foreground: "#fafafa",
+      card: "#0a0a0a",
+      muted: "#121212",
+      border: "#1a1a1a",
+      primary: "#fafafa",
+      sidebar: "#0a0a0a",
+    },
+  },
 }
 
 /** Simple dashboard chrome snapshot for Settings palette cards. */
@@ -64,7 +84,7 @@ export function renderThemePreview(
   mode: ThemeMode
 ): ImageResponse {
   const c = COLORS[palette][mode]
-  const footerBg = palette === "mono" ? c.muted : c.card
+  const footerBg = palette === "mono" || palette === "amoled" ? c.muted : c.card
 
   return new ImageResponse(
     (

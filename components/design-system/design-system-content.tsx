@@ -70,6 +70,11 @@ const PALETTES: {
     label: "Monochrome",
     description: "Quiet greys; keep attendance status colors semantic.",
   },
+  {
+    id: "amoled",
+    label: "AMOLED",
+    description: "Monochrome chrome on a true-black page in dark mode.",
+  },
 ]
 
 const COLOR_TOKENS = [
@@ -94,6 +99,14 @@ const ATTENDANCE_TOKENS = [
   { name: "absent", className: "bg-attendance-absent" },
   { name: "excused", className: "bg-attendance-excused" },
   { name: "campus", className: "bg-attendance-campus" },
+] as const
+
+const CHART_TOKENS = [
+  { name: "chart-1", className: "bg-chart-1" },
+  { name: "chart-2", className: "bg-chart-2" },
+  { name: "chart-3", className: "bg-chart-3" },
+  { name: "chart-4", className: "bg-chart-4" },
+  { name: "chart-5", className: "bg-chart-5" },
 ] as const
 
 const DO_ITEMS = [
@@ -202,7 +215,7 @@ export function DesignSystemContent() {
   }, [])
 
   return (
-    <StaggerContainer className="container mx-auto max-w-5xl px-4 py-6 sm:px-6 md:px-8 md:py-8">
+    <StaggerContainer className="container mx-auto max-w-5xl px-4 pb-6 sm:px-6 md:px-8 md:pb-8">
       <StaggerItem>
         <StandardPageHeader
           title="Design System"
@@ -221,7 +234,7 @@ export function DesignSystemContent() {
               title="Theme switcher"
               description="Palette and mode update CSS variables on the document. Prefer these controls (or Settings) over hard-coded brand colors."
             />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {PALETTES.map((item) => (
                 <ThemePaletteCard
                   key={item.id}
@@ -307,6 +320,16 @@ export function DesignSystemContent() {
               </h3>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                 {ATTENDANCE_TOKENS.map((token) => (
+                  <Swatch key={token.name} {...token} />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-foreground">
+                Chart series
+              </h3>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                {CHART_TOKENS.map((token) => (
                   <Swatch key={token.name} {...token} />
                 ))}
               </div>

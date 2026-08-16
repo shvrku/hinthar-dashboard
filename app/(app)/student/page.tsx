@@ -184,7 +184,7 @@ function StudentPortalContent() {
   }
 
   return (
-    <StaggerContainer className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
+    <StaggerContainer className="container mx-auto max-w-6xl px-4 space-y-6">
       {error ? (
         <StaggerItem>
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

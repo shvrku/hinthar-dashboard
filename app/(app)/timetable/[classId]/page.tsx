@@ -842,7 +842,7 @@ export default function TimetableClassPage() {
       </div>
 
       {/* ── MAIN CONTENT ── */}
-      <StaggerItem className="container mx-auto px-4 sm:px-6 md:px-8 py-6 max-w-7xl flex-1 overflow-hidden min-h-0">
+      <StaggerItem className="container mx-auto max-w-7xl flex-1 overflow-hidden min-h-0 px-4 pb-6 sm:px-6 md:px-8">
         {/* ── LIST VIEW ── */}
         {viewMode === "list" && (
           <div className="max-w-4xl mx-auto space-y-5 pb-20">

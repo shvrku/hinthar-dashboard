@@ -377,7 +377,7 @@ function StudentDetailContent() {
   }
 
   return (
-    <StaggerContainer className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
+    <StaggerContainer className="container mx-auto max-w-6xl px-4 space-y-6">
       <StaggerItem>
         <div className="flex flex-wrap items-center gap-3">
           <Link

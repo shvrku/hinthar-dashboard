@@ -646,7 +646,7 @@ function AdHocAttendanceContent() {
 
   if (!mounted || !isLoaded) {
     return (
-      <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8 max-w-7xl" suppressHydrationWarning>
+      <div className="container mx-auto max-w-7xl px-4 pb-6 sm:px-6 md:px-8 md:pb-8" suppressHydrationWarning>
         <div className="mb-8 h-8 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="mb-6 h-4 w-72 animate-pulse rounded-lg bg-muted" />
         <div className="rounded-xl border border-border p-6 space-y-4">

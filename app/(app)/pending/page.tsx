@@ -34,7 +34,7 @@ export default function PendingApprovalPage() {
         }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 py-8">
+    <div className="mx-auto max-w-lg space-y-6 pb-6">
       <StandardPageHeader title={copy.title} description={copy.description} />
       <div className="rounded-lg border bg-card p-4 text-sm space-y-2">
         <p>

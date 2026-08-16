@@ -44,7 +44,7 @@ export function ThemePaletteCard({
           src={src}
           alt=""
           fill
-          sizes="(max-width: 640px) 100vw, 50vw"
+          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
           className="object-cover object-top"
           loading="eager"
           priority

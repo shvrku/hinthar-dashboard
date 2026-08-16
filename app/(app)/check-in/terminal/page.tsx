@@ -601,18 +601,18 @@ export default function TerminalPage() {
             </div>
           </div>
 
-          <div className="flex w-full shrink-0 flex-col gap-4 overflow-y-auto lg:w-96">
+          <div className="flex w-full shrink-0 flex-col gap-4 overflow-y-auto px-4 py-3 lg:w-[26rem]">
             <div>
               <h2 className="mb-2 text-lg font-semibold tracking-tight">Confirmation</h2>
               {lookupCard?.kind === "confirm" ? (
                   <GsapEnter
                     key={`${lookupCard.student.id}-${lookupCard.pendingToken ?? "manual"}`}
                     y={14}
-                    className="rounded-xl border border-primary/30 bg-card p-6 shadow-md"
+                    className="glow-card rounded-xl border border-border bg-card p-6"
                   >
                     <div className="mb-6 flex items-center gap-4">
-                      <div className="flex size-16 items-center justify-center rounded-full border bg-primary/10 border-primary/20">
-                        <UserIcon className="size-8 text-primary" />
+                      <div className="flex size-16 items-center justify-center rounded-full border border-border bg-muted/50">
+                        <UserIcon className="size-8 text-muted-foreground" />
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground font-medium">
@@ -621,7 +621,7 @@ export default function TerminalPage() {
                         <p className="text-xl font-bold tracking-tight text-foreground">
                           {lookupCard.student.name}
                         </p>
-                        <p className="text-xs font-semibold text-primary mt-0.5">
+                        <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
                           {lookupCard.student.class_name || "No Class Assigned"}
                         </p>
                       </div>
@@ -633,7 +633,7 @@ export default function TerminalPage() {
                       </div>
                     ) : null}
 
-                    <div className="mb-6 rounded-lg bg-muted/50 px-4 py-3 border border-border/50">
+                    <div className="mb-6 rounded-lg border border-border bg-muted px-4 py-3">
                       <p className="text-xs text-muted-foreground">Checking in via</p>
                       <p className="text-sm font-semibold text-foreground">
                         {lookupCard.pendingToken ? "QR scan" : "Manual code"}
@@ -644,7 +644,7 @@ export default function TerminalPage() {
                       <Button
                         onClick={() => void handleConfirm(true)}
                         disabled={checkingIn || lookupCard.student.checked_in_today}
-                        className="flex-1 gap-2"
+                        className="flex-1 gap-2 bg-foreground text-background hover:bg-foreground/90"
                       >
                         {checkingIn ? (
                           <Loader2 className="size-4 animate-spin" />
@@ -668,12 +668,12 @@ export default function TerminalPage() {
                   <GsapEnter
                     key={`deactivated-${lookupCard.student?.id ?? "unknown"}`}
                     y={14}
-                    className="rounded-xl border border-warning/35 bg-warning/10 p-6 shadow-md"
+                    className="glow-card rounded-xl border border-border bg-card p-6"
                   >
                     <div className="mb-4 flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+                      <AlertTriangle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-semibold text-warning">
+                        <p className="text-sm font-semibold text-foreground">
                           QR check-in disabled
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -683,7 +683,7 @@ export default function TerminalPage() {
                     </div>
 
                     {lookupCard.student ? (
-                      <div className="mb-5 rounded-lg border border-border/60 bg-background/40 p-3">
+                      <div className="mb-5 rounded-lg border border-border bg-muted p-3">
                         <p className="text-xs text-muted-foreground">
                           Code: {lookupCard.student.unique_code || `#${lookupCard.student.id}`}
                         </p>
@@ -718,7 +718,7 @@ export default function TerminalPage() {
 
             <div>
               <h2 className="mb-2 text-lg font-semibold tracking-tight">Manual lookup</h2>
-              <div className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+              <div className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <p className="text-xs text-muted-foreground">
                   Enter the student code printed on their card (e.g. HIS26-00001).
                 </p>

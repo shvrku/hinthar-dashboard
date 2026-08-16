@@ -18,7 +18,7 @@ import {
   sanitizeCohortIdentifierInput,
   sanitizeCohortSubCategoryInput,
 } from "@/lib/format-class"
-import { formatBackendDate } from "@/lib/utils"
+import { formatBackendDate, cn } from "@/lib/utils"
 import type { AnalyticsRange, Class, ClassAttendanceSummary, ClassPayload, ClassStudent, Student, TimetableSlot } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
@@ -196,9 +196,9 @@ function ClassDetailContent() {
   if (!isSignedIn) return <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">Please sign in to view this class.</div>
   if (!Number.isFinite(classId)) return <div className="container mx-auto py-16 text-center text-muted-foreground">Invalid class id.</div>
 
-  return <StaggerContainer className="container mx-auto max-w-6xl px-4 py-6 md:py-8 space-y-6">
+  return <StaggerContainer className="container mx-auto max-w-6xl px-4 space-y-6">
     <StaggerItem>
-      <Link href="/classes/" className={buttonVariants({ variant: "ghost", size: "sm" })}><ArrowLeft data-icon="inline-start" />Back to Classes</Link>
+      <Link href="/classes/" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-2 h-8 w-fit gap-1.5 px-2 text-muted-foreground hover:text-foreground")}><ArrowLeft className="size-3.5" />Back to Classes</Link>
     </StaggerItem>
     {error && <StaggerItem><div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div></StaggerItem>}
     {loading ? <PageSkeleton blocks={CLASS_DETAIL_PAGE_LAYOUT} /> : !classItem ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><GraduationCap /></EmptyMedia><EmptyTitle>Class not found</EmptyTitle><EmptyDescription>This class may have been removed.</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => router.push("/classes/")}>Back to Classes</Button></Empty> : <>

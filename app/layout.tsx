@@ -24,7 +24,7 @@ try {
     document.documentElement.classList.remove('dark');
   }
   var storedPalette = localStorage.getItem('palette');
-  var palette = storedPalette === 'mono' ? 'mono' : 'emerald';
+  var palette = storedPalette === 'mono' || storedPalette === 'amoled' ? storedPalette : 'emerald';
   document.documentElement.setAttribute('data-palette', palette);
 } catch (e) {}
 `;

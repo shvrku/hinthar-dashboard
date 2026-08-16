@@ -10,7 +10,7 @@ import {
 import type { ThemeMode, ThemePalette } from "../lib/theme-types"
 
 const OUT_DIR = join(process.cwd(), "public", "themes")
-const PALETTES: ThemePalette[] = ["emerald", "mono"]
+const PALETTES: ThemePalette[] = ["emerald", "mono", "amoled"]
 const MODES: ThemeMode[] = ["light", "dark"]
 
 async function main() {
