@@ -120,10 +120,11 @@ function QrStackPreview({
   )
 }
 
+const SIDE_PANEL_HEIGHT = "h-[34rem]"
 const SIDE_PANEL_CARD =
-  "flex h-[34rem] w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs"
+  `flex ${SIDE_PANEL_HEIGHT} w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-card py-4 shadow-2xs`
 const SIDE_PANEL_EMPTY =
-  "flex w-full flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"
+  `flex ${SIDE_PANEL_HEIGHT} w-full flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center`
 const QR_SLOT =
   "flex min-h-0 flex-1 flex-col items-center justify-center overflow-visible"
 const SIDE_HEADER = "shrink-0 space-y-1.5 pb-3"
@@ -633,17 +634,17 @@ export default function CheckInManagementPage() {
         </div>
       )}
 
-      <div className="flex flex-col items-start gap-6 lg:flex-row">
-        <StaggerItem className="w-full min-w-0 flex-1">
-          <TableRevealProvider>
-            {tablePagination.totalItems > 0 && (
-              <StandardTablePagination
-                {...tablePagination}
-                loading={loading}
-                placement="top"
-                className="mb-4"
-              />
-            )}
+      <TableRevealProvider>
+        <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          {tablePagination.totalItems > 0 && (
+            <StandardTablePagination
+              {...tablePagination}
+              loading={loading}
+              placement="top"
+              className="lg:col-start-1"
+            />
+          )}
+          <StaggerItem className="min-w-0 w-full lg:col-start-1">
             <Card className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
               <Table>
                 <TableHeader>
@@ -747,18 +748,14 @@ export default function CheckInManagementPage() {
                 </AnimatedTableBody>
               </Table>
             </Card>
-            {tablePagination.totalItems > 0 && (
-              <StandardTablePagination
-                {...tablePagination}
-                loading={loading}
-                placement="bottom"
-                className="mt-4"
-              />
-            )}
-          </TableRevealProvider>
-        </StaggerItem>
+          </StaggerItem>
 
-        <StaggerItem className="w-full shrink-0 lg:sticky lg:top-20 lg:w-80">
+          <StaggerItem
+            className={cn(
+              "w-full shrink-0 lg:sticky lg:top-12 lg:col-start-2",
+              tablePagination.totalItems > 0 && "lg:row-start-2"
+            )}
+          >
           {isBulkSelection ? (
             <Card className={SIDE_PANEL_CARD}>
               <CardHeader className={SIDE_HEADER}>
@@ -950,7 +947,16 @@ export default function CheckInManagementPage() {
             </div>
           )}
         </StaggerItem>
-      </div>
+          {tablePagination.totalItems > 0 && (
+            <StandardTablePagination
+              {...tablePagination}
+              loading={loading}
+              placement="bottom"
+              className="lg:col-start-1"
+            />
+          )}
+        </div>
+      </TableRevealProvider>
     </StaggerContainer>
   )
 }
