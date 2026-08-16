@@ -75,7 +75,6 @@ function TimetableLandingContent() {
       <StaggerItem>
         <StandardPageHeader
           title="Timetable"
-          description="Choose a class to view and edit its weekly subject slots."
         />
       </StaggerItem>
 

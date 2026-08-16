@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useUser } from "@clerk/nextjs"
 import {
   CalendarCheck,
   GraduationCap,
@@ -22,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import type { Stats } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { downloadCsv } from "@/lib/export-utils"
+import { dashboardGreeting, pickDashboardSubtext } from "@/lib/dashboard-greeting"
 
 const statCards: {
   key: keyof Stats
@@ -37,17 +39,20 @@ const statCards: {
 ]
 
 function OverviewContent() {
+  const { user } = useUser()
   const queryClient = useQueryClient()
   const { data: stats, isFetching, isLoading, error, refetch } = useStatsQuery()
   const loading = isLoading || isFetching
   const showSkeleton = isLoading && !stats
+  const greeting = dashboardGreeting(user?.firstName)
+  const subtext = React.useMemo(() => pickDashboardSubtext(), [])
 
   return (
     <StaggerContainer className="space-y-6">
       <StaggerItem>
         <StandardPageHeader
-          title="Dashboard"
-          description="Live school operations overview."
+          title={greeting}
+          description={subtext}
           secondaryAction={buildReloadAction({
             hasLoaded: !!stats,
             loading,

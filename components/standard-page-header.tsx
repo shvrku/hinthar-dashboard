@@ -23,6 +23,7 @@ export interface PageHeaderBack {
 interface StandardPageHeaderProps {
   title: string
   description?: string
+  className?: string
   /** Ghost nav link — always "Back to {label}". */
   back?: PageHeaderBack
   primaryAction?: PageHeaderAction
@@ -39,13 +40,19 @@ interface StandardPageHeaderProps {
 export function StandardPageHeader({
   title,
   description,
+  className,
   back,
   primaryAction,
   secondaryAction,
   children,
 }: StandardPageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 border-b border-border/50 pb-4 mb-6 md:flex-row md:items-center md:justify-between">
+    <div
+      className={cn(
+        "mb-6 flex flex-col gap-4 border-b border-border/50 pb-4 md:flex-row md:items-center md:justify-between",
+        className
+      )}
+    >
       <div className="space-y-1">
         {back && (
           <Link

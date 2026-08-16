@@ -746,7 +746,6 @@ export default function TimetableClassPage() {
               ? `Timetable • ${getClassName(selectedClass)}`
               : "Class Timetable"
           }
-          description="View, manage, and schedule this class’s weekly timetable."
           back={{ href: "/timetable/", label: "Timetable" }}
           secondaryAction={buildReloadAction({
             hasLoaded: !!lastLoaded,

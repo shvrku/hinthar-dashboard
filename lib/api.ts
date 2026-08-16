@@ -2,7 +2,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public userMessage: string,
-    public payload?: unknown
+    public payload?: unknown,
+    public retryAfterSeconds?: number
   ) {
     super(userMessage)
     this.name = "ApiError"
@@ -42,6 +43,17 @@ function buildQueryString(params?: Record<string, string | number | undefined | 
   }
   const str = query.toString()
   return str ? `?${str}` : ""
+}
+
+function parseRetryAfterSeconds(res: Response, detail: string): number | undefined {
+  const header = res.headers.get("Retry-After")
+  if (header) {
+    const fromHeader = Number(header)
+    if (Number.isFinite(fromHeader) && fromHeader > 0) return Math.ceil(fromHeader)
+  }
+  const fromDetail = detail.match(/available in (\d+) seconds/i)
+  if (fromDetail) return Number(fromDetail[1])
+  return undefined
 }
 
 async function request<T>(
@@ -96,7 +108,7 @@ async function request<T>(
         detail = raw // use raw text if not JSON
       }
     }
-    throw new ApiError(res.status, detail, payload)
+    throw new ApiError(res.status, detail, payload, parseRetryAfterSeconds(res, detail))
   }
 
   if (res.status === 204) return undefined as T

@@ -517,7 +517,6 @@ export default function StudentsPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Students"
-          description="Manage student profiles, contact info, and enrollments."
           primaryAction={{
             label: "Add Student",
             onClick: openCreateModal,

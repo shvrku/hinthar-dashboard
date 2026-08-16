@@ -37,7 +37,6 @@ export default function SettingsPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Settings"
-          description="Appearance preferences for this browser."
         />
       </StaggerItem>
 

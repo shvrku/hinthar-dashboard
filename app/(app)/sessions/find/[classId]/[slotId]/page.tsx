@@ -318,11 +318,6 @@ function FindSlotSessionsContent() {
       <StaggerItem>
         <StandardPageHeader
           title={slotTitle}
-          description={
-            classLabel
-              ? `Sessions for this timetable slot in ${classLabel}. Click a row to edit.`
-              : "Sessions for this timetable slot. Click a row to edit."
-          }
           back={{
             href: `/sessions/find/${classId}/`,
             label: classLabel ? `Find sessions • ${classLabel}` : "Find sessions",

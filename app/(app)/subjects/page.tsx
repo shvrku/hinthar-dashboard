@@ -326,7 +326,6 @@ export default function SubjectsPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Subjects"
-          description="Manage academic subjects, curriculum offerings, and course definitions."
           primaryAction={{
             label: "Add Subject",
             onClick: openCreateModal,

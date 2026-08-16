@@ -698,7 +698,6 @@ export default function SessionsPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Sessions"
-          description="Schedule and manage class sessions, statuses, and teacher assignments."
           primaryAction={{
             label: sessionMode === "adhoc" ? "Add Ad-Hoc Session" : "Add Session",
             onClick: sessionMode === "adhoc" ? () => {

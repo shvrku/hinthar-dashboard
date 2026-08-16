@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
-import { AlertTriangle, Check, X, Camera, Loader2, Search, User as UserIcon } from "lucide-react"
+import { AlertTriangle, Check, X, Camera, Loader2, Search, SwitchCamera, User as UserIcon } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { CheckInLookup } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,15 @@ import { Input } from "@/components/ui/input"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { GsapEnter } from "@/components/animation/gsap-enter"
+import { toast } from "@/components/ui/toast"
+import { cn } from "@/lib/utils"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type TerminalLookupCard =
   | {
@@ -48,63 +57,135 @@ function Clock() {
   }, [])
 
   return (
-    <div className="text-center md:text-left">
-      <div className="text-3xl font-bold tracking-tight tabular-nums">
+    <div className="text-center md:text-right">
+      <div className="text-2xl font-bold tracking-tight tabular-nums">
         {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
       </div>
-      <div className="text-sm text-muted-foreground">
+      <div className="text-xs text-muted-foreground">
         {time.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
       </div>
     </div>
   )
 }
 
-const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (token: string) => void }>(
+const CAMERA_STORAGE_KEY = "hinthar.checkin.cameraDeviceId"
+
+async function listVideoInputs(): Promise<MediaDeviceInfo[]> {
+  if (!navigator.mediaDevices?.enumerateDevices) return []
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  return devices.filter((d) => d.kind === "videoinput" && d.deviceId)
+}
+
+function cameraLabel(device: MediaDeviceInfo, index: number): string {
+  const label = device.label.trim()
+  if (!label) return `Camera ${index + 1}`
+  return label
+}
+
+const QrScanner = React.forwardRef<{ resetScanLock: () => void; lockScan: () => void }, { onScan: (token: string) => void }>(
   ({ onScan }, ref) => {
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const onScanRef = React.useRef(onScan)
   const scanLockedRef = React.useRef(false)
   const lastDecodeAtRef = React.useRef(0)
+  const [hydrated, setHydrated] = React.useState(false)
+  const [deviceId, setDeviceId] = React.useState("")
+  const [activeId, setActiveId] = React.useState("")
+  const [cameras, setCameras] = React.useState<MediaDeviceInfo[]>([])
   const [active, setActive] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [aspect, setAspect] = React.useState(4 / 3)
 
-  // Keep ref in sync so the effect never needs to re-run
+  const syncAspect = React.useCallback(() => {
+    const video = videoRef.current
+    if (!video?.videoWidth || !video.videoHeight) return
+    setAspect(video.videoWidth / video.videoHeight)
+  }, [])
+
   React.useEffect(() => {
     onScanRef.current = onScan
   }, [onScan])
 
-  // Expose resetScanLock for parent to call after confirm/reject
   React.useImperativeHandle(ref, () => ({
-    resetScanLock: () => { scanLockedRef.current = false }
+    resetScanLock: () => { scanLockedRef.current = false },
+    lockScan: () => { scanLockedRef.current = true },
   }), [])
 
   React.useEffect(() => {
+    try {
+      setDeviceId(localStorage.getItem(CAMERA_STORAGE_KEY) ?? "")
+    } catch {
+      /* ignore */
+    }
+    setHydrated(true)
+  }, [])
+
+  const persistDevice = React.useCallback((id: string) => {
+    setDeviceId(id)
+    try {
+      localStorage.setItem(CAMERA_STORAGE_KEY, id)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!hydrated) return
+
     let stream: MediaStream | null = null
     let animationId: number | null = null
     let cancelled = false
-    // PERF-H2: ~8 fps decode cadence
     const DECODE_INTERVAL_MS = 125
     const MAX_DECODE_WIDTH = 320
 
     async function start() {
       try {
-        // PERF-M3: load jsQR only on the terminal route
         const { default: jsQR } = await import("jsqr")
         if (cancelled) return
 
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: 640, height: 480 },
-        })
+        const videoConstraint: MediaTrackConstraints = deviceId
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint })
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+          })
+        }
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop())
           return
         }
+
+        const listed = await listVideoInputs()
+        if (!cancelled) {
+          setCameras(listed)
+          const liveId = stream.getVideoTracks()[0]?.getSettings().deviceId
+          if (liveId) {
+            setActiveId(liveId)
+            try {
+              localStorage.setItem(CAMERA_STORAGE_KEY, liveId)
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
-          setActive(true)
-          scan(jsQR)
+          if (!cancelled) {
+            const video = videoRef.current
+            video.addEventListener("loadedmetadata", syncAspect)
+            video.addEventListener("resize", syncAspect)
+            syncAspect()
+            setActive(true)
+            setError(null)
+            scan(jsQR)
+          }
         }
       } catch {
         if (!cancelled) setError("Camera access denied or unavailable.")
@@ -115,7 +196,6 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
       if (cancelled) return
       animationId = requestAnimationFrame(() => scan(jsQR))
 
-      // Skip while locked, tab hidden, or between throttle windows
       if (scanLockedRef.current || document.hidden) return
       const now = performance.now()
       if (now - lastDecodeAtRef.current < DECODE_INTERVAL_MS) return
@@ -143,44 +223,155 @@ const QrScanner = React.forwardRef<{ resetScanLock: () => void }, { onScan: (tok
       }
     }
 
-    start()
+    void start()
+
+    const onDeviceChange = () => {
+      void listVideoInputs().then((listed) => {
+        if (!cancelled) setCameras(listed)
+      })
+    }
+    navigator.mediaDevices?.addEventListener?.("devicechange", onDeviceChange)
 
     return () => {
       cancelled = true
+      navigator.mediaDevices?.removeEventListener?.("devicechange", onDeviceChange)
       if (animationId) cancelAnimationFrame(animationId)
       if (stream) stream.getTracks().forEach((t) => t.stop())
+      const video = videoRef.current
+      if (video) {
+        video.removeEventListener("loadedmetadata", syncAspect)
+        video.removeEventListener("resize", syncAspect)
+      }
+      setActive(false)
     }
-  }, []) // empty deps — camera starts once, never restarts
+  }, [hydrated, deviceId, syncAspect])
 
-  if (error) {
-    return (
-      <div className="flex h-full items-center justify-center rounded-xl border border-dashed p-8">
-        <div className="text-center text-sm text-muted-foreground">
-          <Camera className="mx-auto mb-2 size-8" />
-          <p>{error}</p>
-        </div>
+  const slotRef = React.useRef<HTMLDivElement>(null)
+  const [frame, setFrame] = React.useState({ width: 0, height: 0 })
+
+  React.useLayoutEffect(() => {
+    const slot = slotRef.current
+    if (!slot) return
+    const fit = () => {
+      const cw = slot.clientWidth
+      const ch = slot.clientHeight
+      if (cw < 8 || ch < 8) return
+      let width = cw
+      let height = width / aspect
+      if (height > ch) {
+        height = ch
+        width = height * aspect
+      }
+      setFrame({ width: Math.round(width), height: Math.round(height) })
+    }
+    const observer = new ResizeObserver(fit)
+    observer.observe(slot)
+    fit()
+    return () => observer.disconnect()
+  }, [aspect])
+
+  const selectedId = deviceId || activeId || cameras[0]?.deviceId || ""
+  const selectedCamera = cameras.find((cam) => cam.deviceId === selectedId)
+  const selectedLabel = selectedCamera
+    ? cameraLabel(selectedCamera, Math.max(0, cameras.indexOf(selectedCamera)))
+    : "Choose camera"
+
+  const frameClass =
+    "relative overflow-hidden rounded-xl border border-border bg-black shadow-md"
+  const frameStyle: React.CSSProperties =
+    frame.width > 0
+      ? { width: frame.width, height: frame.height }
+      : { width: "100%", height: "100%", maxHeight: "100%" }
+
+  const slot = (
+    <div
+      ref={slotRef}
+      className="flex min-h-0 w-full flex-1 items-center justify-center"
+    >
+      <div
+        className={
+          error
+            ? `${frameClass} flex items-center justify-center border-dashed bg-transparent`
+            : frameClass
+        }
+        style={frameStyle}
+      >
+        {error ? (
+          <div className="text-center text-sm text-muted-foreground">
+            <Camera className="mx-auto mb-2 size-8" />
+            <p>{error}</p>
+          </div>
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              className="absolute inset-0 size-full object-contain"
+              playsInline
+              muted
+              autoPlay
+            />
+            <canvas ref={canvasRef} className="hidden" />
+            {!active && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-950/90">
+                <div className="flex size-16 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
+                  <Camera className="size-7 text-white/70" />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Starting camera…
+                </div>
+              </div>
+            )}
+            {active ? (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div
+                  className="rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.32)]"
+                  style={{
+                    width: Math.round(Math.min(frame.width || 0, frame.height || 0) * 0.88) || "88%",
+                    height: Math.round(Math.min(frame.width || 0, frame.height || 0) * 0.88) || "88%",
+                  }}
+                />
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
-    <div className="relative flex items-center justify-center overflow-hidden rounded-xl">
-      <video
-        ref={videoRef}
-        className="w-full max-w-md rounded-xl border border-border shadow-md"
-        playsInline
-        muted
-      />
-      <canvas ref={canvasRef} className="hidden" />
-      {!active && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/80 backdrop-blur-xs">
-          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {slot}
+      {!error && cameras.length > 1 ? (
+        <div className="flex shrink-0 justify-center">
+          <div className="flex w-56 items-center gap-2">
+            <SwitchCamera className="size-4 shrink-0 text-muted-foreground" />
+            <Select
+              value={selectedId}
+              onValueChange={(id) => {
+                if (id) persistDevice(id)
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full min-w-0 bg-background">
+                <SelectValue placeholder="Choose camera">
+                  {(value: string | null) => {
+                    const cam = cameras.find((c) => c.deviceId === value)
+                    if (!cam) return selectedLabel
+                    return cameraLabel(cam, Math.max(0, cameras.indexOf(cam)))
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {cameras.map((cam, i) => (
+                  <SelectItem key={cam.deviceId || String(i)} value={cam.deviceId}>
+                    {cameraLabel(cam, i)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      )}
-      {/* Clean QR Target Box */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="size-52 rounded-2xl border-2 border-foreground/60" />
-      </div>
+      ) : null}
     </div>
   )
 })
@@ -189,14 +380,54 @@ QrScanner.displayName = "QrScanner"
 export default function TerminalPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
-  const scannerRef = React.useRef<{ resetScanLock: () => void }>(null)
+  const scannerRef = React.useRef<{ resetScanLock: () => void; lockScan: () => void }>(null)
   const [manualCode, setManualCode] = React.useState("")
   const [looking, setLooking] = React.useState(false)
   const [checkingIn, setCheckingIn] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const [success, setSuccess] = React.useState<string | null>(null)
-  // Student awaiting staff confirmation (or blocked lookup result).
   const [lookupCard, setLookupCard] = React.useState<TerminalLookupCard | null>(null)
+  const [throttleUntil, setThrottleUntil] = React.useState<number | null>(null)
+  const [throttleLeft, setThrottleLeft] = React.useState(0)
+
+  React.useEffect(() => {
+    if (!throttleUntil) {
+      setThrottleLeft(0)
+      return
+    }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((throttleUntil - Date.now()) / 1000))
+      setThrottleLeft(left)
+      if (left <= 0) setThrottleUntil(null)
+    }
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
+  }, [throttleUntil])
+
+  const applyThrottle = React.useCallback((err: ApiError) => {
+    const sec = Math.max(1, err.retryAfterSeconds ?? 5)
+    setThrottleUntil(Date.now() + sec * 1000)
+    toast.add({
+      title: `Too many check-ins — try again in ${sec} second${sec === 1 ? "" : "s"}`,
+      type: "warning",
+    })
+  }, [])
+
+  const toastApiError = React.useCallback(
+    (err: unknown, fallback: string) => {
+      if (err instanceof ApiError && err.status === 429) {
+        applyThrottle(err)
+        return
+      }
+      const message =
+        err instanceof ApiError
+          ? err.userMessage
+          : err instanceof Error
+            ? err.message
+            : fallback
+      toast.add({ title: message, type: "error" })
+    },
+    [applyThrottle]
+  )
 
   const resetPending = React.useCallback(() => {
     setLookupCard(null)
@@ -204,21 +435,21 @@ export default function TerminalPage() {
   }, [])
 
   const finishWithMessage = React.useCallback((message: string) => {
-    setSuccess(message)
-    setError(null)
+    toast.add({ title: message, type: "success" })
     setManualCode("")
     setLookupCard(null)
     scannerRef.current?.resetScanLock()
-    setTimeout(() => setSuccess(null), 4000)
   }, [])
 
   // QR scanned → look up (no check-in yet) → show confirmation card.
   const handleScan = React.useCallback(
     async (checkInToken: string) => {
       if (!isSignedIn || looking || checkingIn || lookupCard) return
+      if (throttleUntil && Date.now() < throttleUntil) {
+        scannerRef.current?.resetScanLock()
+        return
+      }
       setLooking(true)
-      setError(null)
-      setSuccess(null)
       try {
         const token = await getToken()
         if (!token) throw new Error("No auth token available")
@@ -236,31 +467,33 @@ export default function TerminalPage() {
             student: blockedStudent,
             message: "QR token is deactivated. This student cannot check in until reactivated.",
           })
-          setError(null)
-        } else if (err instanceof ApiError) {
-          setError(err.userMessage)
         } else {
-          setError(err instanceof Error ? err.message : "Lookup failed")
+          toastApiError(err, "Lookup failed")
+          scannerRef.current?.resetScanLock()
         }
-        scannerRef.current?.resetScanLock()
       } finally {
         setLooking(false)
       }
     },
-    [isSignedIn, looking, checkingIn, lookupCard, getToken]
+    [isSignedIn, looking, checkingIn, lookupCard, throttleUntil, getToken, toastApiError]
   )
 
   // Manual code entered → look up by unique_code → show confirmation card.
   const handleManualLookup = React.useCallback(async () => {
     const code = manualCode.trim()
     if (!code) {
-      setError("Enter a student code (e.g. HIS26-00001).")
+      toast.add({ title: "Enter a student code (e.g. HIS26-00001).", type: "error" })
       return
     }
-    if (!isSignedIn || looking || checkingIn) return
+    if (!isSignedIn || looking || checkingIn || lookupCard) return
+    if (throttleUntil && Date.now() < throttleUntil) {
+      toast.add({
+        title: `Too many check-ins — try again in ${throttleLeft} second${throttleLeft === 1 ? "" : "s"}`,
+        type: "warning",
+      })
+      return
+    }
     setLooking(true)
-    setError(null)
-    setSuccess(null)
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
@@ -270,13 +503,13 @@ export default function TerminalPage() {
         student: match,
         pendingToken: null,
       })
+      scannerRef.current?.lockScan()
     } catch (err) {
-      if (err instanceof ApiError) setError(err.userMessage)
-      else setError(err instanceof Error ? err.message : "Lookup failed")
+      toastApiError(err, "Lookup failed")
     } finally {
       setLooking(false)
     }
-  }, [manualCode, isSignedIn, looking, checkingIn, getToken])
+  }, [manualCode, isSignedIn, looking, checkingIn, lookupCard, throttleUntil, throttleLeft, getToken, toastApiError])
 
   // Staff confirmed → commit the check-in (QR by token, otherwise by student id).
   const handleConfirm = React.useCallback(
@@ -286,9 +519,8 @@ export default function TerminalPage() {
         resetPending()
         return
       }
+      if (lookupCard.student.checked_in_today) return
       setCheckingIn(true)
-      setError(null)
-      setSuccess(null)
       try {
         const token = await getToken()
         if (!token) throw new Error("No auth token available")
@@ -299,15 +531,23 @@ export default function TerminalPage() {
         const name = result.student_name || lookupCard.student.name || "Student"
         finishWithMessage(`${name} checked in successfully.`)
       } catch (err) {
-        if (err instanceof ApiError) setError(err.userMessage)
-        else setError(err instanceof Error ? err.message : "Failed to check in")
+        toastApiError(err, "Failed to check in")
         resetPending()
       } finally {
         setCheckingIn(false)
       }
     },
-    [lookupCard, getToken, finishWithMessage, resetPending]
+    [lookupCard, getToken, finishWithMessage, resetPending, toastApiError]
   )
+
+  const statusLabel =
+    throttleLeft > 0
+      ? `Wait ${throttleLeft}s before the next scan`
+      : looking
+        ? "Looking up student…"
+        : lookupCard
+          ? "Confirm this student first"
+          : "Point camera at a student QR code"
 
   if (!isLoaded) {
     return (
@@ -326,63 +566,44 @@ export default function TerminalPage() {
   }
 
   return (
-    <StaggerContainer className="space-y-6">
-      <StaggerItem>
+    <StaggerContainer className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      <StaggerItem className="shrink-0">
         <StandardPageHeader
           title="Check-In Terminal"
           description="Scan a QR code or enter a student code. Scanned tags auto present all the classes for the rest of the day."
+          className="mb-0 pb-3"
         >
           <Clock />
         </StandardPageHeader>
       </StaggerItem>
 
-      {error ? (
-        <GsapEnter
-          key="terminal-error"
-          className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-        >
-          <span>{error}</span>
-          <button
-            onClick={() => {
-              setError(null)
-              scannerRef.current?.resetScanLock()
-            }}
-            className="ml-2 text-destructive hover:opacity-80 transition-opacity"
-          >
-            <X className="size-4" />
-          </button>
-        </GsapEnter>
-      ) : null}
-
-      {success ? (
-        <GsapEnter
-          key="terminal-success"
-          className="mb-4 flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
-        >
-          <Check className="size-5 text-success shrink-0" />
-          <span>{success}</span>
-        </GsapEnter>
-      ) : null}
-
-      <StaggerItem>
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="min-w-0 flex-1">
-            <h2 className="mb-4 text-lg font-semibold tracking-tight">Scan QR Code</h2>
+      <StaggerItem className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden lg:flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <h2 className="mb-2 shrink-0 text-lg font-semibold tracking-tight">Scan QR Code</h2>
             <QrScanner ref={scannerRef} onScan={(token) => void handleScan(token)} />
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              {looking
-                ? "Looking up student…"
-                : lookupCard?.kind === "deactivated"
-                  ? "Token is deactivated — review card and scan next"
-                  : lookupCard
-                  ? "Confirm the student on the right"
-                  : "Point camera at a student QR code"}
-            </p>
+            <div className="mt-2 flex shrink-0 justify-center">
+              <p
+                role="status"
+                aria-live="polite"
+                className={cn(
+                  "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium",
+                  throttleLeft > 0
+                    ? "border-warning/40 bg-warning/10 text-foreground"
+                    : looking || lookupCard
+                      ? "border-primary/40 bg-primary/10 text-foreground"
+                      : "border-border bg-muted text-foreground"
+                )}
+              >
+                {looking ? <Loader2 className="size-3.5 shrink-0 animate-spin" /> : null}
+                <span className="truncate">{statusLabel}</span>
+              </p>
+            </div>
           </div>
 
-          <div className="w-full lg:w-96 space-y-6">
+          <div className="flex w-full shrink-0 flex-col gap-4 overflow-y-auto lg:w-96">
             <div>
-              <h2 className="mb-4 text-lg font-semibold tracking-tight">Confirmation</h2>
+              <h2 className="mb-2 text-lg font-semibold tracking-tight">Confirmation</h2>
               {lookupCard?.kind === "confirm" ? (
                   <GsapEnter
                     key={`${lookupCard.student.id}-${lookupCard.pendingToken ?? "manual"}`}
@@ -408,7 +629,7 @@ export default function TerminalPage() {
 
                     {lookupCard.student.checked_in_today ? (
                       <div className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
-                        Already checked in today — confirming again will be rejected.
+                        Already checked in today.
                       </div>
                     ) : null}
 
@@ -422,7 +643,7 @@ export default function TerminalPage() {
                     <div className="flex gap-3">
                       <Button
                         onClick={() => void handleConfirm(true)}
-                        disabled={checkingIn}
+                        disabled={checkingIn || lookupCard.student.checked_in_today}
                         className="flex-1 gap-2"
                       >
                         {checkingIn ? (
@@ -482,13 +703,13 @@ export default function TerminalPage() {
                   <GsapEnter
                     key="empty-match"
                     y={0}
-                    className="flex h-56 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"
+                    className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"
                   >
-                    <div className="flex size-12 items-center justify-center rounded-full bg-muted/50 mb-3">
+                    <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-muted/50">
                       <Search className="size-5 text-muted-foreground/60" />
                     </div>
                     <p className="text-sm font-medium text-muted-foreground">Ready to scan</p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground/70">
                       Scan a QR code or enter a student code below
                     </p>
                   </GsapEnter>
@@ -496,8 +717,8 @@ export default function TerminalPage() {
             </div>
 
             <div>
-              <h2 className="mb-4 text-lg font-semibold tracking-tight">Manual lookup</h2>
-              <div className="rounded-xl border border-border/80 bg-card p-6 shadow-2xs space-y-3">
+              <h2 className="mb-2 text-lg font-semibold tracking-tight">Manual lookup</h2>
+              <div className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
                 <p className="text-xs text-muted-foreground">
                   Enter the student code printed on their card (e.g. HIS26-00001).
                 </p>
@@ -511,12 +732,12 @@ export default function TerminalPage() {
                     }}
                     placeholder="Student Code (e.g. HIS26-00001)"
                     className="min-w-0 flex-1 bg-background"
-                    disabled={looking || checkingIn}
+                    disabled={looking || checkingIn || throttleLeft > 0 || !!lookupCard}
                   />
                   <Button
                     onClick={() => void handleManualLookup()}
                     variant="outline"
-                    disabled={looking || checkingIn}
+                    disabled={looking || checkingIn || throttleLeft > 0 || !!lookupCard}
                     className="shadow-xs gap-1.5"
                   >
                     {looking ? (

@@ -513,7 +513,6 @@ export default function TeachersPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Teachers"
-          description="Manage teacher profiles, employment types, and contact information."
           primaryAction={{
             label: "Add Teacher",
             onClick: openAddModal,

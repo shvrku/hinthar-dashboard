@@ -139,6 +139,8 @@ export default function CheckInManagementPage() {
   const [selected, setSelected] = React.useState<Student | null>(null)
   const [selectedIds, setSelectedIds] = React.useState<Set<number>>(new Set())
   const [actionBusy, setActionBusy] = React.useState(false)
+  const [tokenLoading, setTokenLoading] = React.useState(false)
+  const tokenFetchIdRef = React.useRef<number | null>(null)
   const [bulkBusy, setBulkBusy] = React.useState(false)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -172,6 +174,8 @@ export default function CheckInManagementPage() {
     serverPg.setTotalItems(data.count)
     setSelectedIds(new Set())
     setSelected(null)
+    tokenFetchIdRef.current = null
+    setTokenLoading(false)
   }, [getToken, serverPg.page, serverPg.pageSize, serverPg.setTotalItems, debouncedQuery, classFilter])
 
   const loadMeta = React.useCallback(async () => {
@@ -265,7 +269,12 @@ export default function CheckInManagementPage() {
     async (student: Student) => {
       setError(null)
       setSelected({ ...student, check_in_token: student.check_in_token })
-      if (student.check_in_token || !isSignedIn) return
+      tokenFetchIdRef.current = student.id
+      if (student.check_in_token || !isSignedIn) {
+        setTokenLoading(false)
+        return
+      }
+      setTokenLoading(true)
       try {
         const token = await getToken()
         if (!token) return
@@ -276,6 +285,8 @@ export default function CheckInManagementPage() {
       } catch (err) {
         if (err instanceof ApiError) setError(err.userMessage)
         else setError(err instanceof Error ? err.message : "Failed to load check-in token")
+      } finally {
+        if (tokenFetchIdRef.current === student.id) setTokenLoading(false)
       }
     },
     [getToken, isSignedIn]
@@ -296,7 +307,7 @@ export default function CheckInManagementPage() {
   }, [])
 
   const handleRegenerate = React.useCallback(async () => {
-    if (!selected || !isSignedIn) return
+    if (!selected || !isSignedIn || tokenLoading) return
     setActionBusy(true)
     setError(null)
     try {
@@ -314,11 +325,11 @@ export default function CheckInManagementPage() {
     } finally {
       setActionBusy(false)
     }
-  }, [selected, getToken, isSignedIn, patchStudentLocal, flashSuccess])
+  }, [selected, getToken, isSignedIn, tokenLoading, patchStudentLocal, flashSuccess])
 
   const toggleActive = React.useCallback(
     async (activate: boolean) => {
-      if (!selected || !isSignedIn) return
+      if (!selected || !isSignedIn || tokenLoading) return
       setActionBusy(true)
       setError(null)
       try {
@@ -337,11 +348,11 @@ export default function CheckInManagementPage() {
         setActionBusy(false)
       }
     },
-    [selected, getToken, isSignedIn, patchStudentLocal, flashSuccess]
+    [selected, getToken, isSignedIn, tokenLoading, patchStudentLocal, flashSuccess]
   )
 
   const downloadSelectedQr = React.useCallback(async () => {
-    if (!selected?.check_in_token) return
+    if (!selected?.check_in_token || tokenLoading) return
     try {
       await downloadQrPng(
         selected.check_in_token,
@@ -350,7 +361,7 @@ export default function CheckInManagementPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to download QR")
     }
-  }, [selected])
+  }, [selected, tokenLoading])
 
   const pageIds = React.useMemo(() => sortedStudents.map((s) => s.id), [sortedStudents])
   const allPageSelected =
@@ -359,6 +370,8 @@ export default function CheckInManagementPage() {
   const applySelectionSideEffects = React.useCallback(
     (next: Set<number>) => {
       if (next.size === 0) {
+        tokenFetchIdRef.current = null
+        setTokenLoading(false)
         setSelected(null)
         return
       }
@@ -418,7 +431,7 @@ export default function CheckInManagementPage() {
 
   const runBulk = React.useCallback(
     async (mode: "activate" | "deactivate" | "download") => {
-      if (!isSignedIn || selectedIds.size === 0) return
+      if (!isSignedIn || selectedIds.size === 0 || tokenLoading) return
       setBulkBusy(true)
       setError(null)
       try {
@@ -465,7 +478,7 @@ export default function CheckInManagementPage() {
         setBulkBusy(false)
       }
     },
-    [isSignedIn, selectedIds, getToken, pageStudents, patchStudentLocal, flashSuccess]
+    [isSignedIn, selectedIds, tokenLoading, getToken, pageStudents, patchStudentLocal, flashSuccess]
   )
 
   const classOptions = React.useMemo(
@@ -501,6 +514,8 @@ export default function CheckInManagementPage() {
     selected && selectedIds.has(selected.id) ? selected.check_in_token : null
 
   const clearSelection = React.useCallback(() => {
+    tokenFetchIdRef.current = null
+    setTokenLoading(false)
     setSelectedIds(new Set())
     setSelected(null)
   }, [])
@@ -545,7 +560,6 @@ export default function CheckInManagementPage() {
       <StaggerItem>
         <StandardPageHeader
           title="Check-In Management"
-          description="View, activate, regenerate, and export student QR check-in codes — filter or group by class."
           secondaryAction={buildReloadAction({
             hasLoaded: !!lastLoaded,
             loading,
@@ -778,7 +792,7 @@ export default function CheckInManagementPage() {
                       size="icon-sm"
                       aria-label="Clear selection"
                       onClick={clearSelection}
-                      disabled={bulkBusy}
+                      disabled={bulkBusy || tokenLoading}
                     >
                       <X className="size-4" />
                     </Button>
@@ -799,7 +813,11 @@ export default function CheckInManagementPage() {
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-0">
                 <div className={QR_SLOT}>
-                  <QrStackPreview count={selectedIds.size} frontToken={stackFrontToken} />
+                  {tokenLoading ? (
+                    <Loader2 className="size-8 animate-spin text-muted-foreground" />
+                  ) : (
+                    <QrStackPreview count={selectedIds.size} frontToken={stackFrontToken} />
+                  )}
                 </div>
                 <div className={ACTION_STACK}>
                   <Button variant="outline" className="w-full justify-start" disabled>
@@ -808,10 +826,10 @@ export default function CheckInManagementPage() {
                   </Button>
                   <Button
                     variant={
-                      !bulkBusy && selectionStats.canActivate ? "default" : "outline"
+                      !bulkBusy && !tokenLoading && selectionStats.canActivate ? "default" : "outline"
                     }
                     className="w-full justify-start"
-                    disabled={bulkBusy || !selectionStats.canActivate}
+                    disabled={bulkBusy || tokenLoading || !selectionStats.canActivate}
                     onClick={() => void runBulk("activate")}
                   >
                     {bulkBusy ? (
@@ -824,7 +842,7 @@ export default function CheckInManagementPage() {
                   <Button
                     variant="destructive"
                     className="w-full justify-start"
-                    disabled={bulkBusy || !selectionStats.canDeactivate}
+                    disabled={bulkBusy || tokenLoading || !selectionStats.canDeactivate}
                     onClick={() => void runBulk("deactivate")}
                   >
                     <ShieldOff className="mr-2 size-4" />
@@ -832,7 +850,7 @@ export default function CheckInManagementPage() {
                   </Button>
                   <Button
                     className="w-full justify-start"
-                    disabled={bulkBusy}
+                    disabled={bulkBusy || tokenLoading}
                     onClick={() => void runBulk("download")}
                   >
                     <Download className="mr-2 size-4" />
@@ -869,7 +887,9 @@ export default function CheckInManagementPage() {
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-0">
                 <div className={QR_SLOT}>
-                  {selected.check_in_token ? (
+                  {tokenLoading ? (
+                    <Loader2 className="size-8 animate-spin text-muted-foreground" />
+                  ) : selected.check_in_token ? (
                     <QrCanvas
                       value={selected.check_in_token}
                       size={168}
@@ -886,7 +906,7 @@ export default function CheckInManagementPage() {
                     variant="outline"
                     className="w-full justify-start"
                     onClick={handleRegenerate}
-                    disabled={actionBusy}
+                    disabled={actionBusy || tokenLoading}
                   >
                     {actionBusy ? (
                       <Loader2 className="mr-2 size-4 animate-spin" />
@@ -898,6 +918,7 @@ export default function CheckInManagementPage() {
                   <Button
                     variant={
                       !actionBusy &&
+                      !tokenLoading &&
                       !!selected.check_in_token &&
                       selected.check_in_token_active === false
                         ? "default"
@@ -907,6 +928,7 @@ export default function CheckInManagementPage() {
                     onClick={() => void toggleActive(true)}
                     disabled={
                       actionBusy ||
+                      tokenLoading ||
                       !selected.check_in_token ||
                       selected.check_in_token_active !== false
                     }
@@ -920,6 +942,7 @@ export default function CheckInManagementPage() {
                     onClick={() => void toggleActive(false)}
                     disabled={
                       actionBusy ||
+                      tokenLoading ||
                       !selected.check_in_token ||
                       selected.check_in_token_active === false
                     }
@@ -930,7 +953,7 @@ export default function CheckInManagementPage() {
                   <Button
                     className="w-full justify-start"
                     onClick={() => void downloadSelectedQr()}
-                    disabled={!selected.check_in_token}
+                    disabled={tokenLoading || !selected.check_in_token}
                   >
                     <Download className="mr-2 size-4" />
                     Download

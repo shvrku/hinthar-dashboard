@@ -589,7 +589,6 @@ function ClassAttendanceContent() {
       <StaggerItem>
         <StandardPageHeader
           title={currentClassLabel ? `Attendance • ${currentClassLabel}` : "Class Attendance"}
-          description="View and log attendance with high-performance ranged query filters."
           back={{ href: "/attendance/", label: "Attendance" }}
           secondaryAction={buildReloadAction({
             hasLoaded: !!lastLoaded,

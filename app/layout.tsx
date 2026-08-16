@@ -8,6 +8,7 @@ import { FocusProvider } from "@/components/focus-context";
 import { CurrentUserProvider } from "@/components/current-user-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 import Script from "next/script";
@@ -125,7 +126,10 @@ export default function RootLayout({
               <ClerkThemeProvider>
                 <QueryProvider>
                   <CurrentUserProvider>
-                    <TooltipProvider>{children}</TooltipProvider>
+                    <TooltipProvider>
+                      {children}
+                      <Toaster />
+                    </TooltipProvider>
                   </CurrentUserProvider>
                 </QueryProvider>
               </ClerkThemeProvider>
