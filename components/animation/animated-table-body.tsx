@@ -225,7 +225,7 @@ export function AnimatedTableBody({
       )
       revealRows(rows, revealFromRef.current)
     },
-    { dependencies: [revealKey] }
+    { dependencies: [revealKey], revertOnUpdate: true }
   )
 
   useGSAP(
@@ -248,7 +248,7 @@ export function AnimatedTableBody({
         })
       }
     },
-    { dependencies: [loading, hasData] }
+    { dependencies: [loading, hasData], revertOnUpdate: true }
   )
 
   const contentRowCount = showSkeleton

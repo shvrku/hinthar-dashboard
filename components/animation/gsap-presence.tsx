@@ -83,7 +83,7 @@ export function GsapPresence({
         tween.kill()
       }
     },
-    { dependencies: [activeKey, renderKey, duration] }
+    { dependencies: [activeKey, renderKey, duration], revertOnUpdate: true }
   )
 
   React.useEffect(() => {

@@ -83,7 +83,7 @@ export function useStaggerEntrance<T extends HTMLElement>(
         }
       )
     },
-    { scope: ref, dependencies: [shouldAnimate] }
+    { scope: ref, dependencies: [shouldAnimate], revertOnUpdate: true }
   )
 
   return { ref, active: shouldAnimate }

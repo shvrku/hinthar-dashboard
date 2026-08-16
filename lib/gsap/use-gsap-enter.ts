@@ -8,6 +8,9 @@ import { prefersReducedMotion } from "@/lib/gsap/reduced-motion"
 
 gsap.registerPlugin(useGSAP)
 
+/** Sentinel so useGSAP always sees a non-empty deps list (stable hook count). */
+const MOUNT_DEPS: unknown[] = ["mount"]
+
 type EnterVars = {
   y?: number
   opacity?: number
@@ -35,6 +38,11 @@ export function useGsapEnter<T extends HTMLElement>(
     delay = 0,
     ease = easeOutSoft,
   } = vars
+
+  // Keep deps length stable across renders. `@gsap/react` conditionally adds a
+  // second useLayoutEffect when `dependencies.length > 0` (deferCleanup path);
+  // flipping empty ↔ non-empty between renders causes React error #310.
+  const stableDeps = deps.length > 0 ? deps : MOUNT_DEPS
 
   useGSAP(
     () => {
@@ -65,7 +73,7 @@ export function useGsapEnter<T extends HTMLElement>(
         }
       )
     },
-    { dependencies: deps }
+    { dependencies: stableDeps, revertOnUpdate: true }
   )
 
   return ref

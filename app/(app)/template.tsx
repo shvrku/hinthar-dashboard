@@ -9,9 +9,12 @@ import { cn } from "@/lib/utils"
 export default function Template({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isTerminal = pathname.includes("/check-in/terminal")
+  // Always pass a fixed-length deps list. `@gsap/react` useGSAP calls an extra
+  // useLayoutEffect when `dependencies.length > 0`; switching `[]` ↔ `[pathname]`
+  // on terminal navigation throws React #310 (more/fewer hooks than last render).
   const ref = useGsapEnter<HTMLDivElement>(
     { y: 14, duration: durations.page },
-    isTerminal ? [] : [pathname]
+    [pathname]
   )
 
   if (isTerminal) {
