@@ -144,20 +144,45 @@ export function SessionOccurrenceTableSkeletonRows({ rows = 5 }: { rows?: number
   )
 }
 
-export function DashboardStatGridSkeleton() {
+export function DashboardOverviewSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Card key={`stat-skeleton-${i}`} className="border border-border bg-card shadow-xs">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-3">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="size-9 rounded-lg" />
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={`kpi-skeleton-${i}`}>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="size-4 rounded-sm" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="mt-2 h-3 w-32" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-56" />
           </CardHeader>
-          <CardContent className="px-6 pb-6 pt-0">
-            <Skeleton className="h-9 w-20" />
+          <CardContent>
+            <Skeleton className="h-64 w-full rounded-xl" />
           </CardContent>
         </Card>
-      ))}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-44" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={`activity-skeleton-${i}`} className="h-10 w-full" />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

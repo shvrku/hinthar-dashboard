@@ -541,7 +541,47 @@ export interface User {
   is_active: boolean
 }
 
-// --- Stats (GET /api/v1/stats/) ---
+export type TrendDirection = "up" | "down" | "stable"
+
+export interface StatTrend {
+  current: number
+  previous: number
+  delta: number
+  direction: TrendDirection
+}
+
+export type AuditCategory =
+  | "student"
+  | "teacher"
+  | "staff"
+  | "class"
+  | "session"
+  | "check_in"
+  | "user"
+  | "other"
+
+export interface AuditLog {
+  id: number
+  user: number | null
+  user_email: string | null
+  category: AuditCategory
+  summary: string
+  model_name: string
+  record_id: string
+  action: "create" | "update" | "delete"
+  field_name: string | null
+  old_value: string | null
+  new_value: string | null
+  timestamp: string
+}
+
+export interface StudentSeriesPoint {
+  date: string
+  count: number
+  new?: number
+}
+
+/** Stats (GET /api/v1/stats/) --- */
 export interface Stats {
   users: number
   students: number
@@ -554,6 +594,15 @@ export interface Stats {
   sessions: number
   session_attendances: number
   check_ins: number
+  trends: {
+    students: StatTrend
+    teachers: StatTrend
+    classes: StatTrend
+    sessions: StatTrend
+    check_ins: StatTrend
+  }
+  student_series: StudentSeriesPoint[]
+  recent_activity: AuditLog[]
 }
 
 /** DRF page envelope (default page_size 50, max 200). */

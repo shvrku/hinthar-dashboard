@@ -7,10 +7,18 @@ Next.js App Router frontend for the Hinthar school management system (students, 
 | Doc | Purpose |
 |-----|---------|
 | [`docs/FRONTEND_STANDARDS.md`](docs/FRONTEND_STANDARDS.md) | UX review, role gates, paginated pages, attendance IA, payroll scrap list |
-| [`docs/SCALING_IMPLEMENTATION_PLAN.md`](docs/SCALING_IMPLEMENTATION_PLAN.md) | Cross-repo phased implementation |
+| [`docs/SCALING_IMPLEMENTATION_PLAN.md`](docs/SCALING_IMPLEMENTATION_PLAN.md) | Cross-repo plan — **phases 0–9 complete** |
 | [`docs/hinthar-dashboard-design-system.md`](docs/hinthar-dashboard-design-system.md) | Design-system notes (shadcn; **base-vega / zinc**) |
 
 UI: shadcn/ui + Tailwind. Auth: Clerk. API calls go to `/api/v1/*` and are proxied to Django.
+
+## What it does
+
+- **Overview (`/`)** — live KPIs with 30-day trends, student enrollment chart, recent important activity
+- **People & classes** — paginated lists; student / class / teacher hubs (enroll, QR lifecycle, attendance analytics)
+- **Schedule** — timetable, generated sessions, Find sessions (slot-first), substitutes (`actual_teacher`)
+- **Lesson attendance** — class / ad-hoc matrices; unmarked cells vs stored absent
+- **Campus check-in** — school/class overview, terminal, QR activate/deactivate, corrections
 
 ## Getting Started
 

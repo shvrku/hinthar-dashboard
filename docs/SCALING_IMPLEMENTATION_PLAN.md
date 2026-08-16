@@ -7,7 +7,7 @@ Cross-repo plan to bring **Hinthar-SMS** (backend) and **Hinthar-Dashboard** (fr
 
 Goal: scale students / teachers / class times / attendance safely; **scrap payroll from the product surface**; keep attendance matrices as scoped aggregate routes; introduce consistent pagination and role helpers.
 
-**Last status update:** 2026-08-07 (Phase 8 Find sessions + substitute UX ownership + datetime ISO standardization).
+**Last status update:** 2026-08-17 — **this plan is complete** (phases 0–9). Further work is product asks, not unfinished scaling.
 
 ---
 
@@ -15,29 +15,35 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 
 | Phase | Focus | Status |
 |------:|-------|--------|
-| 0 | Docs truthfulness, freeze payroll scope, dead nav | **Done** — orphan Support/Feedback/test routes removed; payroll nav scrubbed |
-| 1 | Roles + permission helpers + frontend gates | **Done** — `people/roles.py`, permissions, `RequireRole`, pending role, Clerk = identity only |
-| 2 | Scrap payroll UI + drop model residue | **Done** — UI cleared; migrations dropped `default_rate` / `bank_details` / `paid` |
-| 3 | Pagination + list pages off fetch-all | **Done** — default page 50 / max 200; list pages use `list*Page` + server `q`/filters (no hybrid fetch-all) |
-| 4 | Attendance matrix filters + UX split | **Done** — matrix `class_id` 400; Sessions Take roll deep links |
-| 5 | Bulk / filter / OpenAPI hygiene | **Done** — `records` preferred; `class_id` aliases; page-boundary tests; error freeze; global handler deferred |
-| 6 | Design system, check-in UX, QR lifecycle | **Done** — ConfirmDialog, timetable empty/legend, thin role homes, Clerk resource auth; shadcn **base-vega / zinc** + Chart |
-| 7 | Entity detail pages + analytics + teacher cover | **Done** — student / class / teacher hubs; `actual_teacher` cover; row-click lists |
-| 8 | Find sessions hub, substitute UX, datetime standards | **Done** — slot-first finder; substitute on `/sessions`; ISO DateTime wire format |
+| 0 | Docs truthfulness, freeze payroll scope, dead nav | **Done** |
+| 1 | Roles + permission helpers + frontend gates | **Done** |
+| 2 | Scrap payroll UI + drop model residue | **Done** |
+| 3 | Pagination + list pages off fetch-all | **Done** |
+| 4 | Attendance matrix filters + UX split | **Done** |
+| 5 | Bulk / filter / OpenAPI hygiene | **Done** (live `/api/v1/docs/`; checked-in schema file optional) |
+| 6 | Design system, check-in UX, QR lifecycle | **Done** |
+| 7 | Entity detail pages + analytics + teacher cover | **Done** |
+| 8 | Find sessions hub, substitute UX, datetime standards | **Done** |
+| 9 | Attendance unmarked vs absent, code splits, audit logs, live overview | **Done** |
 
-### Remaining (priority order)
+The school-ops dashboard and API now follow the standards: paged lists, scoped aggregates, role gates, ISO datetimes, semantic tokens, entity hubs, Find sessions, check-in overview, QR lifecycle, and a live home overview with important audit events.
 
-1. Optional: commit Spectacular schema snapshot; global DRF exception handler.
-2. Teacher-scoped querysets (if teacher login is imminent).
-3. Teacher check-in writing `actual_teacher` (deferred — field reserved; staff assign via Sessions / Find sessions today).
-4. Optional polish: deep-link Find sessions from teacher hub recent rows; ad-hoc substitute UI parity if product wants it on ad-hoc edit.
+### Not part of this plan (only if product asks)
 
-### Out of scope until product asks
+| Item | Why it is not “remaining scaling” |
+|------|-----------------------------------|
+| Full `/audit-logs` page | Home already shows a filtered preview; API is staff+ |
+| Teacher-scoped querysets / teacher portal | Staff-only dashboard today; field `actual_teacher` is ready |
+| Teacher check-in writing `actual_teacher` | Staff assign substitute on Sessions / Find sessions |
+| Global DRF exception handler | Error freeze already documents `{error}` + DRF field errors |
+| Checked-in `openapi-schema.yml` | Interactive docs at `/api/v1/docs/` are live |
+| Academic records (exams / results) | Separate product milestone |
+
+### Out of scope
 
 - Reviving `payroll/`
 - Clerk multi-session / Pro org switching as the account-switch story (current: sign out → sign-in)
-- Student self-service portal
-- Day-level teacher attendance; dedicated `substituted` session status
+- Dedicated `substituted` session status
 - Removing `/sessions` table (kept for lookup + bulk)
 
 ---
@@ -56,7 +62,7 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 - **Find sessions** (`/sessions/find/` → `/sessions/find/[classId]/` week grid → `/sessions/find/[classId]/[slotId]/` filtered table + edit dialog).
 - Substitute ownership: teacher hub Recent sessions **read-only**; assign/clear substitute on `/sessions` edit + Find slot edit; `SessionTeacherCell` (Substitute badge + Assigned tooltip).
 - Timetable / attendance / find landings: class picker cards centered; headers stay full-width.
-- Month KPI stats on attendance class/adhoc exclude future sessions (pregenerated absents).
+- Month KPI stats on attendance class/adhoc **count the loaded window**, including future dated sessions. Missing matrix cells are unmarked (not absent).
 - Shared datetime helpers in `lib/utils.ts` (`parseBackendDateTime`, `formatBackendDateTime`, `toSessionDateString`, `formatSlotClock`, …); attendance/sessions/check-in call sites migrated.
 
 ### Earlier (2026-08-06) — Phase 7 hubs
@@ -132,7 +138,7 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 | Ad-hoc bulk_upsert status choices crash | Fixed |
 | Document / stabilize `records` body for upsert | Done — prefer `{"records":[…]}`; bare list fallback |
 | Canonical FK query params; OpenAPI refresh | Done — `class_id` on session-attendances + class-students; bulk_upsert OpenAPI; schema file regen when env allows |
-| Error body consistency | Done for this cycle — domain `{"error"}` (+ optional nested context); DRF validation; **global handler deferred** |
+| Error body consistency | Done for this cycle — domain `{"error"}` (+ optional nested context); DRF validation; global handler is optional later hygiene |
 | Page-boundary tests on hot lists | Done — students, teachers, users, sessions, check-ins |
 
 ---
@@ -263,22 +269,82 @@ Product goal: staff find a class slot’s dated occurrences without hunting the 
 
 ### Attendance / timetable polish (same cycle)
 
-- Month KPI stats exclude future pregenerated absents.
 - Class picker cards centered on attendance / timetable / find landings (headers full-width).
 - Timetable class page title / auto-load / Refresh aligned with attendance class page.
+- **Superseded 2026-08-16:** attendance KPIs no longer drop future sessions (that hid the whole grid when staff jumped ahead a date). Unmarked cells are also no longer counted as absent — see Phase 9.
 
 ---
 
-## Moving forward (recommended next work)
+## Phase 9 — Attendance truth, splits, audit logs, live overview — 2026-08-16–17
 
-```text
-Next 1  Optional: OpenAPI schema snapshot / global exception handler
-Next 2  Teacher scoped querysets (if teacher login is imminent)
-Next 3  Teacher check-in via actual_teacher (deferred)
-Next 4  Optional: deep-link Find sessions from teacher hub; ad-hoc substitute UI parity
-```
+Shipped across Dashboard `ui-rebrand` and SMS `develop` (GitHub: *All fixes*, *Color changes and layouts*, *Studentpage and linkage*, *Qr Page management*, *Optimizations*, *StudentPage and Linkage*, *Rate limit increase*, *Examples and identifier standards*) plus the uncommitted audit / overview work.
 
-Analytics product sketch: class roll (have), **student profile trends** (have), **class / teacher attendance summary** (have), teacher/subject coverage, school heatmaps — **never** mix campus check-in rate with lesson roll without labeling.
+### Attendance unmarked vs absent (standard)
+
+Stored lesson statuses remain **`present | late | absent | excused` only**. There is no `unmarked` row in the database.
+
+| Matrix cell | Meaning | UI |
+|-------------|---------|----|
+| `records[sessionId] = "absent"` | A `SessionAttendance` row exists with status absent (including pregenerated bulk absents) | Coral / `--attendance-absent` |
+| `records[sessionId]` missing or `null` | No attendance row | Grey, em dash `—` (UI fallback `"unmarked"`) |
+
+APIs must **not** fill missing cells as `'absent'`. Dashboard KPIs count loaded matrix rows only; unmarked is not absent. Future sessions in the loaded date window stay in the KPIs (do not filter them out or the grid goes empty when staff pick a future date).
+
+### Frontend splits & cleanup (Dashboard)
+
+- Shared attendance pieces: `components/attendance/` (`attendance-shared.ts`, `attendance-kpis.tsx`, `attendance-matrix.tsx`, `attendance-roster.tsx`, `attendance-view-skeleton.tsx`). Class / ad-hoc pages compose these.
+- Terminal camera: `components/check-in/qr-scanner.tsx` (`jsQR` stays lazy).
+- Students/teachers CSV: `BulkImportModal` mounted only when the import dialog is open.
+- Removed unused `FocusProvider` and the unused direct `date-fns` dependency.
+- Palettes: **emerald** (default) and **mono**; AMOLED theme preview assets; Settings picker.
+- App shell: `overflow-y-auto` on `main`; **padding lives on an inner wrapper** with extra bottom padding (`pb-10` / `md:pb-12`) so last cards are not flush with the viewport. Do not put page padding on `StaggerContainer`.
+
+### Student / owner APIs (SMS + Dashboard)
+
+- `GET /me/student/` — linked student profile + QR token (student role).
+- `GET /me/attendance-summary/?range=` — owner campus + lesson summary.
+- Staff: `POST /students/{id}/link_user/` / `unlink_user/` for Clerk matching.
+- QR activate / deactivate / regenerate remain staff+ on the student hub.
+
+### Backend hygiene (SMS)
+
+- Session date filters use `class_sessions.datetime_bounds` (`aware_day_range`, `month_day_range`) so `start_time` lookups stay index-friendly.
+- Check-in throttle: `120/minute`.
+- Class `cohort_identifier` / `cohort_sub_category` identifier rules aligned with dummy data and migrations.
+
+### Audit logs (SMS) — important events only
+
+`people.AuditLog` now has `category` + human `summary` (migration `0014_auditlog_category_summary`). Helper: `people.audit.log_event()` / `AuditedViewSetMixin`.
+
+**Logged:** student / teacher / staff / class CRUD and bulk import-delete; enroll / unenroll; QR token regen / activate / deactivate; user role and `is_active`; one **Generated N sessions** summary (per-session creates during generate are muted); session / ad-hoc status change and delete; QR / manual check-in create and undo.
+
+**Not logged:** individual attendance-matrix cells; subject catalog noise.
+
+`GET /audit-logs/` is **staff+** (not admin-only). Dashboard home shows ~8 recent rows and **excludes** per-session `Created Session #…` noise (keeps `Generated …` summaries). A dedicated `/audit-logs` management page is not in this plan.
+
+Apply: `python manage.py migrate people`.
+
+### Live overview (`/` + `GET /stats/`)
+
+`GET /stats/` still returns table counts, plus:
+
+| Field | Meaning |
+|-------|---------|
+| `trends` | 30-day up / down / stable for students, teachers, classes (stable), sessions (activity), check-ins (activity) |
+| `student_series` | Cumulative headcount by month-end; leading empty months trimmed (one baseline month kept); optional `new` count per month |
+| `recent_activity` | Latest important audit rows (always fresh; counts/trends cached ~5 min under `stats_overview_v2`) |
+
+Home (`RequireRole` staff): greeting, four trend KPIs, student enrollment **line/area** chart, compact recent-activity list. Single series only — no bar+line overlay.
+
+---
+
+## This plan is complete
+
+Phases 0–9 are implemented. Do not treat the historical phase tables below as a backlog.
+
+If product later asks for a full audit-logs page, a teacher portal, academic records, or a global exception handler, start a **new** plan — do not reopen this one as “ongoing scaling.”
+
+Analytics already in product: class roll, student / class / teacher attendance summaries, live home stats. Never mix campus check-in rate with lesson roll without labeling.
 
 ---
 
@@ -299,6 +365,7 @@ PR-K  class detail hub + analytics                               ✓
 PR-L  teacher attendance + substitutes (actual_teacher)            ✓
 PR-M  shadcn charts + list row-click                             ✓
 PR-N  Find sessions + substitute ownership + ISO datetime        ✓
+PR-O  Attendance unmarked vs absent + page splits + live overview / audit logs  ✓
 ```
 
 ---
@@ -342,4 +409,4 @@ PR-N  Find sessions + substitute ownership + ISO datetime        ✓
 | Semantic color tokens | **Done** — prefer tokens over palette utilities |
 | shadcn charts | **Done** — `components/ui/chart` |
 
-The main remaining scale risks are **OpenAPI drift** and **teacher over-open reads** (if teachers log in) — not missing entity hubs, Find sessions, or unbounded check-in overview downloads.
+The main remaining *product* risks (not unfinished scaling) are **teacher over-open reads if teachers log in** and optional OpenAPI file snapshot drift. Entity hubs, Find sessions, check-in overview, QR lifecycle, and live overview are in.

@@ -23,8 +23,10 @@ export default async function AppLayout({
       <AppSidebar />
       <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <SiteHeader />
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-6">
-          <AppAccessGate>{children}</AppAccessGate>
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-1 flex-col p-4 pb-10 md:p-6 md:pb-12">
+            <AppAccessGate>{children}</AppAccessGate>
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>

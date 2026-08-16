@@ -22,7 +22,7 @@ Keep these **visually and verbally separate** in nav and page titles:
 
 Staff confusion risk: keep **Session Attendance** vs **Check-In** verbally separate (campus presence ≠ lesson roll).
 
-Scaling status / next work: `docs/SCALING_IMPLEMENTATION_PLAN.md`.
+Scaling plan (complete): `docs/SCALING_IMPLEMENTATION_PLAN.md`.
 
 ---
 
@@ -37,11 +37,11 @@ Verdicts are for **front-office / academic staff**, not developers.
 - Check-in terminal is lookup → confirm → commit (no token leakage in UI).
 - Role gates via `RequireRole` / sidebar filtering; Clerk is identity, Django owns role.
 
-### Issues by page (as of 2026-08-07)
+### Issues by page (as of 2026-08-17)
 
 | Page | Graspability | Notes |
 |------|--------------|-------|
-| `/` (Overview) | Medium | Prefer live KPIs here (Phase 6); `/dashboard` redirects to `/`. |
+| `/` (Overview) | Good | Staff home: greeting, four 30-day trend KPIs, student enrollment line/area chart, compact recent-activity list from `GET /stats/`. `/dashboard` redirects to `/`. |
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
 | `/classes/[id]` | Good | Hub: roster, timetable summary, attendance analytics. |
 | `/teachers` | Good | Payroll rate/bank fields removed. |
@@ -53,8 +53,8 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/timetable` | Good | Landing → class week grid; empty states + week legend. |
 | `/sessions` | Good | Bulk / cross-class lookup; Assigned + Substitute on edit; `SessionTeacherCell`. |
 | `/sessions/find/` | Good | Slot-first path: class → week grid → slot occurrence table + edit. |
-| `/attendance/` | Better | Landing → class or ad-hoc. Remaining: deep links from Sessions; optional density polish. |
-| `/attendance/class/[classId]/` | Good | Server subject/teacher filters; headers show subject · teacher; identifiers under names; excused supported; month KPIs exclude future sessions. |
+| `/attendance/` | Good | Landing → class or ad-hoc. Sessions **Take roll** deep-links into the matching roster. |
+| `/attendance/class/[classId]/` | Good | Server subject/teacher filters; headers show subject · teacher; identifiers under names; excused supported. Month KPIs count **loaded** rows (including future sessions in the window). Missing cells are unmarked (`—`), not absent. |
 | `/attendance/adhoc/` | Good | Add Session + **Add Students** (server search, load-more). Empty grid until students added. |
 | `/check-in/overview` | Good | Server aggregate. **All classes**: dual Missing \| Checked-in columns, each paginated via `status=`; single class keeps dual columns unpaginated; icon-only **Undo** / actions; school-wide search. |
 | `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
@@ -69,6 +69,8 @@ Verdicts are for **front-office / academic staff**, not developers.
 3. Column headers: subject, teacher, date, time. Student secondary line: `unique_code`.
 4. Ad-hoc participants = attendance rows created via Add Students (start **absent**).
 5. Sessions **Take roll** deep-links into class/ad-hoc roster with `session_id` (+ date filters).
+6. Matrix: stored statuses are `present | late | absent | excused` only. Missing / `null` cells are unmarked (grey `—`). KPIs never treat unmarked as absent; they include future sessions that are already in the loaded window.
+7. Shared pieces live in `components/attendance/` — class and ad-hoc pages compose them.
 
 ### Find sessions / substitute UX — current contract
 
@@ -81,7 +83,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 
 ### Datetime handling
 
-- Parse/display backend DateTimes only via `lib/utils.ts` (`parseBackendDateTime`, `formatBackendDateTime`, `formatBackendDate`, `formatBackendTime`, `toSessionDateString`, `formatSlotClock`, …).
+- Parse/display backend DateTimes only via `lib/utils.ts` (`parseBackendDateTime`, `formatBackendDateTime`, `formatBackendDate`, `formatBackendTime`, `toSessionDateString`, `formatSlotClock`, `formatRelativeTime`, …).
 - Expect **ISO-8601** from the API; helpers still tolerate legacy `dd/mm/yy` input during transition.
 - Do not use bare `new Date(backendString)` for list/matrix keys or filters.
 ---
@@ -138,7 +140,7 @@ When adding a paginated list page:
 - Use shadcn primitives from `components/ui/` — do not reinvent Select/Dialog/Table.
 - Shared chrome: `StandardPageHeader`, KPI strip, confirm dialog (**one** shared `ConfirmDialog`, not per-page copies).
 - Forms: consistent required-field marking; no payroll fields on teachers/sessions.
-- Motion: wrap management pages in `StaggerContainer` / `StaggerItem` (include the header). Do not add decorative noise or page-level padding on the stagger root.
+- Motion: wrap management pages in `StaggerContainer` / `StaggerItem` (include the header). Do not add decorative noise or page-level padding on the stagger root — app shell padding lives on the inner `main` wrapper (`p-4 pb-10 md:p-6 md:pb-12`).
 
 ### Page header & reload contract
 
@@ -180,12 +182,12 @@ Loading states:
 
 ## 4. How to add a new paginated management route (frontend)
 
-Example: `/audit-logs` backed by `GET /api/v1/audit-logs/?page=&page_size=`.
+Example: a future `/audit-logs` page backed by `GET /api/v1/audit-logs/?page=&page_size=&category=` (staff+). Home already previews important events from `GET /stats/.recent_activity` — do not duplicate that feed as a second fetch-all.
 
 1. **Types** in `lib/types.ts` for the entity + `Paginated<T>`.
 2. **API** helper: `listAuditLogs({ page, page_size, …filters })` returning the envelope (do not auto-unwrap `results` only — expose `count`).
 3. **Page** `app/audit-logs/page.tsx`:
-   - `RequireRole minimum="admin"`
+   - `RequireRole minimum="staff"` (API is staff+, not admin-only)
    - Read `page` / filters from `useSearchParams`
    - `useEffect` load on param change
    - Table + `StandardTablePagination`
@@ -221,7 +223,7 @@ When a new overview is needed (e.g. class attendance for a term):
 | Default rate | Out of scope — do not show (payroll frozen) |
 | Dashboard (static home) | Overview **or** live Stats dashboard |
 
-Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI).
+Status labels: **Present**, **Late**, **Absent**, **Excused** (Title Case in UI). Unmarked cells use an em dash, not “Absent”.
 
 Teacher fields: **Assigned** (generation teacher) vs **Substitute** (`actual_teacher` when set). Empty substitute = taught as assigned.
 

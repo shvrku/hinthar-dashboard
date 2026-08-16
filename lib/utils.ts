@@ -134,6 +134,21 @@ export function formatBackendTime(value: string): string {
   })
 }
 
+/** Compact relative time for activity feeds (e.g. "3h ago"). */
+export function formatRelativeTime(value: string, now = new Date()): string {
+  const d = parseBackendDateTime(value)
+  if (isNaN(d.getTime())) return "—"
+  const sec = Math.round((now.getTime() - d.getTime()) / 1000)
+  if (sec < 45) return "just now"
+  if (sec < 90) return "1m ago"
+  if (sec < 3600) return `${Math.round(sec / 60)}m ago`
+  if (sec < 5400) return "1h ago"
+  if (sec < 86400) return `${Math.round(sec / 3600)}h ago`
+  if (sec < 172800) return "1d ago"
+  if (sec < 604800) return `${Math.round(sec / 86400)}d ago`
+  return formatBackendDateTime(value)
+}
+
 /** Normalize timetable / ad-hoc clock to `HH:MM`. */
 export function formatSlotClock(value: string): string {
   const m = value.trim().match(/^(\d{1,2}):(\d{2})/)
