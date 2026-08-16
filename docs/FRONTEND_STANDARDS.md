@@ -59,7 +59,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/check-in/overview` | Good | Server aggregate. **All classes**: dual Missing \| Checked-in columns, each paginated via `status=`; single class keeps dual columns unpaginated; icon-only **Undo** / actions; school-wide search. |
 | `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
 | `/check-in/corrections` | Good | Undo mis-tap campus check-ins; auto-reverts lesson marks attributed to that check-in. |
-| `/check-in/terminal` | Good | Lookup → confirm → commit; deactivated QR shows confirmation-panel card with student info when available. |
+| `/check-in/terminal` | Good | Lookup → confirm → commit; deactivated QR/code shows confirmation-panel card (QR **and** unique-code paths blocked until reactivated). |
 | Auth / roles | Addressed | Resource `auth.protect` + gates; still enforce API scoping for teachers/students. |
 
 ### Attendance UX — current contract

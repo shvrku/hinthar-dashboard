@@ -330,21 +330,21 @@ export function createApi(token: string) {
       request<{ check_in_token: string; check_in_token_active?: boolean }>(
         `/students/${id}/regenerate_check_in_token/`,
         token,
-        { method: "POST" }
+        { method: "POST", body: JSON.stringify({}) }
       ),
 
     activateCheckInToken: (id: number) =>
       request<{ check_in_token_active: boolean }>(
         `/students/${id}/activate_check_in_token/`,
         token,
-        { method: "POST" }
+        { method: "POST", body: JSON.stringify({}) }
       ),
 
     deactivateCheckInToken: (id: number) =>
       request<{ check_in_token_active: boolean }>(
         `/students/${id}/deactivate_check_in_token/`,
         token,
-        { method: "POST" }
+        { method: "POST", body: JSON.stringify({}) }
       ),
 
     getStudentAttendanceSummary: (id: number, range: import("./types").StudentAnalyticsRange) =>

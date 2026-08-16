@@ -150,7 +150,7 @@ export default function TerminalPage() {
           setLookupCard({
             kind: "deactivated",
             student: blockedStudent,
-            message: "QR token is deactivated. This student cannot check in until reactivated.",
+            message: "Check-in is deactivated for this student until staff reactivates their QR.",
           })
         } else {
           toastApiError(err, "Lookup failed")
@@ -190,7 +190,17 @@ export default function TerminalPage() {
       })
       scannerRef.current?.lockScan()
     } catch (err) {
-      toastApiError(err, "Lookup failed")
+      if (err instanceof ApiError && err.status === 403) {
+        const blockedStudent = parseBlockedLookupStudent(err.payload)
+        setLookupCard({
+          kind: "deactivated",
+          student: blockedStudent,
+          message: "Check-in is deactivated for this student until staff reactivates their QR.",
+        })
+        scannerRef.current?.lockScan()
+      } else {
+        toastApiError(err, "Lookup failed")
+      }
     } finally {
       setLooking(false)
     }
