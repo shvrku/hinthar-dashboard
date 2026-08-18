@@ -31,17 +31,21 @@ export function RequireRole({
   mode?: GateMode
   children: React.ReactNode
 }) {
-  const { role, loading, error } = useCurrentUser()
+  const { role, user, loading, error } = useCurrentUser()
   const router = useRouter()
   const pathnameRaw = usePathname()
   const pathname =
     pathnameRaw.length > 1 && pathnameRaw.endsWith("/")
       ? pathnameRaw.slice(0, -1)
       : pathnameRaw
+  const waitingForLink =
+    role === "pending" ||
+    (role === "student" && user?.student_profile_id == null) ||
+    (role === "teacher" && user?.teacher_profile_id == null)
 
   React.useEffect(() => {
     if (loading) return
-    if (role === "pending" && pathname !== "/pending") {
+    if (waitingForLink && pathname !== "/pending") {
       router.replace("/pending/")
       return
     }
@@ -56,7 +60,7 @@ export function RequireRole({
         router.replace("/check-in/terminal/")
       }
     }
-  }, [loading, role, pathname, router, mode])
+  }, [loading, role, waitingForLink, pathname, router, mode])
 
   if (loading) {
     return null
@@ -73,7 +77,7 @@ export function RequireRole({
     )
   }
 
-  if (role === "pending") {
+  if (waitingForLink) {
     return null
   }
 

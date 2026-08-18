@@ -4,6 +4,7 @@ import { useClerk } from "@clerk/nextjs"
 import { useCurrentUser } from "@/components/current-user-provider"
 import { Button } from "@/components/ui/button"
 import { StandardPageHeader } from "@/components/standard-page-header"
+
 export default function PendingApprovalPage() {
   const { user, loading } = useCurrentUser()
   const { signOut } = useClerk()
@@ -13,20 +14,23 @@ export default function PendingApprovalPage() {
   }
 
   const role = user?.role
-  const copy =
-    role === "teacher"
-      ? {
-          title: "Teacher portal coming soon",
-          description:
-            "Your teacher account is active, but the teacher workspace is not enabled in this release. Ask an administrator if you need staff access for now.",
-          statusNote: "Teacher role assigned — portal not available yet",
-        }
-      : {
-          title: "Awaiting approval",
-          description:
-            "Your account was created successfully. An administrator must assign a role before you can use the dashboard.",
-          statusNote: "Waiting for admin approval",
-        }
+  const unmatched = role === "student" || role === "teacher"
+  const copy = unmatched
+    ? {
+        title: "Account not linked yet",
+        description:
+          "Your login is still pending a match. Ask an administrator to link this account to your student or teacher record before you can open your hub.",
+        statusNote:
+          role === "teacher"
+            ? "Teacher role assigned — not linked to a teacher record"
+            : "Student role assigned — not linked to a student record",
+      }
+    : {
+        title: "Still pending",
+        description:
+          "Your account was created successfully. An administrator must assign a role and link it before you can use the dashboard.",
+        statusNote: "Waiting for admin approval",
+      }
 
   return (
     <div className="mx-auto max-w-lg space-y-6 pb-6">

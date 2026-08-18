@@ -115,14 +115,22 @@ interface CommandSearchDialogProps {
 
 export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogProps) {
   const router = useRouter()
-  const { role } = useCurrentUser()
+  const { role, user } = useCurrentUser()
+  const studentHref =
+    user?.student_profile_id != null ? `/students/${user.student_profile_id}` : "/pending"
+  const teacherHref =
+    user?.teacher_profile_id != null ? `/teachers/${user.teacher_profile_id}` : "/pending"
 
   const visibleItems = React.useMemo(() => {
     if (role === "student") {
-      return navigationItems.filter((item) => item.studentOnly)
+      return navigationItems
+        .filter((item) => item.studentOnly)
+        .map((item) => ({ ...item, href: studentHref }))
     }
     if (role === "teacher") {
-      return navigationItems.filter((item) => item.teacherOnly)
+      return navigationItems
+        .filter((item) => item.teacherOnly)
+        .map((item) => ({ ...item, href: teacherHref }))
     }
     if (!isStaffOrAbove(role)) {
       return []
@@ -131,7 +139,7 @@ export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogP
     return navigationItems.filter(
       (item) => !item.studentOnly && !item.teacherOnly && (!item.adminOnly || admin)
     )
-  }, [role])
+  }, [role, studentHref, teacherHref])
 
   const groupedItems = React.useMemo(() => {
     const groups = new Map<string, NavigationItem[]>()

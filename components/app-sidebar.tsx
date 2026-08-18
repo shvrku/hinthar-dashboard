@@ -104,7 +104,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, isSignedIn, isLoaded } = useUser()
   const { openUserProfile, signOut } = useClerk()
-  const { role, loading: accountLoading } = useCurrentUser()
+  const { role, user: account, loading: accountLoading } = useCurrentUser()
   const { isMobile, setOpenMobile } = useSidebar()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
   const checkInExpanded = pathname.startsWith("/check-in") || checkInOpen
@@ -115,7 +115,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const showTeacherNav = !accountLoading && role === "teacher"
   const showTerminalNav = !accountLoading && canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
-  const teacherHomeHref = user?.teacher_profile_id ? `/teachers/${user.teacher_profile_id}` : "/pending"
+  const teacherHomeHref = account?.teacher_profile_id
+    ? `/teachers/${account.teacher_profile_id}`
+    : "/pending"
+  const studentHomeHref = account?.student_profile_id
+    ? `/students/${account.student_profile_id}`
+    : "/pending"
   const homeHref = "/"
 
   const closeMobileSidebar = React.useCallback(() => {
@@ -299,7 +304,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="My Hub"
-                  isActive={pathname === teacherHomeHref}
+                  isActive={
+                    pathname === teacherHomeHref ||
+                    pathname === `${teacherHomeHref}/` ||
+                    pathname.startsWith("/teachers/")
+                  }
                   render={<Link href={teacherHomeHref} onClick={handleNavClick} />}
                 >
                   <UserCheck />
@@ -333,8 +342,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Home"
-                  isActive={pathname === "/" || pathname.startsWith("/students/")}
-                  render={<Link href="/" onClick={handleNavClick} />}
+                  isActive={
+                    pathname === studentHomeHref ||
+                    pathname === `${studentHomeHref}/` ||
+                    pathname.startsWith("/students/") ||
+                    pathname === "/pending" ||
+                    pathname === "/pending/"
+                  }
+                  render={<Link href={studentHomeHref} onClick={handleNavClick} />}
                 >
                   <QrCode />
                   <span>Home</span>

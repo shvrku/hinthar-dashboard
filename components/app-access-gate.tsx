@@ -35,12 +35,16 @@ function isOwnTeacherHubPath(pathname: string, teacherProfileId: number | null):
   return match != null && Number(match[1]) === teacherProfileId
 }
 
+function isPendingPath(pathname: string): boolean {
+  return pathname === "/pending"
+}
+
 /**
  * Global access gate after Clerk sign-in:
  * - `/` is the post-login dispatcher (all signed-in roles)
  * - `/settings` → all signed-in roles (appearance is client-local)
  * - `/student` leftover alias (redirect page)
- * - pending → `/pending`
+ * - pending / unmatched student or teacher → `/pending`
  * - teacher → `/`, `/settings`, own `/teachers/{id}`
  * - terminal → `/`, `/settings`, `/check-in/terminal*`
  * - student → `/`, `/settings`, own `/students/{id}`
@@ -51,6 +55,11 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   const { role, user, loading } = useCurrentUser()
   const pathname = normalizePath(usePathname())
   const router = useRouter()
+  const studentProfileId = user?.student_profile_id ?? null
+  const teacherProfileId = user?.teacher_profile_id ?? null
+  const unmatchedStudent = role === "student" && studentProfileId == null
+  const unmatchedTeacher = role === "teacher" && teacherProfileId == null
+  const waitingForLink = role === "pending" || unmatchedStudent || unmatchedTeacher
 
   React.useEffect(() => {
     if (!authLoaded || loading || !isSignedIn || !role) return
@@ -58,8 +67,8 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
       return
     }
 
-    if (role === "pending") {
-      if (pathname !== "/pending") router.replace("/pending/")
+    if (waitingForLink) {
+      if (!isPendingPath(pathname)) router.replace("/pending/")
       return
     }
 
@@ -71,24 +80,33 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (role === "student") {
-      if (!isOwnStudentHubPath(pathname, user?.student_profile_id ?? null)) {
+      if (!isOwnStudentHubPath(pathname, studentProfileId)) {
         router.replace("/")
       }
       return
     }
 
     if (role === "teacher") {
-      const teacherProfileId = user?.teacher_profile_id ?? null
       if (!isOwnTeacherHubPath(pathname, teacherProfileId)) {
         router.replace("/")
       }
       return
     }
 
-    if (isStaffOrAbove(role) && pathname === "/pending") {
+    if (isStaffOrAbove(role) && isPendingPath(pathname)) {
       router.replace("/overview/")
     }
-  }, [authLoaded, loading, isSignedIn, role, user?.student_profile_id, user?.teacher_profile_id, pathname, router])
+  }, [
+    authLoaded,
+    loading,
+    isSignedIn,
+    role,
+    studentProfileId,
+    teacherProfileId,
+    waitingForLink,
+    pathname,
+    router,
+  ])
 
   if (!authLoaded || (isSignedIn && loading)) {
     return null
@@ -110,18 +128,18 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  if (role === "pending") {
-    if (pathname !== "/pending") return null
+  if (waitingForLink) {
+    if (!isPendingPath(pathname)) return null
     return <>{children}</>
   }
 
   if (role === "teacher") {
-    if (!isOwnTeacherHubPath(pathname, user?.teacher_profile_id ?? null)) return null
+    if (!isOwnTeacherHubPath(pathname, teacherProfileId)) return null
     return <>{children}</>
   }
 
   if (role === "student") {
-    if (!isOwnStudentHubPath(pathname, user?.student_profile_id ?? null)) return null
+    if (!isOwnStudentHubPath(pathname, studentProfileId)) return null
     return <>{children}</>
   }
 
