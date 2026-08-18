@@ -9,19 +9,25 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { ChartExportMenu } from "@/components/chart-export-menu"
-import { formatBackendDate } from "@/lib/utils"
+import { cn, formatBackendDate } from "@/lib/utils"
 import type { StudentSeriesPoint } from "@/lib/types"
 
 const enrollmentConfig = {
   count: { label: "Students", color: "var(--chart-1)" },
 } satisfies ChartConfig
 
-export function StudentEnrollmentChart({ data }: { data: StudentSeriesPoint[] }) {
+export function StudentEnrollmentChart({
+  data,
+  className,
+}: {
+  data: StudentSeriesPoint[]
+  className?: string
+}) {
   const ref = React.useRef<HTMLDivElement>(null)
   const gradientId = React.useId().replace(/:/g, "")
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn("flex flex-col gap-2", className)}>
       <div className="flex justify-end">
         <ChartExportMenu
           filenameBase="student-enrollment"
@@ -34,8 +40,8 @@ export function StudentEnrollmentChart({ data }: { data: StudentSeriesPoint[] })
           disabled={data.length === 0}
         />
       </div>
-      <div ref={ref}>
-        <ChartContainer config={enrollmentConfig} className="h-64 w-full aspect-auto">
+      <div ref={ref} className="flex-1 min-h-0">
+        <ChartContainer config={enrollmentConfig} className="h-full min-h-[16rem] w-full aspect-auto">
           <AreaChart data={data} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

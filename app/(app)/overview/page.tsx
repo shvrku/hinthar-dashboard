@@ -262,7 +262,7 @@ function OverviewContent() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-5">
-            <Card className="lg:col-span-3">
+            <Card className="lg:col-span-3 flex flex-col">
               <CardHeader>
                 <CardTitle>Student enrollment</CardTitle>
                 <CardDescription>
@@ -271,8 +271,8 @@ function OverviewContent() {
                     : "Cumulative headcount over the last 12 months"}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <StudentEnrollmentChart data={stats?.student_series ?? []} />
+              <CardContent className="flex-1 min-h-0">
+                <StudentEnrollmentChart data={stats?.student_series ?? []} className="h-full" />
               </CardContent>
             </Card>
 
