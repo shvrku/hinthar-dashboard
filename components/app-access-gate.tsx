@@ -29,12 +29,19 @@ function isOwnStudentHubPath(pathname: string, studentProfileId: number | null):
   return match != null && Number(match[1]) === studentProfileId
 }
 
+function isOwnTeacherHubPath(pathname: string, teacherProfileId: number | null): boolean {
+  if (teacherProfileId == null) return false
+  const match = pathname.match(/^\/teachers\/(\d+)$/)
+  return match != null && Number(match[1]) === teacherProfileId
+}
+
 /**
  * Global access gate after Clerk sign-in:
  * - `/` is the post-login dispatcher (all signed-in roles)
  * - `/settings` → all signed-in roles (appearance is client-local)
  * - `/student` leftover alias (redirect page)
- * - pending / teacher → `/pending`
+ * - pending → `/pending`
+ * - teacher → `/`, `/settings`, own `/teachers/{id}`
  * - terminal → `/`, `/settings`, `/check-in/terminal*`
  * - student → `/`, `/settings`, own `/students/{id}`
  * - staff/admin → full app
@@ -71,14 +78,17 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (role === "teacher") {
-      if (pathname !== "/pending") router.replace("/pending/")
+      const teacherProfileId = user?.teacher_profile_id ?? null
+      if (!isOwnTeacherHubPath(pathname, teacherProfileId)) {
+        router.replace("/")
+      }
       return
     }
 
     if (isStaffOrAbove(role) && pathname === "/pending") {
       router.replace("/overview/")
     }
-  }, [authLoaded, loading, isSignedIn, role, user?.student_profile_id, pathname, router])
+  }, [authLoaded, loading, isSignedIn, role, user?.student_profile_id, user?.teacher_profile_id, pathname, router])
 
   if (!authLoaded || (isSignedIn && loading)) {
     return null
@@ -100,8 +110,13 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  if (role === "pending" || role === "teacher") {
+  if (role === "pending") {
     if (pathname !== "/pending") return null
+    return <>{children}</>
+  }
+
+  if (role === "teacher") {
+    if (!isOwnTeacherHubPath(pathname, user?.teacher_profile_id ?? null)) return null
     return <>{children}</>
   }
 

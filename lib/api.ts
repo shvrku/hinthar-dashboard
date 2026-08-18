@@ -364,6 +364,17 @@ export function createApi(token: string) {
         method: "POST",
       }),
 
+    linkTeacherUser: (teacherId: number, userId: number) =>
+      request<import("./types").Teacher>(`/teachers/${teacherId}/link_user/`, token, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
+
+    unlinkTeacherUser: (teacherId: number) =>
+      request<import("./types").Teacher>(`/teachers/${teacherId}/unlink_user/`, token, {
+        method: "POST",
+      }),
+
     // --- Check-Ins ---
     listCheckIns: (params?: Record<string, string | number | undefined | null>) =>
       fetchAllPages<import("./types").CheckIn>(`/check-ins/`, token, params),

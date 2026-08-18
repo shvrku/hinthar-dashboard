@@ -4,7 +4,7 @@ import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Link2, Loader2, Search, Unlink } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
-import type { Student, User } from "@/lib/types"
+import type { Teacher, User } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
@@ -31,28 +31,28 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-const LINKABLE_ROLES = new Set(["pending", "student"])
+const LINKABLE_ROLES = new Set(["pending", "teacher"])
 
 function isLinkableUser(user: User) {
-  return LINKABLE_ROLES.has(user.role) && !user.teacher_profile_id && !user.staff_profile_id
+  return LINKABLE_ROLES.has(user.role) && !user.teacher_profile_id && !user.student_profile_id && !user.staff_profile_id
 }
 
-function MatchingContent() {
+function MatchingTeachersContent() {
   const { getToken } = useAuth()
   const [unmatchedUsers, setUnmatchedUsers] = React.useState<User[]>([])
-  const [unmatchedStudents, setUnmatchedStudents] = React.useState<Student[]>([])
+  const [unmatchedTeachers, setUnmatchedTeachers] = React.useState<Teacher[]>([])
   const [linkedUsers, setLinkedUsers] = React.useState<User[]>([])
-  const [linkedByUserId, setLinkedByUserId] = React.useState<Map<number, Student>>(new Map())
+  const [linkedByUserId, setLinkedByUserId] = React.useState<Map<number, Teacher>>(new Map())
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
   const [accountQuery, setAccountQuery] = React.useState("")
   const [linkedQuery, setLinkedQuery] = React.useState("")
-  const [selectedStudentByUser, setSelectedStudentByUser] = React.useState<Record<number, string>>({})
+  const [selectedTeacherByUser, setSelectedTeacherByUser] = React.useState<Record<number, string>>({})
   const [linkingUserId, setLinkingUserId] = React.useState<number | null>(null)
-  const [unlinkingStudentId, setUnlinkingStudentId] = React.useState<number | null>(null)
-  const [unlinkTarget, setUnlinkTarget] = React.useState<{ user: User; student: Student } | null>(null)
+  const [unlinkingTeacherId, setUnlinkingTeacherId] = React.useState<number | null>(null)
+  const [unlinkTarget, setUnlinkTarget] = React.useState<{ user: User; teacher: Teacher } | null>(null)
 
   const flashSuccess = React.useCallback((msg: string) => {
     setSuccess(msg)
@@ -63,23 +63,23 @@ function MatchingContent() {
     const token = await getToken()
     if (!token) return
     const api = createApi(token)
-    const [usersUnlinked, studentsUnlinked, usersLinked, studentsLinked] = await Promise.all([
+    const [usersUnlinked, teachersUnlinked, usersLinked, teachersLinked] = await Promise.all([
       api.listUsers({
         linked: "false",
-        linked_target: "student",
+        linked_target: "teacher",
         linkable: "true",
-        linkable_target: "student",
+        linkable_target: "teacher",
       }),
-      api.listStudents({ linked: "false" }),
-      api.listUsers({ linked: "true", linked_target: "student" }),
-      api.listStudents({ linked: "true" }),
+      api.listTeachers({ linked: "false" }),
+      api.listUsers({ linked: "true", linked_target: "teacher" }),
+      api.listTeachers({ linked: "true" }),
     ])
     setUnmatchedUsers(usersUnlinked.filter(isLinkableUser))
-    setUnmatchedStudents(studentsUnlinked)
-    setLinkedUsers(usersLinked)
-    const map = new Map<number, Student>()
-    for (const student of studentsLinked) {
-      if (student.user_id != null) map.set(student.user_id, student)
+    setUnmatchedTeachers(teachersUnlinked)
+    setLinkedUsers(usersLinked.filter((user) => user.teacher_profile_id != null))
+    const map = new Map<number, Teacher>()
+    for (const teacher of teachersLinked) {
+      if (teacher.user_id != null) map.set(teacher.user_id, teacher)
     }
     setLinkedByUserId(map)
   }, [getToken])
@@ -91,25 +91,27 @@ function MatchingContent() {
       await load()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
-      setError(err instanceof ApiError ? err.userMessage : "Failed to load matching data")
+      setError(err instanceof ApiError ? err.userMessage : "Failed to load teacher matching data")
     } finally {
       setLoading(false)
     }
   }, [load])
 
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount
-    void reload()
+    const timer = window.setTimeout(() => {
+      void reload()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [reload])
 
-  const studentOptions = React.useMemo(
+  const teacherOptions = React.useMemo(
     () =>
-      unmatchedStudents.map((student) => ({
-        value: String(student.id),
-        label: student.name,
-        subLabel: [student.unique_code, ...(student.class_labels ?? [])].filter(Boolean).join(" · "),
+      unmatchedTeachers.map((teacher) => ({
+        value: String(teacher.id),
+        label: teacher.name,
+        subLabel: [teacher.unique_code, teacher.school_code].filter(Boolean).join(" · "),
       })),
-    [unmatchedStudents]
+    [unmatchedTeachers]
   )
 
   const filteredUnmatchedUsers = React.useMemo(() => {
@@ -125,28 +127,28 @@ function MatchingContent() {
     const q = linkedQuery.trim().toLowerCase()
     if (!q) return linkedUsers
     return linkedUsers.filter((user) => {
-      const student = linkedByUserId.get(user.id)
-      const haystack = `${user.email} ${user.username} ${student?.name ?? ""} ${student?.unique_code ?? ""}`.toLowerCase()
+      const teacher = linkedByUserId.get(user.id)
+      const haystack = `${user.email} ${user.username} ${teacher?.name ?? ""} ${teacher?.unique_code ?? ""}`.toLowerCase()
       return haystack.includes(q)
     })
   }, [linkedUsers, linkedByUserId, linkedQuery])
 
   const handleLink = async (user: User) => {
-    const studentId = Number(selectedStudentByUser[user.id])
-    if (!Number.isFinite(studentId)) return
+    const teacherId = Number(selectedTeacherByUser[user.id])
+    if (!Number.isFinite(teacherId)) return
     setLinkingUserId(user.id)
     setError(null)
     try {
       const token = await getToken()
       if (!token) return
-      const student = unmatchedStudents.find((s) => s.id === studentId)
-      await createApi(token).linkStudentUser(studentId, user.id)
-      setSelectedStudentByUser((prev) => {
+      const teacher = unmatchedTeachers.find((t) => t.id === teacherId)
+      await createApi(token).linkTeacherUser(teacherId, user.id)
+      setSelectedTeacherByUser((prev) => {
         const next = { ...prev }
         delete next[user.id]
         return next
       })
-      flashSuccess(`Linked ${user.email || user.username} to ${student?.name ?? "student"}.`)
+      flashSuccess(`Linked ${user.email || user.username} to ${teacher?.name ?? "teacher"}.`)
       await load()
       setLastLoaded(new Date().toLocaleTimeString())
     } catch (err) {
@@ -158,12 +160,12 @@ function MatchingContent() {
 
   const handleUnlink = async () => {
     if (!unlinkTarget) return
-    setUnlinkingStudentId(unlinkTarget.student.id)
+    setUnlinkingTeacherId(unlinkTarget.teacher.id)
     setError(null)
     try {
       const token = await getToken()
       if (!token) return
-      await createApi(token).unlinkStudentUser(unlinkTarget.student.id)
+      await createApi(token).unlinkTeacherUser(unlinkTarget.teacher.id)
       flashSuccess(
         `Unlinked ${unlinkTarget.user.email || unlinkTarget.user.username}. Account is pending again.`
       )
@@ -173,7 +175,7 @@ function MatchingContent() {
     } catch (err) {
       setError(err instanceof ApiError ? err.userMessage : "Failed to unlink account")
     } finally {
-      setUnlinkingStudentId(null)
+      setUnlinkingTeacherId(null)
     }
   }
 
@@ -181,8 +183,8 @@ function MatchingContent() {
     <StaggerContainer className="space-y-8">
       <StaggerItem>
         <StandardPageHeader
-          title="Match students"
-          description="Link Clerk accounts to student records. Linking sets the account role to student; unlinking returns a student-role account to pending."
+          title="Match teachers"
+          description="Link Clerk accounts to teacher records. Linking sets the account role to teacher; unlinking returns a teacher-role account to pending."
           back={{ href: "/users/management/", label: "Users" }}
           secondaryAction={buildReloadAction({
             hasLoaded: lastLoaded !== null,
@@ -202,14 +204,14 @@ function MatchingContent() {
           <div>
             <h2 className="text-lg font-semibold">Unmatched accounts</h2>
             <p className="text-sm text-muted-foreground">
-              Pending and student logins that are not attached to a roster row.
+              Pending and teacher logins that are not attached to a teacher row.
             </p>
           </div>
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search accounts…"
+              placeholder="Search accounts..."
               value={accountQuery}
               onChange={(e) => setAccountQuery(e.target.value)}
               className="pl-9"
@@ -224,7 +226,7 @@ function MatchingContent() {
                 <TableRow>
                   <TableHead>Account</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Student record</TableHead>
+                  <TableHead>Teacher record</TableHead>
                   <TableHead className="w-[120px]" />
                 </TableRow>
               </TableHeader>
@@ -245,10 +247,10 @@ function MatchingContent() {
                 idleTitle="No accounts loaded yet"
                 idleDescription="Use Load Data in the toolbar to fetch unmatched accounts."
                 emptyTitle="No unmatched accounts"
-                emptyDescription="Every pending or student login already has a roster match, or none have signed up yet."
+                emptyDescription="Every pending or teacher login already has a teacher match, or none have signed up yet."
               >
                 {filteredUnmatchedUsers.map((user) => {
-                  const selected = selectedStudentByUser[user.id] ?? ""
+                  const selected = selectedTeacherByUser[user.id] ?? ""
                   const busy = linkingUserId === user.id
                   return (
                     <TableRow key={user.id}>
@@ -263,14 +265,14 @@ function MatchingContent() {
                       </TableCell>
                       <TableCell className="min-w-[16rem]">
                         <SearchableSelect
-                          options={studentOptions}
+                          options={teacherOptions}
                           value={selected}
                           onValueChange={(value) =>
-                            setSelectedStudentByUser((prev) => ({ ...prev, [user.id]: value }))
+                            setSelectedTeacherByUser((prev) => ({ ...prev, [user.id]: value }))
                           }
-                          placeholder="Select student…"
-                          searchPlaceholder="Search students…"
-                          disabled={busy || studentOptions.length === 0}
+                          placeholder="Select teacher..."
+                          searchPlaceholder="Search teachers..."
+                          disabled={busy || teacherOptions.length === 0}
                         />
                       </TableCell>
                       <TableCell>
@@ -291,9 +293,9 @@ function MatchingContent() {
             </Table>
           </div>
         </TableRevealProvider>
-        {!loading && unmatchedStudents.length === 0 && unmatchedUsers.length > 0 ? (
+        {!loading && unmatchedTeachers.length === 0 && unmatchedUsers.length > 0 ? (
           <p className="text-sm text-muted-foreground">
-            No unlinked student records remain. Create a student in the directory first.
+            No unlinked teacher records remain. Create a teacher first.
           </p>
         ) : null}
       </StaggerItem>
@@ -303,14 +305,14 @@ function MatchingContent() {
           <div>
             <h2 className="text-lg font-semibold">Linked pairs</h2>
             <p className="text-sm text-muted-foreground">
-              Unlinking clears the roster match and sets a student-role account back to pending.
+              Unlinking clears the teacher match and sets a teacher-role account back to pending.
             </p>
           </div>
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search linked pairs…"
+              placeholder="Search linked pairs..."
               value={linkedQuery}
               onChange={(e) => setLinkedQuery(e.target.value)}
               className="pl-9"
@@ -324,7 +326,7 @@ function MatchingContent() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Account</TableHead>
-                  <TableHead>Student</TableHead>
+                  <TableHead>Teacher</TableHead>
                   <TableHead className="w-[120px]" />
                 </TableRow>
               </TableHeader>
@@ -345,10 +347,10 @@ function MatchingContent() {
                 idleTitle="No links loaded yet"
                 idleDescription="Use Load Data in the toolbar to fetch linked pairs."
                 emptyTitle="No linked pairs"
-                emptyDescription="Match an unmatched account to a student record above."
+                emptyDescription="Match an unmatched account to a teacher record above."
               >
                 {filteredLinkedUsers.map((user) => {
-                  const student = linkedByUserId.get(user.id)
+                  const teacher = linkedByUserId.get(user.id)
                   return (
                     <TableRow key={user.id}>
                       <TableCell>
@@ -356,13 +358,13 @@ function MatchingContent() {
                         <div className="text-xs text-muted-foreground">{user.username}</div>
                       </TableCell>
                       <TableCell>
-                        {student ? (
+                        {teacher ? (
                           <div>
-                            <div className="font-medium">{student.name}</div>
-                            <div className="text-xs font-mono text-muted-foreground">{student.unique_code}</div>
+                            <div className="font-medium">{teacher.name}</div>
+                            <div className="text-xs font-mono text-muted-foreground">{teacher.unique_code}</div>
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Student #{user.student_profile_id}</span>
+                          <span className="text-sm text-muted-foreground">Teacher #{user.teacher_profile_id}</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -370,8 +372,8 @@ function MatchingContent() {
                           variant="outline"
                           size="sm"
                           className="gap-1.5"
-                          disabled={!student || unlinkingStudentId === student.id}
-                          onClick={() => student && setUnlinkTarget({ user, student })}
+                          disabled={!teacher || unlinkingTeacherId === teacher.id}
+                          onClick={() => teacher && setUnlinkTarget({ user, teacher })}
                         >
                           <Unlink className="size-4" />
                           Unlink
@@ -392,20 +394,20 @@ function MatchingContent() {
             <DialogTitle>Unlink this account?</DialogTitle>
             <DialogDescription>
               {unlinkTarget
-                ? `${unlinkTarget.user.email || unlinkTarget.user.username} will be detached from ${unlinkTarget.student.name}. If the role is student, it becomes pending.`
+                ? `${unlinkTarget.user.email || unlinkTarget.user.username} will be detached from ${unlinkTarget.teacher.name}. If the role is teacher, it becomes pending.`
                 : null}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUnlinkTarget(null)} disabled={unlinkingStudentId !== null}>
+            <Button variant="outline" onClick={() => setUnlinkTarget(null)} disabled={unlinkingTeacherId !== null}>
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={() => void handleUnlink()}
-              disabled={unlinkingStudentId !== null}
+              disabled={unlinkingTeacherId !== null}
             >
-              {unlinkingStudentId !== null ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              {unlinkingTeacherId !== null ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
               Unlink
             </Button>
           </DialogFooter>
@@ -415,10 +417,10 @@ function MatchingContent() {
   )
 }
 
-export default function MatchingPage() {
+export default function MatchingTeachersPage() {
   return (
     <RequireRole mode="admin">
-      <MatchingContent />
+      <MatchingTeachersContent />
     </RequireRole>
   )
 }

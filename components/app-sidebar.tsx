@@ -84,8 +84,9 @@ const operationsItems = [
 ]
 
 const adminItems = [
-  { title: "Users", url: "/users", icon: UserCog },
-  { title: "Match students", url: "/users/matching", icon: Link2 },
+  { title: "Users", url: "/users/management", icon: UserCog },
+  { title: "Match students", url: "/users/matching/students", icon: Link2 },
+  { title: "Match teachers", url: "/users/matching/teachers", icon: Link2 },
 ]
 
 const checkInSubItemsStaff = [
@@ -106,12 +107,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role, loading: accountLoading } = useCurrentUser()
   const { isMobile, setOpenMobile } = useSidebar()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
+  const checkInExpanded = pathname.startsWith("/check-in") || checkInOpen
 
   const showStaffNav = !accountLoading && isStaffOrAbove(role)
   const showAdminNav = !accountLoading && isAdmin(role)
   const showStudentNav = !accountLoading && role === "student"
+  const showTeacherNav = !accountLoading && role === "teacher"
   const showTerminalNav = !accountLoading && canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
+  const teacherHomeHref = user?.teacher_profile_id ? `/teachers/${user.teacher_profile_id}` : "/pending"
   const homeHref = "/"
 
   const closeMobileSidebar = React.useCallback(() => {
@@ -123,12 +127,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     // Let the sheet finish closing so Clerk's modal isn't trapped under it.
     window.setTimeout(() => openUserProfile(), isMobile ? 150 : 0)
   }, [closeMobileSidebar, isMobile, openUserProfile])
-
-  React.useEffect(() => {
-    if (pathname.startsWith("/check-in")) {
-      setCheckInOpen(true)
-    }
-  }, [pathname])
 
   React.useEffect(() => {
     if (isMobile) {
@@ -239,7 +237,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 })}
 
                 <Collapsible
-                  open={checkInOpen}
+                  open={checkInExpanded}
                   onOpenChange={setCheckInOpen}
                   className="group/collapsible"
                 >
@@ -276,8 +274,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarMenu>
                   {adminItems.map((item) => {
                     const isActive =
-                      item.url === "/users"
-                        ? pathname === "/users" || pathname === "/users/"
+                      item.url === "/users/management"
+                        ? pathname === "/users" || pathname === "/users/" || pathname === "/users/management" || pathname === "/users/management/"
                         : pathname === item.url ||
                           pathname === `${item.url}/` ||
                           pathname.startsWith(`${item.url}/`)
@@ -294,6 +292,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </SidebarGroup>
             ) : null}
           </>
+        ) : showTeacherNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Teacher</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="My Hub"
+                  isActive={pathname === teacherHomeHref}
+                  render={<Link href={teacherHomeHref} onClick={handleNavClick} />}
+                >
+                  <UserCheck />
+                  <span>My Hub</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
         ) : showTerminalNav ? (
           <SidebarGroup>
             <SidebarGroupLabel>Check-In</SidebarGroupLabel>

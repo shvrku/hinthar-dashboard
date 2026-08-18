@@ -15,12 +15,21 @@ export default function RoleHomeDispatcher() {
   const router = useRouter()
   const { user, role, loading } = useCurrentUser()
   const studentId = user?.student_profile_id ?? null
+  const teacherId = user?.teacher_profile_id ?? null
   const unmatchedStudent = role === "student" && studentId == null
 
   React.useEffect(() => {
     if (loading || !role) return
-    if (role === "pending" || role === "teacher") {
+    if (role === "pending") {
       router.replace("/pending/")
+      return
+    }
+    if (role === "teacher") {
+      if (teacherId != null) {
+        router.replace(`/teachers/${teacherId}/`)
+      } else {
+        router.replace("/pending/")
+      }
       return
     }
     if (role === "terminal") {
@@ -36,7 +45,7 @@ export default function RoleHomeDispatcher() {
     if (isStaffOrAbove(role)) {
       router.replace("/overview/")
     }
-  }, [loading, role, studentId, router])
+  }, [loading, role, studentId, teacherId, router])
 
   if (unmatchedStudent) {
     return (

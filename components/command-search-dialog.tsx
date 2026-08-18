@@ -40,6 +40,8 @@ type NavigationItem = {
   adminOnly?: boolean
   /** When true, only student-role accounts see this row. */
   studentOnly?: boolean
+  /** When true, only teacher-role accounts see this row. */
+  teacherOnly?: boolean
   keywords?: string[]
 }
 
@@ -57,12 +59,28 @@ const navigationItems: NavigationItem[] = [
   { title: "Check-In Management", href: "/check-in/management", group: "Operations", icon: QrCode },
   { title: "Check-In Terminal", href: "/check-in/terminal", group: "Operations", icon: Monitor },
   {
+    title: "User Management",
+    href: "/users/management",
+    group: "Administration",
+    icon: Users,
+    adminOnly: true,
+    keywords: ["users", "roles", "accounts", "permissions", "admin"],
+  },
+  {
     title: "Match students",
-    href: "/users/matching",
+    href: "/users/matching/students",
     group: "Administration",
     icon: Link2,
     adminOnly: true,
     keywords: ["link", "account", "matching", "portal"],
+  },
+  {
+    title: "Match teachers",
+    href: "/users/matching/teachers",
+    group: "Administration",
+    icon: Link2,
+    adminOnly: true,
+    keywords: ["link", "teacher", "account", "matching", "portal"],
   },
   {
     title: "Design System",
@@ -80,6 +98,14 @@ const navigationItems: NavigationItem[] = [
     studentOnly: true,
     keywords: ["qr", "stats", "attendance", "check-in", "hub"],
   },
+  {
+    title: "My Teacher Hub",
+    href: "/",
+    group: "Teacher",
+    icon: UserCheck,
+    teacherOnly: true,
+    keywords: ["teacher", "profile", "hub", "attendance", "sessions"],
+  },
 ]
 
 interface CommandSearchDialogProps {
@@ -95,12 +121,15 @@ export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogP
     if (role === "student") {
       return navigationItems.filter((item) => item.studentOnly)
     }
+    if (role === "teacher") {
+      return navigationItems.filter((item) => item.teacherOnly)
+    }
     if (!isStaffOrAbove(role)) {
       return []
     }
     const admin = isAdmin(role)
     return navigationItems.filter(
-      (item) => !item.studentOnly && (!item.adminOnly || admin)
+      (item) => !item.studentOnly && !item.teacherOnly && (!item.adminOnly || admin)
     )
   }, [role])
 
