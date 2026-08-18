@@ -19,7 +19,6 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { MotionToggle } from "@/components/motion-toggle"
 import { Button } from "@/components/ui/button"
 import { CommandSearchDialog } from "@/components/command-search-dialog"
-import { useCurrentUser } from "@/components/current-user-provider"
 
 function formatPathSegment(segment: string) {
   return segment
@@ -34,8 +33,7 @@ export function SiteHeader() {
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [isMac, setIsMac] = React.useState(false)
   const headerRef = useGsapEnter<HTMLElement>({ y: -10, duration: 0.45 })
-  const { role } = useCurrentUser()
-  const homeHref = role === "student" ? "/student/" : "/"
+  const homeHref = "/"
 
   React.useEffect(() => {
     setIsMac(typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform || ""))

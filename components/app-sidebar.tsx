@@ -65,9 +65,8 @@ import {
 import { useCurrentUser } from "@/components/current-user-provider"
 import { canCheckIn, isAdmin, isStaffOrAbove } from "@/lib/roles"
 import { Badge } from "@/components/ui/badge"
-
 const overviewItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/overview", icon: LayoutDashboard },
 ]
 
 const managementItems = [
@@ -104,16 +103,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, isSignedIn, isLoaded } = useUser()
   const { openUserProfile, signOut } = useClerk()
-  const { role } = useCurrentUser()
+  const { role, loading: accountLoading } = useCurrentUser()
   const { isMobile, setOpenMobile } = useSidebar()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
 
-  const showStaffNav = isStaffOrAbove(role)
-  const showAdminNav = isAdmin(role)
-  const showStudentNav = role === "student"
-  const showTerminalNav = canCheckIn(role) && !showStaffNav
+  const showStaffNav = !accountLoading && isStaffOrAbove(role)
+  const showAdminNav = !accountLoading && isAdmin(role)
+  const showStudentNav = !accountLoading && role === "student"
+  const showTerminalNav = !accountLoading && canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
-  const homeHref = showStudentNav ? "/student/" : "/"
+  const homeHref = "/"
 
   const closeMobileSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile(false)
@@ -320,8 +319,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Home"
-                  isActive={pathname === "/student" || pathname.startsWith("/student/")}
-                  render={<Link href="/student/" onClick={handleNavClick} />}
+                  isActive={pathname === "/" || pathname.startsWith("/students/")}
+                  render={<Link href="/" onClick={handleNavClick} />}
                 >
                   <QrCode />
                   <span>Home</span>

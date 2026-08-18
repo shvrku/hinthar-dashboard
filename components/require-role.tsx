@@ -46,8 +46,8 @@ export function RequireRole({
       return
     }
     if (role === "student" && mode !== "student" && mode !== "any") {
-      if (pathname !== "/student") {
-        router.replace("/student/")
+      if (pathname !== "/") {
+        router.replace("/")
       }
       return
     }
@@ -59,11 +59,7 @@ export function RequireRole({
   }, [loading, role, pathname, router, mode])
 
   if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-        Loading account…
-      </div>
-    )
+    return null
   }
 
   if (error) {
@@ -88,7 +84,7 @@ export function RequireRole({
         <p className="text-sm text-muted-foreground">
           Your account does not have permission to view this page.
         </p>
-        <Button variant="outline" render={<Link href={role === "terminal" ? "/check-in/terminal" : role === "student" ? "/student" : "/"} />}>
+        <Button variant="outline" render={<Link href="/" />}>
           Go back
         </Button>
       </div>

@@ -14,7 +14,7 @@ UI: shadcn/ui + Tailwind. Auth: Clerk. API calls go to `/api/v1/*` and are proxi
 
 ## What it does
 
-- **Overview (`/`)** — live KPIs with 30-day trends, student enrollment chart, recent important activity
+- **Role home (`/`)** — post-login dispatcher; staff land on **Overview (`/overview`)** with live KPIs, enrollment chart, and recent activity. Students land on a read-only `/students/[id]` hub (QR download only).
 - **People & classes** — paginated lists; student / class / teacher hubs (enroll, QR lifecycle, attendance analytics)
 - **Schedule** — timetable, generated sessions, Find sessions (slot-first), substitutes (`actual_teacher`)
 - **Lesson attendance** — class / ad-hoc matrices; unmarked cells vs stored absent

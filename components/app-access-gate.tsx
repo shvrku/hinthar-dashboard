@@ -14,34 +14,42 @@ function normalizePath(pathname: string): string {
   return pathname
 }
 
-/** Client-only appearance prefs — available to every signed-in role. */
 function isSettingsPath(pathname: string): boolean {
   return pathname === "/settings"
 }
 
-/** Student portal home. Must not match staff `/students`. */
-function isStudentPortalPath(pathname: string): boolean {
+/** Leftover singular portal — redirect page runs for every signed-in role. */
+function isLegacyStudentPortalPath(pathname: string): boolean {
   return pathname === "/student"
+}
+
+function isOwnStudentHubPath(pathname: string, studentProfileId: number | null): boolean {
+  if (studentProfileId == null) return false
+  const match = pathname.match(/^\/students\/(\d+)$/)
+  return match != null && Number(match[1]) === studentProfileId
 }
 
 /**
  * Global access gate after Clerk sign-in:
- * - /settings → all signed-in roles (appearance is client-local)
- * - pending → /pending (or settings)
- * - terminal → /check-in/terminal only (or settings)
- * - student → /student (or settings)
- * - teacher → /pending (or settings; no portal yet)
+ * - `/` is the post-login dispatcher (all signed-in roles)
+ * - `/settings` → all signed-in roles (appearance is client-local)
+ * - `/student` leftover alias (redirect page)
+ * - pending / teacher → `/pending`
+ * - terminal → `/`, `/settings`, `/check-in/terminal*`
+ * - student → `/`, `/settings`, own `/students/{id}`
  * - staff/admin → full app
  */
 export function AppAccessGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded: authLoaded } = useAuth()
-  const { role, loading } = useCurrentUser()
+  const { role, user, loading } = useCurrentUser()
   const pathname = normalizePath(usePathname())
   const router = useRouter()
 
   React.useEffect(() => {
     if (!authLoaded || loading || !isSignedIn || !role) return
-    if (isSettingsPath(pathname)) return
+    if (isSettingsPath(pathname) || pathname === "/" || isLegacyStudentPortalPath(pathname)) {
+      return
+    }
 
     if (role === "pending") {
       if (pathname !== "/pending") router.replace("/pending/")
@@ -56,7 +64,9 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (role === "student") {
-      if (!isStudentPortalPath(pathname)) router.replace("/student/")
+      if (!isOwnStudentHubPath(pathname, user?.student_profile_id ?? null)) {
+        router.replace("/")
+      }
       return
     }
 
@@ -66,19 +76,14 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (isStaffOrAbove(role) && pathname === "/pending") {
-      router.replace("/")
+      router.replace("/overview/")
     }
-  }, [authLoaded, loading, isSignedIn, role, pathname, router])
+  }, [authLoaded, loading, isSignedIn, role, user?.student_profile_id, pathname, router])
 
   if (!authLoaded || (isSignedIn && loading)) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-        Loading account…
-      </div>
-    )
+    return null
   }
 
-  // Public auth pages (sign-in/up) — no Django role yet
   if (!isSignedIn) {
     return <>{children}</>
   }
@@ -91,7 +96,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (isSettingsPath(pathname)) {
+  if (isSettingsPath(pathname) || pathname === "/" || isLegacyStudentPortalPath(pathname)) {
     return <>{children}</>
   }
 
@@ -101,7 +106,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   }
 
   if (role === "student") {
-    if (!isStudentPortalPath(pathname)) return null
+    if (!isOwnStudentHubPath(pathname, user?.student_profile_id ?? null)) return null
     return <>{children}</>
   }
 

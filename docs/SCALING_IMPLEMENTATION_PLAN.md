@@ -147,8 +147,8 @@ The school-ops dashboard and API now follow the standards: paged lists, scoped a
 
 | Task | Status |
 |------|--------|
-| `/dashboard` redirects to `/` | Done |
-| Live KPIs on `/` via `getStats()` | Done |
+| `/dashboard` redirects to `/overview` | Done |
+| Live KPIs on `/overview` via `getStats()`; `/` is the post-login dispatcher | Done |
 | shadcn install (`base-vega` / zinc) | **Done** — see `components.json`; keep semantic tokens in `globals.css` |
 | Shared `ConfirmDialog` | **Done** — `components/confirm-dialog.tsx` |
 | Role-appropriate home surfaces | **Done** — thin teacher/student/pending copy on `/pending` |

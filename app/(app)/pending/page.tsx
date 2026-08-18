@@ -4,17 +4,12 @@ import { useClerk } from "@clerk/nextjs"
 import { useCurrentUser } from "@/components/current-user-provider"
 import { Button } from "@/components/ui/button"
 import { StandardPageHeader } from "@/components/standard-page-header"
-
 export default function PendingApprovalPage() {
   const { user, loading } = useCurrentUser()
   const { signOut } = useClerk()
 
   if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-        Loading account…
-      </div>
-    )
+    return null
   }
 
   const role = user?.role

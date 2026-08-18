@@ -6,7 +6,7 @@ import { createApi } from "@/lib/api"
 
 /** Shared query keys — keep stable for cache hits across pages. */
 export const apiQueryKeys = {
-  me: ["me"] as const,
+  me: (clerkUserId?: string | null) => ["me", clerkUserId ?? ""] as const,
   classes: (params?: string) => ["classes", params ?? ""] as const,
   subjects: (params?: string) => ["subjects", params ?? ""] as const,
   teachersSelect: ["teachers", "select"] as const,
@@ -19,11 +19,11 @@ export function useApiToken() {
   return { getToken, isSignedIn: !!isSignedIn, isLoaded }
 }
 
-export function useMeQuery(enabled = true) {
+export function useMeQuery(enabled = true, clerkUserId?: string | null) {
   const { getToken, isSignedIn, isLoaded } = useApiToken()
   return useQuery({
-    queryKey: apiQueryKeys.me,
-    enabled: enabled && isLoaded && isSignedIn,
+    queryKey: apiQueryKeys.me(clerkUserId),
+    enabled: enabled && isLoaded && isSignedIn && !!clerkUserId,
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const token = await getToken()

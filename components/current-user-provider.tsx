@@ -18,23 +18,39 @@ type CurrentUserContextValue = {
 const CurrentUserContext = React.createContext<CurrentUserContextValue | null>(null)
 
 export function CurrentUserProvider({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded } = useAuth()
+  const { userId, isSignedIn, isLoaded } = useAuth()
   const queryClient = useQueryClient()
-  const meQuery = useMeQuery(isLoaded && !!isSignedIn)
+  const meQuery = useMeQuery(isLoaded && !!isSignedIn, userId)
+
+  const prevUserIdRef = React.useRef<string | null | undefined>(undefined)
+
+  // Clerk identity changed (sign-in, sign-out, account switch) — drop stale API cache.
+  React.useEffect(() => {
+    if (!isLoaded) return
+    const nextUserId = userId ?? null
+    const prevUserId = prevUserIdRef.current
+    if (prevUserId !== undefined && prevUserId !== nextUserId) {
+      queryClient.clear()
+    }
+    prevUserIdRef.current = nextUserId
+  }, [userId, isLoaded, queryClient])
 
   const refresh = React.useCallback(async () => {
-    if (!isSignedIn) {
-      queryClient.removeQueries({ queryKey: apiQueryKeys.me })
+    if (!isSignedIn || !userId) {
+      queryClient.removeQueries({ queryKey: apiQueryKeys.me(userId) })
       return
     }
-    await queryClient.invalidateQueries({ queryKey: apiQueryKeys.me })
-  }, [isSignedIn, queryClient])
+    await queryClient.invalidateQueries({ queryKey: apiQueryKeys.me(userId) })
+  }, [isSignedIn, userId, queryClient])
+
+  const accountLoading =
+    !isLoaded || (isSignedIn && (!userId || meQuery.isPending))
 
   const value = React.useMemo(
     () => ({
       user: meQuery.data ?? null,
       role: (meQuery.data?.role as Role | undefined) ?? null,
-      loading: !isLoaded || (!!isSignedIn && meQuery.isLoading),
+      loading: accountLoading,
       error: meQuery.error
         ? meQuery.error instanceof Error
           ? meQuery.error.message
@@ -42,7 +58,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
         : null,
       refresh,
     }),
-    [meQuery.data, meQuery.isLoading, meQuery.error, refresh, isLoaded, isSignedIn]
+    [meQuery.data, meQuery.isPending, meQuery.error, accountLoading, refresh]
   )
 
   return (

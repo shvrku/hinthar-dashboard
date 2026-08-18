@@ -44,7 +44,7 @@ type NavigationItem = {
 }
 
 const navigationItems: NavigationItem[] = [
-  { title: "Dashboard", href: "/", group: "Overview", icon: LayoutDashboard },
+  { title: "Dashboard", href: "/overview", group: "Overview", icon: LayoutDashboard },
   { title: "Classes Roster", href: "/classes", group: "Management", icon: GraduationCap },
   { title: "Student Directory", href: "/students", group: "Management", icon: Users },
   { title: "Teacher Faculty", href: "/teachers", group: "Management", icon: UserCheck },
@@ -74,11 +74,11 @@ const navigationItems: NavigationItem[] = [
   },
   {
     title: "My QR and attendance",
-    href: "/student",
+    href: "/",
     group: "Student",
     icon: QrCode,
     studentOnly: true,
-    keywords: ["qr", "stats", "attendance", "check-in"],
+    keywords: ["qr", "stats", "attendance", "check-in", "hub"],
   },
 ]
 

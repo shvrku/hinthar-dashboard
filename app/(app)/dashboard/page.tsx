@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-/** Live KPIs live on `/` now (I1). Keep this path as a redirect for old bookmarks. */
+/** Live KPIs live on `/overview`. Keep this path as a redirect for old bookmarks. */
 export default function DashboardRedirectPage() {
-  redirect("/")
+  redirect("/overview/")
 }

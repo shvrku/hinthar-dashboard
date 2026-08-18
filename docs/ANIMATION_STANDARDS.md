@@ -133,7 +133,49 @@ Do not invent new durations in pages without updating `easings.ts`.
 - Stagger at most **`TABLE_ROW_STAGGER_CAP` (24)** rows individually; remaining rows fade in as one group.
 - Do not pass a separate `animationKey` — child React keys drive the reveal.
 
-### 4.5 Small presence
+### 4.5 Bootstrap overlay & navigation progress bar
+
+Two global motion layers handle loading outside the page content tree. Both live above the sidebar (`z-[9998]` / `z-[9999]`).
+
+#### Bootstrap overlay (`components/bootstrap-overlay.tsx`)
+
+Shown during the initial app load — covering Clerk session verification, Django `/me/` profile fetch, and the role-based router dispatch. Stays visible until all three phases complete, then fades out.
+
+| Detail | Value |
+|--------|-------|
+| Background | `bg-background` — inherits light/dark theme automatically |
+| Icon | Inline SVG (1024×1024 viewBox, 90×90px render). `rx="240"` on the background rect matches `--radius-2xl`. Light mode: `fill-foreground` rect + white layers. Dark mode: rect transparent, white layers float on dark bg. |
+| Layer stagger | `opacity 0→1`, `y 10→0`, 120 ms between layers (`easeOutSoft`, `durations.reveal`). |
+| Progress bar | 5 px tall, `bg-foreground/10` track, `bg-foreground/70` fill. Tweens to fake-indeterminate breakpoints per phase (`easeOutSoft`, 0.6 s). |
+| Phases | `session (20%) → profile (60%) → routing (88%) → done (100%)` |
+| Exit | `gsap.to(overlay, { opacity: 0, duration: 0.35, ease: easeOutSnap })` then unmount. |
+| Debug keybind | `Shift+D` — toggles a phase label under the bar (hidden from normal users). |
+| Slow-network hint | After 8 s in any non-done phase a "Taking longer than expected" message + Reload button appear. |
+| Reduced motion | All GSAP calls gated behind `prefersReducedMotion()`. |
+
+**Phase lifecycle:**
+
+```text
+Clerk isLoaded? no  → phase = "session"
+profile loading?    → phase = "profile"
+role resolved, route not yet changed? → phase = "routing"
+pathname != "/"     → phase = "done" → fade out overlay
+```
+
+**Do not** render `AccountBootstrapScreen` or any per-page spinner inside the `(app)` layout while this overlay is mounted. Loading states within `AppAccessGate`, `RequireRole`, and dispatcher pages return `null` — the overlay covers them.
+
+#### Navigation progress bar (`components/navigation-progress.tsx`)
+
+A 2 px viewport-fixed bar at `top-0` (`z-[9998]`) that fires on every client-side route change **after** the bootstrap overlay has unmounted.
+
+| Detail | Value |
+|--------|-------|
+| Trigger | `usePathname()` change (skips the very first paint) |
+| Color | `bg-foreground` — always contrasts regardless of palette |
+| Motion | `scaleX: 0 → 0.8` (`easeOutSoft`, 0.4 s) then `→ 1` (`power1.out`, 0.2 s), container fades out after 50 ms |
+| Reduced motion | All GSAP calls gated behind `prefersReducedMotion()` |
+
+### 4.6 Small presence
 
 - Theme toggle: `GsapPresence`.
 - Terminal alerts / confirmation panels: `GsapEnter` with a stable `key` to replay.
@@ -294,7 +336,10 @@ Completed (2026-08-07):
 3. **Lighthouse sample** — `/students`, `/teachers`, `/check-in/overview` (see §7.5); CLS 0.
 4. **`animationKey` removed** — reveal driven by child React keys only.
 
-No further animation follow-ups currently queued.
+Completed (2026-08-18):
+
+5. **Bootstrap overlay** — full-page GSAP loading screen covering session + profile + routing phases (§4.5). Replaces all per-page `AccountBootstrapScreen` returns inside the `(app)` layout.
+6. **Navigation progress bar** — viewport-fixed 2 px top bar for in-session route changes (§4.5).
 
 ---
 
@@ -304,6 +349,8 @@ No further animation follow-ups currently queued.
 lib/gsap/easings.ts
 lib/gsap/reduced-motion.ts
 lib/gsap/use-gsap-enter.ts
+components/bootstrap-overlay.tsx      # full-page bootstrap screen (session + profile + routing)
+components/navigation-progress.tsx    # viewport-fixed top-bar progress for in-session navigations
 components/animated-stagger.tsx
 components/animation/
   animated-table-body.tsx
@@ -317,5 +364,6 @@ components/ui/card.tsx          # auto-stagger
 components/ui/skeleton.tsx      # shimmer class
 components/standard-table-pagination.tsx  # placement
 app/(app)/template.tsx
+app/(app)/layout.tsx            # mounts BootstrapOverlay + NavigationProgress above sidebar
 app/globals.css                 # skeleton-shimmer + data-attribute hides + reduced-motion
 ```

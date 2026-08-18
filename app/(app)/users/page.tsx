@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import { Loader2, Search } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
@@ -200,6 +201,7 @@ function UsersAdminContent() {
               <TableRow>
                 <TableHead>Email / Username</TableHead>
                 <TableHead>Clerk ID</TableHead>
+                <TableHead>Student</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Active</TableHead>
               </TableRow>
@@ -209,12 +211,12 @@ function UsersAdminContent() {
               hasData={users.length > 0}
               rowCount={Math.min(serverPg.pageSize, 8)}
               skeletonRowCount={Math.min(serverPg.pageSize, 8)}
-              colSpan={4}
+              colSpan={5}
               skeleton={
                 <TableSkeletonRows
                   rows={Math.min(serverPg.pageSize, 8)}
-                  columns={4}
-                  cellClassNames={["h-4 w-40", "h-4 w-28", "h-8 w-32", "h-5 w-16 rounded-full"]}
+                  columns={5}
+                  cellClassNames={["h-4 w-40", "h-4 w-28", "h-4 w-16", "h-8 w-32", "h-5 w-16 rounded-full"]}
                 />
               }
               idle={lastLoaded === null}
@@ -231,6 +233,18 @@ function UsersAdminContent() {
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {user.clerk_id}
+                  </TableCell>
+                  <TableCell>
+                    {user.student_profile_id != null ? (
+                      <Link
+                        href={`/students/${user.student_profile_id}/`}
+                        className="font-mono text-xs text-primary hover:underline"
+                      >
+                        {user.student_profile_id}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
