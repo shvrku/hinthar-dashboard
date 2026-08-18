@@ -20,7 +20,7 @@ export function AccountBootstrapScreen({
   message = "Loading your account…",
   className,
 }: AccountBootstrapScreenProps) {
-  const ref = useGsapEnter({ y: 14, duration: durations.enter })
+  const ref = useGsapEnter<HTMLDivElement>({ y: 14, duration: durations.enter })
 
   return (
     <div
