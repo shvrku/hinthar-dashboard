@@ -14,7 +14,7 @@ UI: shadcn/ui + Tailwind. Auth: Clerk. API calls go to `/api/v1/*` and are proxi
 
 ## What it does
 
-- **Role home (`/`)** — post-login dispatcher; staff land on **Overview (`/overview`)**. Linked students / teachers land on their hub; unmatched or pending accounts land on `/pending`.
+- **Role home (`/`)** — post-login dispatcher; staff land on **Overview (`/overview`)**. Linked students / teachers land on their hub; unmatched or pending accounts land on `/pending`. Deactivated accounts (`is_active=false`) land on `/account-locked` after `GET /me/` succeeds.
 - **People & classes** — paginated lists; student / class / teacher hubs (weekly timetable snippet, enroll, QR lifecycle, attendance analytics)
 - **Schedule** — timetable, generated sessions, Find sessions (slot-first), substitutes (`actual_teacher`)
 - **Lesson attendance** — class / ad-hoc matrices; unmarked cells vs stored absent

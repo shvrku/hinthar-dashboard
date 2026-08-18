@@ -17,6 +17,10 @@ export default function RoleHomeDispatcher() {
 
   React.useEffect(() => {
     if (loading || !role) return
+    if (user?.is_active === false) {
+      router.replace("/account-locked/")
+      return
+    }
     if (role === "pending") {
       router.replace("/pending/")
       return
@@ -44,7 +48,7 @@ export default function RoleHomeDispatcher() {
     if (isStaffOrAbove(role)) {
       router.replace("/overview/")
     }
-  }, [loading, role, studentId, teacherId, router])
+  }, [loading, role, studentId, teacherId, user?.is_active, router])
 
   return null
 }

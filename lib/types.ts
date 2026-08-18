@@ -539,6 +539,22 @@ export interface User {
   student_profile_id: number | null
   staff_profile_id: number | null
   is_active: boolean
+  can_delete?: boolean
+  delete_blocked_reason?: string | null
+  can_deactivate?: boolean
+  deactivate_blocked_reason?: string | null
+}
+
+export interface ClerkUnlinkedUser {
+  clerk_id: string
+  email: string
+  username: string
+}
+
+export interface ClerkSyncReport {
+  clerk_unlinked: ClerkUnlinkedUser[]
+  django_unlinked: User[]
+  clerk_dashboard_users_url: string
 }
 
 export type TrendDirection = "up" | "down" | "stable"

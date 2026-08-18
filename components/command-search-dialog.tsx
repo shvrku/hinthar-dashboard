@@ -64,7 +64,7 @@ const navigationItems: NavigationItem[] = [
     group: "Users",
     icon: Users,
     adminOnly: true,
-    keywords: ["users", "roles", "accounts", "permissions", "admin", "management"],
+    keywords: ["users", "roles", "accounts", "permissions", "admin", "management", "inactive", "deactivated", "locked", "disabled"],
   },
   {
     title: "Match students",
@@ -122,6 +122,9 @@ export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogP
     user?.teacher_profile_id != null ? `/teachers/${user.teacher_profile_id}` : "/pending"
 
   const visibleItems = React.useMemo(() => {
+    if (user?.is_active === false) {
+      return []
+    }
     if (role === "student") {
       return navigationItems
         .filter((item) => item.studentOnly)
@@ -139,7 +142,7 @@ export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogP
     return navigationItems.filter(
       (item) => !item.studentOnly && !item.teacherOnly && (!item.adminOnly || admin)
     )
-  }, [role, studentHref, teacherHref])
+  }, [role, studentHref, teacherHref, user?.is_active])
 
   const groupedItems = React.useMemo(() => {
     const groups = new Map<string, NavigationItem[]>()

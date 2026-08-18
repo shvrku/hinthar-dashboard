@@ -39,11 +39,16 @@ function isPendingPath(pathname: string): boolean {
   return pathname === "/pending"
 }
 
+function isAccountLockedPath(pathname: string): boolean {
+  return pathname === "/account-locked"
+}
+
 /**
  * Global access gate after Clerk sign-in:
  * - `/` is the post-login dispatcher (all signed-in roles)
  * - `/settings` → all signed-in roles (appearance is client-local)
  * - `/student` leftover alias (redirect page)
+ * - deactivated (`is_active=false`) → `/account-locked` (plus `/` and `/settings`)
  * - pending / unmatched student or teacher → `/pending`
  * - teacher → `/`, `/settings`, own `/teachers/{id}`
  * - terminal → `/`, `/settings`, `/check-in/terminal*`
@@ -60,10 +65,21 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   const unmatchedStudent = role === "student" && studentProfileId == null
   const unmatchedTeacher = role === "teacher" && teacherProfileId == null
   const waitingForLink = role === "pending" || unmatchedStudent || unmatchedTeacher
+  const accountLocked = user?.is_active === false
 
   React.useEffect(() => {
     if (!authLoaded || loading || !isSignedIn || !role) return
     if (isSettingsPath(pathname) || pathname === "/" || isLegacyStudentPortalPath(pathname)) {
+      return
+    }
+
+    if (accountLocked) {
+      if (!isAccountLockedPath(pathname)) router.replace("/account-locked/")
+      return
+    }
+
+    if (isAccountLockedPath(pathname)) {
+      router.replace("/")
       return
     }
 
@@ -104,6 +120,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     studentProfileId,
     teacherProfileId,
     waitingForLink,
+    accountLocked,
     pathname,
     router,
   ])
@@ -126,6 +143,15 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
 
   if (isSettingsPath(pathname) || pathname === "/" || isLegacyStudentPortalPath(pathname)) {
     return <>{children}</>
+  }
+
+  if (accountLocked) {
+    if (!isAccountLockedPath(pathname)) return null
+    return <>{children}</>
+  }
+
+  if (isAccountLockedPath(pathname)) {
+    return null
   }
 
   if (waitingForLink) {

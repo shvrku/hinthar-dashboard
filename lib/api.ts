@@ -861,6 +861,24 @@ export function createApi(token: string) {
         body: JSON.stringify(data),
       }),
 
+    deleteUser: (id: number) =>
+      request<void>(`/users/${id}/`, token, { method: "DELETE" }),
+
+    getClerkSync: () =>
+      request<import("./types").ClerkSyncReport>(`/users/clerk_sync/`, token),
+
+    importClerkUsers: (clerkIds?: string[]) =>
+      request<import("./types").User[]>(`/users/clerk_import/`, token, {
+        method: "POST",
+        body: JSON.stringify(clerkIds ? { clerk_ids: clerkIds } : {}),
+      }),
+
+    linkClerkUser: (userId: number, clerkId: string) =>
+      request<import("./types").User>(`/users/${userId}/clerk_link/`, token, {
+        method: "POST",
+        body: JSON.stringify({ clerk_id: clerkId }),
+      }),
+
     // --- Stats ---
     getStats: () =>
       request<import("./types").Stats>(`/stats/`, token),

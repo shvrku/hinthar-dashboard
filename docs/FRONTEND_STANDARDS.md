@@ -41,8 +41,9 @@ Verdicts are for **front-office / academic staff**, not developers.
 
 | Page | Graspability | Notes |
 |------|--------------|-------|
-| `/` | Dispatcher | Post-login role router: staff → `/overview`, linked student → own `/students/[id]`, linked teacher → own `/teachers/[id]`, unmatched student/teacher and pending → `/pending`, terminal → `/check-in/terminal`. `/dashboard` redirects to `/overview`. |
+| `/` | Dispatcher | Post-login role router: **deactivated** (`is_active=false`) → `/account-locked`, staff → `/overview`, linked student → own `/students/[id]`, linked teacher → own `/teachers/[id]`, unmatched student/teacher and pending → `/pending`, terminal → `/check-in/terminal`. `/dashboard` redirects to `/overview`. |
 | `/pending` | Good | Waiting-for-link home. Same page for `pending` role **and** unmatched student/teacher (role set, no profile id). |
+| `/account-locked` | Good | Own Django row is `is_active=false`. Sign out (or `/settings`). Not the admin **Users → Deactivated** list. |
 | `/settings` | Good | Appearance (theme + palette). All signed-in roles. |
 | `/overview` | Good | Staff home: greeting, four 30-day trend KPIs, student enrollment line/area chart, compact recent-activity list from `GET /stats/`. |
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
@@ -54,7 +55,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/student` | Redirect | Legacy alias: student → `/`; staff+ → `/students/`. |
 | `/subjects` | Good | Simple catalog. |
 | `/users` | Redirect | Canonical list is `/users/management`. |
-| `/users/management` | Good | Server `q` + role filter. **Student** column links `student_profile_id` to `/students/{id}/`. |
+| `/users/management` | Good | All accounts. Server `q` + role + **status** (`active` / `deactivated` / all). **Clerk Sync**. Deactivate / activate / delete with grey-out reasons. `/users/deactivated` redirects here with `?status=deactivated`. |
 | `/users/matching/students` | Good | Admin: link Clerk accounts to student rows. `/users/matching` redirects here. |
 | `/users/matching/teachers` | Good | Admin: link Clerk accounts to teacher rows. `/users/matching-teachers` re-exports this page. |
 | `/timetable` | Good | Landing → class week grid; empty states + week legend. |
@@ -67,7 +68,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
 | `/check-in/corrections` | Good | Undo mis-tap campus check-ins; auto-reverts lesson marks attributed to that check-in. |
 | `/check-in/terminal` | Good | Lookup → confirm → commit; deactivated QR/code shows confirmation-panel card (QR **and** unique-code paths blocked until reactivated). |
-| Auth / roles | Addressed | Resource `auth.protect` + gates. `/` is the Clerk force-redirect + dispatcher. Waiting-for-link (`pending`, unmatched student/teacher): `/`, `/settings`, `/pending` only. Linked students: those plus own `/students/{id}`. Linked teachers: those plus own `/teachers/{id}`. New Clerk sign-ups JIT as `pending` on first `GET /me/` — no auto-link by email. |
+| Auth / roles | Addressed | Resource `auth.protect` + gates. `/` is the Clerk force-redirect + dispatcher. Deactivated (`me.is_active=false`): `/`, `/settings`, `/account-locked` only — `GET /me/` still works with a JWT so this page can load. Waiting-for-link (`pending`, unmatched student/teacher): `/`, `/settings`, `/pending` only. Linked students: those plus own `/students/{id}`. Linked teachers: those plus own `/teachers/{id}`. New Clerk sign-ups JIT as `pending` on first `GET /me/` — no auto-link by email. |
 
 ### Attendance UX — current contract
 
@@ -111,7 +112,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 | Resource auth | `await auth.protect()` in `app/(app)/layout.tsx`; API proxy checks session and returns 401. Public: `app/(public)/sign-in`, `sign-up`. |
 | Identity | Call `GET /me/` after sign-in; cache role on client context |
 | Nav | Filter sidebar items by `isStaffOrAbove` / `isTerminalOrAbove` / etc. |
-| Page gate | Shared `<RequireRole mode="staff" />` (`mode`: `staff` \| `admin` \| `checkin` \| `any` \| `student`); `AppAccessGate` for terminal / pending / unmatched redirects |
+| Page gate | Shared `<RequireRole mode="staff" />` (`mode`: `staff` \| `admin` \| `checkin` \| `any` \| `student`); `AppAccessGate` for deactivated → `/account-locked`, plus terminal / pending / unmatched redirects |
 | Actions | Hide destructive buttons the role cannot call (still enforced by API) |
 
 Mirror backend helpers in `lib/roles.ts`:
@@ -134,6 +135,8 @@ Admins match Clerk accounts to roster rows. Do not invent a second matching UI.
 | `/users/matching/teachers` | Same on `/teachers/{id}/…` with `linked_target=teacher` / `linkable_target=teacher` |
 
 Linkable roles: student `{pending, student}`, teacher `{pending, teacher}`, and no other profile already attached. Unlink returns a student/teacher-role account to `pending`.
+
+**Clerk Sync** (same Users page): compare this Clerk instance to Django `clerk_id`. **Clerk Import** is a webhook-miss fallback (Clerk user, no Django row). **Clerk Link** remaps a Django-unlinked row to one unused Clerk id. Create missing people in Clerk Dashboard, not Next `/sign-up`. APIs: `getClerkSync`, `importClerkUsers`, `linkClerkUser` in `lib/api.ts` — no Clerk calls from the browser.
 
 ### Data fetching
 

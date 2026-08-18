@@ -42,9 +42,14 @@ export function RequireRole({
     role === "pending" ||
     (role === "student" && user?.student_profile_id == null) ||
     (role === "teacher" && user?.teacher_profile_id == null)
+  const accountLocked = user?.is_active === false
 
   React.useEffect(() => {
     if (loading) return
+    if (accountLocked && pathname !== "/account-locked") {
+      router.replace("/account-locked/")
+      return
+    }
     if (waitingForLink && pathname !== "/pending") {
       router.replace("/pending/")
       return
@@ -60,7 +65,7 @@ export function RequireRole({
         router.replace("/check-in/terminal/")
       }
     }
-  }, [loading, role, waitingForLink, pathname, router, mode])
+  }, [loading, role, waitingForLink, accountLocked, pathname, router, mode])
 
   if (loading) {
     return null
@@ -75,6 +80,10 @@ export function RequireRole({
         </Button>
       </div>
     )
+  }
+
+  if (accountLocked) {
+    return null
   }
 
   if (waitingForLink) {

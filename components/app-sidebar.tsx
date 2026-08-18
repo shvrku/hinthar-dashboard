@@ -99,7 +99,8 @@ function isUsersSubItemActive(pathname: string, url: string) {
       pathname === "/users" ||
       pathname === "/users/" ||
       pathname === "/users/management" ||
-      pathname === "/users/management/"
+      pathname === "/users/management/" ||
+      pathname.startsWith("/users/deactivated")
     )
   }
   if (url === "/users/matching/students") {
@@ -140,11 +141,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const checkInExpanded = pathname.startsWith("/check-in") || checkInOpen
   const usersExpanded = isUsersSectionPath(pathname) || usersOpen
 
-  const showStaffNav = !accountLoading && isStaffOrAbove(role)
-  const showAdminNav = !accountLoading && isAdmin(role)
-  const showStudentNav = !accountLoading && role === "student"
-  const showTeacherNav = !accountLoading && role === "teacher"
-  const showTerminalNav = !accountLoading && canCheckIn(role) && !showStaffNav
+  const accountLocked = !accountLoading && account?.is_active === false
+  const showStaffNav = !accountLocked && !accountLoading && isStaffOrAbove(role)
+  const showAdminNav = !accountLocked && !accountLoading && isAdmin(role)
+  const showStudentNav = !accountLocked && !accountLoading && role === "student"
+  const showTeacherNav = !accountLocked && !accountLoading && role === "teacher"
+  const showTerminalNav = !accountLocked && !accountLoading && canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
   const teacherHomeHref = account?.teacher_profile_id
     ? `/teachers/${account.teacher_profile_id}`
@@ -152,7 +154,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const studentHomeHref = account?.student_profile_id
     ? `/students/${account.student_profile_id}`
     : "/pending"
-  const homeHref = "/"
+  const homeHref = accountLocked ? "/account-locked" : "/"
 
   const closeMobileSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile(false)
@@ -404,13 +406,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
-        ) : role ? (
+        ) : accountLocked || role ? (
           <SidebarGroup>
             <SidebarGroupLabel>Account</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                  Role: <Badge variant="outline" className="ml-1 capitalize">{role}</Badge>
+                  {accountLocked ? (
+                    <>Status: <Badge variant="outline" className="ml-1">Deactivated</Badge></>
+                  ) : (
+                    <>Role: <Badge variant="outline" className="ml-1 capitalize">{role}</Badge></>
+                  )}
                 </div>
               </SidebarMenuItem>
             </SidebarMenu>

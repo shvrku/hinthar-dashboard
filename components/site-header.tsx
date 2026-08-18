@@ -19,6 +19,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { MotionToggle } from "@/components/motion-toggle"
 import { Button } from "@/components/ui/button"
 import { CommandSearchDialog } from "@/components/command-search-dialog"
+import { useCurrentUser } from "@/components/current-user-provider"
 
 function formatPathSegment(segment: string) {
   return segment
@@ -33,14 +34,16 @@ export function SiteHeader() {
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [isMac, setIsMac] = React.useState(false)
   const headerRef = useGsapEnter<HTMLElement>({ y: -10, duration: 0.45 })
-  const homeHref = "/"
+  const { user: account, loading: accountLoading } = useCurrentUser()
+  const accountLocked = !accountLoading && account?.is_active === false
+  const homeHref = accountLocked ? "/account-locked" : "/"
 
   React.useEffect(() => {
     setIsMac(typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform || ""))
   }, [])
 
-  // Listen to Ctrl+K / Cmd+K
   React.useEffect(() => {
+    if (accountLocked) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
@@ -49,7 +52,7 @@ export function SiteHeader() {
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  }, [accountLocked])
 
   return (
     <>
@@ -91,21 +94,22 @@ export function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Functional Command Search Trigger */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSearchOpen(true)}
-            className="h-8 w-48 justify-between text-xs text-muted-foreground font-normal px-2.5 border-border/60 bg-muted/30 hover:bg-muted/60"
-          >
-            <span className="flex items-center gap-1.5 truncate">
-              <Search className="size-3.5" />
-              <span>Search Hinthar...</span>
-            </span>
-            <kbd className="pointer-events-none inline-flex h-4 select-none items-center gap-0.5 rounded border border-border bg-background px-1 text-[10px] font-medium opacity-100">
-              <span>{isMac ? "⌘" : "Ctrl"}</span>K
-            </kbd>
-          </Button>
+          {!accountLocked ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSearchOpen(true)}
+              className="h-8 w-48 justify-between text-xs text-muted-foreground font-normal px-2.5 border-border/60 bg-muted/30 hover:bg-muted/60"
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <Search className="size-3.5" />
+                <span>Search Hinthar...</span>
+              </span>
+              <kbd className="pointer-events-none inline-flex h-4 select-none items-center gap-0.5 rounded border border-border bg-background px-1 text-[10px] font-medium opacity-100">
+                <span>{isMac ? "⌘" : "Ctrl"}</span>K
+              </kbd>
+            </Button>
+          ) : null}
 
           <MotionToggle />
           <ThemeToggle />
