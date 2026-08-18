@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { ArrowLeft, CalendarDays, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
+import { ArrowLeft, BookOpen, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { ApiError, createApi } from "@/lib/api"
 import {
   formatClassLabel,
@@ -22,7 +22,7 @@ import { formatBackendDate, cn } from "@/lib/utils"
 import type { AnalyticsRange, Class, ClassAttendanceSummary, ClassPayload, ClassStudent, Student, TimetableSlot } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
 import { SearchableSelect } from "@/components/searchable-select"
-import { TimetableWeekSnippet } from "@/components/timetable-week-snippet"
+import { HubTimetableCard } from "@/components/hub-timetable-card"
 import {
   AttendanceOverviewSkeleton,
   CLASS_DETAIL_PAGE_LAYOUT,
@@ -95,7 +95,7 @@ function ClassDetailContent() {
         api.getClass(classId),
         api.listClassStudentsPage({ class_id: classId, page_size: 200 }),
         api.listStudentsPage({ page_size: 200 }),
-        api.listTimetableSlots({ class_id: classId }),
+        api.getClassTimetable(classId),
       ])
       setClassItem(foundClass)
       setRoster(rosterPage.results)
@@ -205,7 +205,12 @@ function ClassDetailContent() {
       <Card className="border-border/80"><CardContent className="p-6 md:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="space-y-3"><Badge variant="secondary">{classItem.education_level}</Badge><h1 className="text-2xl font-bold tracking-tight">{formatClassLabel(classItem)}</h1><dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Identifier (letter)</dt><dd className="font-medium">{classItem.cohort_identifier}</dd></div><div><dt className="text-muted-foreground">Sub-category</dt><dd className="font-medium">{classItem.cohort_sub_category ?? "—"}</dd></div></dl></div><Button variant="outline" size="sm" onClick={openEdit}><Pencil data-icon="inline-start" />Edit class</Button></div></CardContent></Card>
 
       <div className="grid gap-6">
-        <Card><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><CalendarDays />Weekly timetable</CardTitle><CardDescription>Snippet of this class week — open the full editor to add or change slots.</CardDescription></div></CardHeader><CardContent><TimetableWeekSnippet slots={slots} classId={classItem.id} /></CardContent></Card>
+        <HubTimetableCard
+          slots={slots}
+          description="Snippet of this class week — open the full editor to add or change slots."
+          editorHref={`/timetable/${classItem.id}/`}
+          slotLine="teacher"
+        />
         <Card><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Users />Roster <Badge variant="secondary">{roster.length}</Badge></CardTitle><CardDescription>Enroll and manage students in this cohort.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4">
           {rosterStudents.length ? <div className="divide-y rounded-xl border">{rosterStudents.map(({ entry, student }) => <div key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3"><Link href={student ? `/students/${student.id}/` : "/students/"} className="min-w-0 hover:text-primary"><p className="truncate font-medium">{student?.name ?? `Student #${entry.student_id ?? "?"}`}</p><p className="text-xs text-muted-foreground">{student?.unique_code}</p></Link><Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" disabled={removingId === entry.id} onClick={() => void remove(entry.id)} aria-label="Unenroll student">{removingId === entry.id ? <Loader2 className="animate-spin" /> : <Trash2 />}</Button></div>)}</div> : <p className="text-sm text-muted-foreground">No students enrolled yet.</p>}
           <div className="flex flex-col gap-2 sm:flex-row"><SearchableSelect className="flex-1" options={studentOptions} value={studentId} onValueChange={setStudentId} placeholder="Select a student…" searchPlaceholder="Search students…" /><Button disabled={!studentId || enrolling} onClick={() => void enroll()}>{enrolling ? <Loader2 className="animate-spin" /> : <Plus data-icon="inline-start" />}Enroll</Button></div>

@@ -1,6 +1,10 @@
 # Hinthar Dashboard: Design System & UI Architecture Specification
 
-This document provides a comprehensive design system and UI/UX specification for redefining the **Hinthar School Management Dashboard**. It standardizes layout structures around the **shadcn/ui `sidebar-08` (Inset Variant)** pattern, establishes dual Vercel Dark and Modern Clean Light color palettes, and outlines standard component layouts across all management views.
+> **Historical (2026).** Do not copy tokens, cobalt/HSL palettes, or layout recipes from this file.
+> Live contracts: [`FRONTEND_STANDARDS.md`](./FRONTEND_STANDARDS.md) §7, `app/globals.css`, and the in-app Design System page.
+> Palettes are `emerald` / `mono` / `amoled` (`data-palette`), orthogonal to light/dark.
+
+This document was an early specification for redefining the **Hinthar School Management Dashboard**. It standardized layout structures around the **shadcn/ui `sidebar-08` (Inset Variant)** pattern and a dual Vercel Dark / Clean Light palette that is **no longer the implemented token set**.
 
 ---
 

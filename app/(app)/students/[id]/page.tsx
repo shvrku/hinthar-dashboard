@@ -28,6 +28,7 @@ import {
   type StudentAnalyticsRange,
   type StudentAttendanceSummary,
   type StudentPayload,
+  type TimetableSlot,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { isStaffOrAbove } from "@/lib/roles"
@@ -61,6 +62,20 @@ import {
   StudentIdentityCard,
   StudentQrCard,
 } from "@/components/students/student-record"
+import { HubTimetableCard } from "@/components/hub-timetable-card"
+
+async function mergeClassTimetables(
+  api: ReturnType<typeof createApi>,
+  classIds: number[]
+): Promise<TimetableSlot[]> {
+  if (classIds.length === 0) return []
+  const lists = await Promise.all(classIds.map((id) => api.getClassTimetable(id)))
+  const byId = new Map<number, TimetableSlot>()
+  for (const list of lists) {
+    for (const slot of list) byId.set(slot.id, slot)
+  }
+  return [...byId.values()]
+}
 
 function StudentDetailContent() {
   const params = useParams()
@@ -76,6 +91,7 @@ function StudentDetailContent() {
 
   const [student, setStudent] = React.useState<Student | null>(null)
   const [enrollments, setEnrollments] = React.useState<ClassStudent[]>([])
+  const [slots, setSlots] = React.useState<TimetableSlot[]>([])
   const [summary, setSummary] = React.useState<StudentAttendanceSummary | null>(null)
   const [range, setRange] = React.useState<StudentAnalyticsRange>("month")
 
@@ -119,10 +135,23 @@ function StudentDetailContent() {
         ])
         setStudent(studentRes)
         setEnrollments(enrollmentRes.results)
+        const classIds = [
+          ...new Set(
+            enrollmentRes.results
+              .map((entry) =>
+                typeof entry.class_obj === "object" && entry.class_obj
+                  ? entry.class_obj.id
+                  : entry.class_obj_id ?? 0
+              )
+              .filter((id) => id > 0)
+          ),
+        ]
+        setSlots(await mergeClassTimetables(api, classIds))
       } else {
         const studentRes = await api.getStudent(studentId)
         setStudent(studentRes)
         setEnrollments([])
+        setSlots(await mergeClassTimetables(api, studentRes.class_ids ?? []))
       }
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
@@ -199,8 +228,21 @@ function StudentDetailContent() {
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
-      const entry = await createApi(token).createClassStudent(Number(enrollClassId), student.id)
+      const api = createApi(token)
+      const entry = await api.createClassStudent(Number(enrollClassId), student.id)
       setEnrollments((prev) => [...prev, entry])
+      const classId =
+        typeof entry.class_obj === "object" && entry.class_obj
+          ? entry.class_obj.id
+          : entry.class_obj_id
+      if (classId) {
+        const added = await api.getClassTimetable(classId, true)
+        setSlots((prev) => {
+          const byId = new Map(prev.map((slot) => [slot.id, slot]))
+          for (const slot of added) byId.set(slot.id, slot)
+          return [...byId.values()]
+        })
+      }
       setEnrollClassId("")
       flashSuccess("Enrolled in class.")
     } catch (err) {
@@ -218,7 +260,15 @@ function StudentDetailContent() {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
       await createApi(token).deleteClassStudent(classStudentId)
+      const removed = enrollments.find((e) => e.id === classStudentId)
+      const removedClassId =
+        typeof removed?.class_obj === "object" && removed.class_obj
+          ? removed.class_obj.id
+          : removed?.class_obj_id
       setEnrollments((prev) => prev.filter((e) => e.id !== classStudentId))
+      if (removedClassId) {
+        setSlots((prev) => prev.filter((slot) => slot.class_obj?.id !== removedClassId))
+      }
       flashSuccess("Removed from class.")
     } catch (err) {
       if (err instanceof ApiError) setError(err.userMessage)
@@ -384,153 +434,159 @@ function StudentDetailContent() {
         </Empty>
       ) : (
         <>
-          <StudentIdentityCard
-            student={student}
-            showContact={isStaff}
-            actions={
-              isStaff ? (
-                <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={openEdit}>
-                  <Pencil className="size-4" />
-                  Edit profile
-                </Button>
-              ) : undefined
-            }
-          />
-
           <div className="grid gap-6 lg:grid-cols-3">
-            {isStaff ? (
-              <Card className="border-border/80 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BookOpen className="size-5 text-muted-foreground" />
-                    Enrolled classes
-                  </CardTitle>
-                  <CardDescription>Cohorts this student belongs to.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {enrollments.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Not enrolled in any class yet.</p>
-                  ) : (
-                    <ul className="divide-y rounded-xl border">
-                      {enrollments.map((entry) => {
-                        const cls =
-                          typeof entry.class_obj === "object" && entry.class_obj
-                            ? (entry.class_obj as Class)
-                            : allClasses.find((c) => c.id === entry.class_obj_id)
-                        const label = cls ? formatClassLabel(cls) : `Class #${entry.class_obj_id ?? "?"}`
-                        return (
-                          <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                            <div>
-                              <p className="font-medium">{label}</p>
-                              {cls ? (
-                                <Link
-                                  href={`/classes/${cls.id}/`}
-                                  className="text-xs text-muted-foreground hover:text-primary"
-                                >
-                                  View in classes
-                                </Link>
-                              ) : null}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-destructive hover:text-destructive"
-                              disabled={unenrollingId === entry.id}
-                              onClick={() => void handleUnenroll(entry.id)}
-                              aria-label={`Remove from ${label}`}
-                            >
-                              {unenrollingId === entry.id ? (
-                                <Loader2 className="size-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="size-4" />
-                              )}
-                            </Button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div className="min-w-0 flex-1">
-                      <label className="mb-1.5 block text-xs text-muted-foreground">Add to class</label>
-                      <SearchableSelect
-                        options={classOptions}
-                        value={enrollClassId}
-                        onValueChange={setEnrollClassId}
-                        placeholder="Select class…"
-                        searchPlaceholder="Search classes…"
-                      />
-                    </div>
-                    <Button
-                      className="shrink-0 gap-1.5"
-                      disabled={!enrollClassId || enrolling}
-                      onClick={() => void handleEnroll()}
-                    >
-                      {enrolling ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                      Enroll
+            <div className="h-full lg:col-span-2">
+              <StudentIdentityCard
+                student={student}
+                showContact
+                actions={
+                  isStaff ? (
+                    <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={openEdit}>
+                      <Pencil className="size-4" />
+                      Edit profile
                     </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <StudentClassLabelsCard labels={student.class_labels ?? []} />
-            )}
-
+                  ) : undefined
+                }
+              />
+            </div>
             <StudentQrCard
               student={student}
-              showSecret={isStaff}
               actions={
                 isStaff ? (
-                  <div className="flex flex-wrap gap-2">
+                  <>
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="flex-1 gap-1.5"
+                      size="default"
+                      className="w-full"
                       disabled={tokenLoading}
                       onClick={() => void refreshQrToken()}
                     >
                       {tokenLoading ? (
-                        <Loader2 className="size-4 animate-spin" />
+                        <Loader2 data-icon="inline-start" className="animate-spin" />
                       ) : (
-                        <RefreshCw className="size-4" />
+                        <RefreshCw data-icon="inline-start" />
                       )}
                       Regenerate
                     </Button>
                     {student.check_in_token_active === false ? (
                       <Button
-                        size="sm"
-                        className="flex-1 gap-1.5"
+                        size="default"
+                        className="w-full"
                         disabled={qrLoading}
                         onClick={() => void toggleQrActive(true)}
                       >
                         {qrLoading ? (
-                          <Loader2 className="size-4 animate-spin" />
+                          <Loader2 data-icon="inline-start" className="animate-spin" />
                         ) : (
-                          <ShieldCheck className="size-4" />
+                          <ShieldCheck data-icon="inline-start" />
                         )}
                         Activate
                       </Button>
                     ) : (
                       <Button
                         variant="destructive"
-                        size="sm"
-                        className="flex-1 gap-1.5"
+                        size="default"
+                        className="w-full"
                         disabled={qrLoading}
                         onClick={() => void toggleQrActive(false)}
                       >
                         {qrLoading ? (
-                          <Loader2 className="size-4 animate-spin" />
+                          <Loader2 data-icon="inline-start" className="animate-spin" />
                         ) : (
-                          <ShieldOff className="size-4" />
+                          <ShieldOff data-icon="inline-start" />
                         )}
                         Deactivate
                       </Button>
                     )}
-                  </div>
+                  </>
                 ) : undefined
               }
             />
           </div>
+
+          <HubTimetableCard
+            slots={slots}
+            description="Weekly slots from enrolled classes — not dated session occurrences."
+            slotLine={(student.class_ids?.length ?? enrollments.length) > 1 ? "teacher-and-class" : "teacher"}
+          />
+
+          {isStaff ? (
+            <Card className="border-border/80">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BookOpen className="size-5 text-muted-foreground" />
+                  Classes
+                </CardTitle>
+                <CardDescription>Cohorts this student belongs to.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {enrollments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Not enrolled in any class yet.</p>
+                ) : (
+                  <ul className="divide-y rounded-xl border">
+                    {enrollments.map((entry) => {
+                      const cls =
+                        typeof entry.class_obj === "object" && entry.class_obj
+                          ? (entry.class_obj as Class)
+                          : allClasses.find((c) => c.id === entry.class_obj_id)
+                      const label = cls ? formatClassLabel(cls) : `Class #${entry.class_obj_id ?? "?"}`
+                      return (
+                        <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                          <div>
+                            <p className="font-medium">{label}</p>
+                            {cls ? (
+                              <Link
+                                href={`/classes/${cls.id}/`}
+                                className="text-xs text-muted-foreground hover:text-primary"
+                              >
+                                View in classes
+                              </Link>
+                            ) : null}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive"
+                            disabled={unenrollingId === entry.id}
+                            onClick={() => void handleUnenroll(entry.id)}
+                            aria-label={`Remove from ${label}`}
+                          >
+                            {unenrollingId === entry.id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-4" />
+                            )}
+                          </Button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1">
+                    <label className="mb-1.5 block text-xs text-muted-foreground">Add to class</label>
+                    <SearchableSelect
+                      options={classOptions}
+                      value={enrollClassId}
+                      onValueChange={setEnrollClassId}
+                      placeholder="Select class…"
+                      searchPlaceholder="Search classes…"
+                    />
+                  </div>
+                  <Button
+                    className="shrink-0 gap-1.5"
+                    disabled={!enrollClassId || enrolling}
+                    onClick={() => void handleEnroll()}
+                  >
+                    {enrolling ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                    Enroll
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <StudentClassLabelsCard labels={student.class_labels ?? []} />
+          )}
 
           <StudentAttendanceOverview
             summary={summary}

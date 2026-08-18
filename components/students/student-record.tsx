@@ -7,6 +7,7 @@ import { ATTENDANCE_STATUS_COLORS } from "@/lib/chart-colors"
 import { downloadQrPng, qrDownloadFilename } from "@/lib/qr-download"
 import { cn } from "@/lib/utils"
 import type { Student, StudentAnalyticsRange, StudentAttendanceSummary } from "@/lib/types"
+import { formatClassLabelText } from "@/lib/format-class"
 import { QrCanvas } from "@/components/qr-canvas"
 import { ChartChunkSkeleton } from "@/components/charts/chart-chunk-skeleton"
 import { Badge } from "@/components/ui/badge"
@@ -44,13 +45,15 @@ export function StudentIdentityCard({
   student,
   showContact = false,
   actions,
+  className,
 }: {
   student: Student
   showContact?: boolean
   actions?: React.ReactNode
+  className?: string
 }) {
   return (
-    <Card className="overflow-hidden border-border/80">
+    <Card className={cn("h-full overflow-hidden border-border/80", className)}>
       <CardContent className="p-6 md:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-3">
@@ -80,14 +83,7 @@ export function StudentIdentityCard({
                   <dt className="text-muted-foreground">Contact</dt>
                   <dd className="break-words font-medium">{student.contact ?? "—"}</dd>
                 </div>
-              ) : (
-                <div>
-                  <dt className="text-muted-foreground">Classes</dt>
-                  <dd className="font-medium">
-                    {student.class_labels?.length ? student.class_labels.join(", ") : "—"}
-                  </dd>
-                </div>
-              )}
+              ) : null}
               <div>
                 <dt className="text-muted-foreground">UCI</dt>
                 <dd className="font-medium">{student.exam_candidate_number ?? "—"}</dd>
@@ -103,20 +99,20 @@ export function StudentIdentityCard({
 
 export function StudentClassLabelsCard({ labels }: { labels: string[] }) {
   return (
-    <Card className="border-border/80 lg:col-span-2">
+    <Card className="border-border/80">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <BookOpen className="size-5 text-muted-foreground" />
-          Enrolled classes
+          Classes
         </CardTitle>
-        <CardDescription>Cohorts you belong to.</CardDescription>
+        <CardDescription>Cohorts this student belongs to.</CardDescription>
       </CardHeader>
       <CardContent>
         {labels.length ? (
           <ul className="divide-y rounded-xl border">
             {labels.map((label) => (
               <li key={label} className="px-4 py-3 font-medium">
-                {label}
+                {formatClassLabelText(label)}
               </li>
             ))}
           </ul>
@@ -130,11 +126,9 @@ export function StudentClassLabelsCard({ labels }: { labels: string[] }) {
 
 export function StudentQrCard({
   student,
-  showSecret = false,
   actions,
 }: {
   student: Student
-  showSecret?: boolean
   actions?: React.ReactNode
 }) {
   const [downloading, setDownloading] = React.useState(false)
@@ -150,45 +144,42 @@ export function StudentQrCard({
   }
 
   return (
-    <Card className="border-border/80">
+    <Card className="h-full border-border/80">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <QrCode className="size-5 text-muted-foreground" />
-          Campus QR
+          Student QR
         </CardTitle>
-        <CardDescription>
-          {showSecret
-            ? "Check-in token for terminal scanning."
-            : "Show this at the check-in terminal. Staff manage activation."}
-        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-1 flex-col">
         {student.check_in_token ? (
-          <div className="flex flex-col items-center gap-3">
-            <QrCanvas value={student.check_in_token} />
-            {showSecret ? (
-              <p className="max-w-full break-all px-2 text-center font-mono text-[10px] text-muted-foreground">
-                {student.check_in_token}
-              </p>
-            ) : student.check_in_token_active === false ? (
-              <p className="text-center text-xs text-destructive">
-                This QR is inactive. Ask staff to turn it back on before scanning.
-              </p>
-            ) : null}
+          <div className="flex min-h-0 flex-1 items-center gap-4">
+            <QrCanvas value={student.check_in_token} size={144} className="shrink-0" />
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+              {student.check_in_token_active === false ? (
+                <p className="text-xs text-destructive">
+                  This ID is inactive. Ask staff to turn it back on before scanning.
+                </p>
+              ) : null}
+              {actions}
+              <Button
+                size="default"
+                className="w-full"
+                disabled={downloading}
+                onClick={() => void handleDownload()}
+              >
+                {downloading ? (
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
+                ) : (
+                  <Download data-icon="inline-start" />
+                )}
+                Download
+              </Button>
+            </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No token on file.</p>
+          <p className="text-sm text-muted-foreground">No ID code on file.</p>
         )}
-        {actions}
-        <Button
-          size="sm"
-          className="w-full gap-1.5"
-          disabled={!student.check_in_token || downloading}
-          onClick={() => void handleDownload()}
-        >
-          {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          Download QR
-        </Button>
       </CardContent>
     </Card>
   )

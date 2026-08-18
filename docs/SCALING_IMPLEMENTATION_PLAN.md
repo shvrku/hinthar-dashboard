@@ -9,6 +9,8 @@ Goal: scale students / teachers / class times / attendance safely; **scrap payro
 
 **Last status update:** 2026-08-17 — **this plan is complete** (phases 0–9). Further work is product asks, not unfinished scaling.
 
+This file is a **historical phase log**. Current UX/API contracts live in `FRONTEND_STANDARDS.md` and the sibling `Hinthar-SMS/docs/API_STANDARDS.md`. Hub matching, owner timetable reads, and `/pending` for unmatched accounts landed after the phase table froze — trust those two files over the task rows below.
+
 ---
 
 ## Status at a glance
@@ -151,7 +153,7 @@ The school-ops dashboard and API now follow the standards: paged lists, scoped a
 | Live KPIs on `/overview` via `getStats()`; `/` is the post-login dispatcher | Done |
 | shadcn install (`base-vega` / zinc) | **Done** — see `components.json`; keep semantic tokens in `globals.css` |
 | Shared `ConfirmDialog` | **Done** — `components/confirm-dialog.tsx` |
-| Role-appropriate home surfaces | **Done** — thin teacher/student/pending copy on `/pending` |
+| Role-appropriate home surfaces | **Done** — linked student/teacher hubs; unmatched + pending share `/pending` |
 | Timetable empty states / legend | **Done** — Empty* + week legend |
 | Clerk resource auth (no `createRouteMatcher`) | **Done** — `(public)`/`(app)` layouts + slim `proxy.ts` |
 | Semantic color tokens (no ad-hoc emerald/rose/sky) | **Done** — `globals.css` + `lib/status-styles.ts` / `chart-colors.ts` |

@@ -13,6 +13,7 @@ export type PageSkeletonBlock =
       fields?: number
       action?: boolean
       titleClassName?: string
+      className?: string
     }
   | {
       type: "card"
@@ -199,13 +200,13 @@ function renderBody(block: PageSkeletonBlock, key: string): ReactNode {
 
     case "media-panel":
       return (
-        <div key={key} className="space-y-4">
-          <Skeleton className="mx-auto size-[180px] rounded-lg" />
-          <div className="flex gap-2">
-            <Skeleton className="h-8 flex-1 rounded-lg" />
-            <Skeleton className="h-8 flex-1 rounded-lg" />
+        <div key={key} className="flex items-center gap-4">
+          <Skeleton className="size-[144px] shrink-0 rounded-lg" />
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
           </div>
-          <Skeleton className="h-8 w-full rounded-lg" />
         </div>
       )
 
@@ -235,7 +236,7 @@ function renderBlock(block: PageSkeletonBlock, key: string): ReactNode {
 
     case "profile-hero":
       return (
-        <Card key={key} className="border-border/80">
+        <Card key={key} className={cn("border-border/80", block.className)}>
           <CardContent className="p-6 md:p-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-3 min-w-0 flex-1">

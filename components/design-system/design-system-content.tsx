@@ -117,6 +117,7 @@ const DO_ITEMS = [
   "Keep Session Attendance vs Campus Check-In verbally separate.",
   "Parse backend datetimes only via `lib/utils.ts` helpers.",
   "Reuse `StandardPageHeader`, `ConfirmDialog`, and `StandardTablePagination`.",
+  "Hubs: identity row → weekly TimetableSlot grid (`HubTimetableCard`) → compact related info → analytics.",
 ]
 
 const DONT_ITEMS = [

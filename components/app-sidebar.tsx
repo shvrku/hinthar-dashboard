@@ -20,7 +20,6 @@ import {
   Link2,
   LogOut,
   LogIn,
-  School,
   Repeat2,
   Undo2,
   Search,
@@ -63,6 +62,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useCurrentUser } from "@/components/current-user-provider"
+import { HintharMark } from "@/components/hinthar-mark"
 import { canCheckIn, isAdmin, isStaffOrAbove } from "@/lib/roles"
 import { Badge } from "@/components/ui/badge"
 const overviewItems = [
@@ -83,11 +83,40 @@ const operationsItems = [
   { title: "Session Attendance", url: "/attendance", icon: ClipboardCheck },
 ]
 
-const adminItems = [
-  { title: "Users", url: "/users/management", icon: UserCog },
+const userSubItems = [
+  { title: "Management", url: "/users/management", icon: UserCog },
   { title: "Match students", url: "/users/matching/students", icon: Link2 },
   { title: "Match teachers", url: "/users/matching/teachers", icon: Link2 },
 ]
+
+function isUsersSectionPath(pathname: string) {
+  return pathname === "/users" || pathname.startsWith("/users/")
+}
+
+function isUsersSubItemActive(pathname: string, url: string) {
+  if (url === "/users/management") {
+    return (
+      pathname === "/users" ||
+      pathname === "/users/" ||
+      pathname === "/users/management" ||
+      pathname === "/users/management/"
+    )
+  }
+  if (url === "/users/matching/students") {
+    return (
+      pathname.startsWith("/users/matching/students") ||
+      pathname === "/users/matching" ||
+      pathname === "/users/matching/"
+    )
+  }
+  if (url === "/users/matching/teachers") {
+    return (
+      pathname.startsWith("/users/matching/teachers") ||
+      pathname.startsWith("/users/matching-teachers")
+    )
+  }
+  return pathname === url || pathname === `${url}/` || pathname.startsWith(`${url}/`)
+}
 
 const checkInSubItemsStaff = [
   { title: "Overview", url: "/check-in/overview", icon: LayoutDashboard },
@@ -107,7 +136,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role, user: account, loading: accountLoading } = useCurrentUser()
   const { isMobile, setOpenMobile } = useSidebar()
   const [checkInOpen, setCheckInOpen] = React.useState(() => pathname.startsWith("/check-in"))
+  const [usersOpen, setUsersOpen] = React.useState(() => isUsersSectionPath(pathname))
   const checkInExpanded = pathname.startsWith("/check-in") || checkInOpen
+  const usersExpanded = isUsersSectionPath(pathname) || usersOpen
 
   const showStaffNav = !accountLoading && isStaffOrAbove(role)
   const showAdminNav = !accountLoading && isAdmin(role)
@@ -172,8 +203,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" render={<Link href={homeHref} onClick={handleNavClick} />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold">
-                <School className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <HintharMark className="size-5" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold text-foreground">Hinthar</span>
@@ -249,7 +280,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenuItem>
                     <CollapsibleTrigger
                       render={
-                        <SidebarMenuButton tooltip="Check-In" isActive={pathname.startsWith("/check-in")}>
+                        <SidebarMenuButton tooltip="Check-In">
                           <QrCode />
                           <span>Check-In</span>
                           <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
@@ -260,7 +291,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       <SidebarMenuSub>
                         {checkInSubItems.map((sub) => (
                           <SidebarMenuSubItem key={sub.title}>
-                            <SidebarMenuSubButton isActive={pathname === sub.url} render={<Link href={sub.url} onClick={handleNavClick} />}>
+                            <SidebarMenuSubButton isActive={pathname === sub.url || pathname === `${sub.url}/` || pathname.startsWith(`${sub.url}/`)} render={<Link href={sub.url} onClick={handleNavClick} />}>
                               <sub.icon className="size-3.5" />
                               <span>{sub.title}</span>
                             </SidebarMenuSubButton>
@@ -277,22 +308,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarGroup>
                 <SidebarGroupLabel>Administration</SidebarGroupLabel>
                 <SidebarMenu>
-                  {adminItems.map((item) => {
-                    const isActive =
-                      item.url === "/users/management"
-                        ? pathname === "/users" || pathname === "/users/" || pathname === "/users/management" || pathname === "/users/management/"
-                        : pathname === item.url ||
-                          pathname === `${item.url}/` ||
-                          pathname.startsWith(`${item.url}/`)
-                    return (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })}
+                  <Collapsible
+                    open={usersExpanded}
+                    onOpenChange={setUsersOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton tooltip="Users">
+                            <UserCog />
+                            <span>Users</span>
+                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                          </SidebarMenuButton>
+                        }
+                      />
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {userSubItems.map((sub) => (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton
+                                isActive={isUsersSubItemActive(pathname, sub.url)}
+                                render={<Link href={sub.url} onClick={handleNavClick} />}
+                              >
+                                <sub.icon className="size-3.5" />
+                                <span>{sub.title}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
                 </SidebarMenu>
               </SidebarGroup>
             ) : null}
@@ -303,7 +350,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  tooltip="My Hub"
+                  tooltip="Home"
                   isActive={
                     pathname === teacherHomeHref ||
                     pathname === `${teacherHomeHref}/` ||
@@ -311,8 +358,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   }
                   render={<Link href={teacherHomeHref} onClick={handleNavClick} />}
                 >
-                  <UserCheck />
-                  <span>My Hub</span>
+                  <QrCode />
+                  <span>Home</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

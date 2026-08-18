@@ -1,0 +1,35 @@
+import { cn } from "@/lib/utils"
+
+/**
+ * Hinthar mark from `public/icon-transparent.svg`.
+ * Source art is 1024² with a large padded canvas; viewBox is cropped to the
+ * clip (`312 306 400×412.5`) so sidebar/favicon-sized renders aren’t tiny.
+ * Fills use `currentColor` at the same 0.2 / 0.5 / 0.8 opacities as the SVG.
+ */
+export function HintharMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="312 306 400 412.5"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn("size-4", className)}
+      aria-hidden
+    >
+      <path
+        d="M312.002 541.381L312.998 391.39C313.179 364.238 332.16 340.979 358.378 335.782L503.213 307.074C538.018 300.175 570.315 327.408 570.077 363.452L569.079 513.443C568.899 540.594 549.918 563.854 523.701 569.051L378.865 597.759C344.06 604.658 311.762 577.425 312.002 541.381Z"
+        fill="currentColor"
+        fillOpacity="0.2"
+      />
+      <path
+        d="M382.963 601.193L383.959 451.202C384.14 424.051 403.121 400.791 429.339 395.594L574.175 366.886C608.98 359.987 641.277 387.22 641.037 423.264L640.041 573.256C639.861 600.407 620.878 623.667 594.661 628.863L449.826 657.572C415.021 664.471 382.723 637.237 382.963 601.193Z"
+        fill="currentColor"
+        fillOpacity="0.5"
+      />
+      <path
+        d="M453.924 661.061L454.921 511.07C455.101 483.917 474.082 460.659 500.3 455.461L645.135 426.753C679.94 419.854 712.239 447.087 711.999 483.131L711.002 633.122C710.821 660.274 691.84 683.534 665.622 688.731L520.787 717.439C485.982 724.337 453.685 697.105 453.924 661.061Z"
+        fill="currentColor"
+        fillOpacity="0.8"
+      />
+    </svg>
+  )
+}

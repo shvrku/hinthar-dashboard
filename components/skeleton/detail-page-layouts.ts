@@ -3,19 +3,16 @@ import type { PageSkeletonBlock } from "@/components/skeleton/page-skeleton"
 /** Student `/students/[id]` loading layout. */
 export const STUDENT_DETAIL_PAGE_LAYOUT: PageSkeletonBlock[] = [
   { type: "back-link" },
-  { type: "profile-hero", badges: 3, fields: 4, action: true },
   {
     type: "grid",
     className: "lg:grid-cols-3",
     blocks: [
       {
-        type: "card",
+        type: "profile-hero",
         className: "lg:col-span-2",
-        header: { description: true },
-        body: [
-          { type: "list-rows", rows: 3 },
-          { type: "enroll-row" },
-        ],
+        badges: 3,
+        fields: 4,
+        action: true,
       },
       {
         type: "card",
@@ -23,6 +20,16 @@ export const STUDENT_DETAIL_PAGE_LAYOUT: PageSkeletonBlock[] = [
         body: { type: "media-panel" },
       },
     ],
+  },
+  {
+    type: "card",
+    header: { description: true },
+    body: { type: "timetable-week" },
+  },
+  {
+    type: "card",
+    header: { description: true },
+    body: [{ type: "list-rows", rows: 1 }, { type: "enroll-row" }],
   },
   {
     type: "card",
@@ -63,6 +70,11 @@ export const CLASS_DETAIL_PAGE_LAYOUT: PageSkeletonBlock[] = [
 /** Teacher `/teachers/[id]` loading layout. */
 export const TEACHER_DETAIL_PAGE_LAYOUT: PageSkeletonBlock[] = [
   { type: "profile-hero", badges: 2, fields: 3, action: true },
+  {
+    type: "card",
+    header: { description: true },
+    body: { type: "timetable-week" },
+  },
   {
     type: "card",
     header: { tabs: true, description: true },

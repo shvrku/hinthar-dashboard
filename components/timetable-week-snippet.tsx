@@ -2,19 +2,39 @@
 
 import Link from "next/link"
 import type { TimetableSlot } from "@/lib/types"
+import { formatClassLabel } from "@/lib/format-class"
 import { cn, formatSlotClock } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+export type TimetableSlotLine = "teacher" | "class" | "teacher-and-class"
+
 type TimetableWeekSnippetProps = {
   slots: TimetableSlot[]
-  classId: number
   className?: string
+  /** Staff editor — omit on student/teacher hubs (read-only). */
+  editorHref?: string
+  slotLine?: TimetableSlotLine
 }
 
-/** Compact read-only week grid for class hub (links out to full editor). */
-export function TimetableWeekSnippet({ slots, classId, className }: TimetableWeekSnippetProps) {
+function slotSecondary(slot: TimetableSlot, line: TimetableSlotLine): string | null {
+  const teacher = slot.teacher?.name ?? null
+  const classLabel = slot.class_obj ? formatClassLabel(slot.class_obj) : null
+  if (line === "class") return classLabel
+  if (line === "teacher-and-class") {
+    return [classLabel, teacher].filter(Boolean).join(" · ") || null
+  }
+  return teacher
+}
+
+/** Compact read-only week grid of weekly slots (not dated sessions). */
+export function TimetableWeekSnippet({
+  slots,
+  className,
+  editorHref,
+  slotLine = "teacher",
+}: TimetableWeekSnippetProps) {
   const byDay = DAYS.map((_, day) =>
     slots
       .filter((slot) => slot.day_of_week === day)
@@ -38,20 +58,25 @@ export function TimetableWeekSnippet({ slots, classId, className }: TimetableWee
                   {byDay[index].length === 0 ? (
                     <p className="px-1 py-3 text-center text-[10px] text-muted-foreground/70">—</p>
                   ) : (
-                    byDay[index].map((slot) => (
-                      <div
-                        key={slot.id}
-                        className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-1"
-                      >
-                        <p className="truncate text-[11px] font-semibold leading-tight text-foreground">
-                          {slot.subject.name}
-                        </p>
-                        <p className="truncate text-[10px] text-muted-foreground">
-                          {formatSlotClock(slot.start_time)}–{formatSlotClock(slot.end_time)}
-                        </p>
-                        <p className="truncate text-[10px] text-muted-foreground">{slot.teacher.name}</p>
-                      </div>
-                    ))
+                    byDay[index].map((slot) => {
+                      const secondary = slotSecondary(slot, slotLine)
+                      return (
+                        <div
+                          key={slot.id}
+                          className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-1"
+                        >
+                          <p className="truncate text-[11px] font-semibold leading-tight text-foreground">
+                            {slot.subject.name}
+                          </p>
+                          <p className="truncate text-[10px] text-muted-foreground">
+                            {formatSlotClock(slot.start_time)}–{formatSlotClock(slot.end_time)}
+                          </p>
+                          {secondary ? (
+                            <p className="truncate text-[10px] text-muted-foreground">{secondary}</p>
+                          ) : null}
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </div>
@@ -59,12 +84,11 @@ export function TimetableWeekSnippet({ slots, classId, className }: TimetableWee
           </div>
         </div>
       )}
-      <Link
-        href={`/timetable/${classId}/`}
-        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
-      >
-        Open full timetable
-      </Link>
+      {editorHref ? (
+        <Link href={editorHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}>
+          Open full timetable
+        </Link>
+      ) : null}
     </div>
   )
 }

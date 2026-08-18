@@ -37,21 +37,26 @@ Verdicts are for **front-office / academic staff**, not developers.
 - Check-in terminal is lookup → confirm → commit (no token leakage in UI).
 - Role gates via `RequireRole` / sidebar filtering; Clerk is identity, Django owns role.
 
-### Issues by page (as of 2026-08-17)
+### Issues by page (as of 2026-08-18)
 
 | Page | Graspability | Notes |
 |------|--------------|-------|
-| `/` | Dispatcher | Post-login role router: staff → `/overview`, student → own `/students/[id]`, terminal → `/check-in/terminal`, pending/teacher → `/pending`. Unmatched students stay here with empty copy. `/dashboard` redirects to `/overview`. |
+| `/` | Dispatcher | Post-login role router: staff → `/overview`, linked student → own `/students/[id]`, linked teacher → own `/teachers/[id]`, unmatched student/teacher and pending → `/pending`, terminal → `/check-in/terminal`. `/dashboard` redirects to `/overview`. |
+| `/pending` | Good | Waiting-for-link home. Same page for `pending` role **and** unmatched student/teacher (role set, no profile id). |
+| `/settings` | Good | Appearance (theme + palette). All signed-in roles. |
 | `/overview` | Good | Staff home: greeting, four 30-day trend KPIs, student enrollment line/area chart, compact recent-activity list from `GET /stats/`. |
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
-| `/classes/[id]` | Good | Hub: roster, timetable summary, attendance analytics. |
+| `/classes/[id]` | Good | Hub: roster, weekly slot grid, attendance analytics. |
 | `/teachers` | Good | Payroll rate/bank fields removed. |
-| `/teachers/[id]` | Good | Hub: analytics; recent sessions **read-only** — manage substitute on Sessions / Find sessions. |
+| `/teachers/[id]` | Good | Shared hub: profile, weekly slot grid, analytics; recent sessions **read-only**. **Manage on Sessions** is staff-only — owner teachers cannot open `/sessions`. |
 | `/students` | Good | Staff+ directory. Server search + pagination; bulk import helps scale. Students cannot open this. |
-| `/students/[id]` | Good | Shared hub. Staff: profile, enrollments, QR activate/deactivate/regenerate, campus vs lesson analytics. Owner student (`me.student_profile_id === id`): read-only + QR download only. |
+| `/students/[id]` | Good | Shared hub: details + QR on one row, weekly class timetable, class row cards, campus vs lesson analytics. Staff: enroll, QR activate/deactivate/regenerate. Owner student (`me.student_profile_id === id`): read-only + QR download only. |
 | `/student` | Redirect | Legacy alias: student → `/`; staff+ → `/students/`. |
 | `/subjects` | Good | Simple catalog. |
-| `/users` | Good | Server `q` + role filter. **Student** column links `student_profile_id` to `/students/{id}/`. |
+| `/users` | Redirect | Canonical list is `/users/management`. |
+| `/users/management` | Good | Server `q` + role filter. **Student** column links `student_profile_id` to `/students/{id}/`. |
+| `/users/matching/students` | Good | Admin: link Clerk accounts to student rows. `/users/matching` redirects here. |
+| `/users/matching/teachers` | Good | Admin: link Clerk accounts to teacher rows. `/users/matching-teachers` re-exports this page. |
 | `/timetable` | Good | Landing → class week grid; empty states + week legend. |
 | `/sessions` | Good | Bulk / cross-class lookup; Assigned + Substitute on edit; `SessionTeacherCell`. |
 | `/sessions/find/` | Good | Slot-first path: class → week grid → slot occurrence table + edit. |
@@ -62,7 +67,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
 | `/check-in/corrections` | Good | Undo mis-tap campus check-ins; auto-reverts lesson marks attributed to that check-in. |
 | `/check-in/terminal` | Good | Lookup → confirm → commit; deactivated QR/code shows confirmation-panel card (QR **and** unique-code paths blocked until reactivated). |
-| Auth / roles | Addressed | Resource `auth.protect` + gates. `/` is the Clerk force-redirect + dispatcher. Students: `/`, `/settings`, own `/students/{id}` only. New Clerk sign-ups JIT as `pending` on first `GET /me/` — no auto-link by email. |
+| Auth / roles | Addressed | Resource `auth.protect` + gates. `/` is the Clerk force-redirect + dispatcher. Waiting-for-link (`pending`, unmatched student/teacher): `/`, `/settings`, `/pending` only. Linked students: those plus own `/students/{id}`. Linked teachers: those plus own `/teachers/{id}`. New Clerk sign-ups JIT as `pending` on first `GET /me/` — no auto-link by email. |
 
 ### Attendance UX — current contract
 
@@ -77,7 +82,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 ### Find sessions / substitute UX — current contract
 
 1. Prefer `/sessions/find/` when staff know the class + weekly slot; keep `/sessions` for bulk search.
-2. Week grid must match `/timetable/[classId]/` (time × day), not day-column stacks.
+2. Week grid on **Find sessions** and `/timetable/[classId]/` is **time × day**. Hub cards (`HubTimetableCard` / `TimetableWeekSnippet`) are the allowed **day-column** exception — do not “fix” hubs to match the editor.
 3. Slot click → filtered occurrence **table** (`timetable_slot_id` + date range); row click → session edit dialog.
 4. Substitute edits live on Sessions / Find sessions only — teacher hub recent rows are read-only.
 5. UI copy: **Substitute** (not “cover”); Assigned teacher stays the generation teacher; empty `actual_teacher` = taught as assigned.
@@ -106,18 +111,29 @@ Verdicts are for **front-office / academic staff**, not developers.
 | Resource auth | `await auth.protect()` in `app/(app)/layout.tsx`; API proxy checks session and returns 401. Public: `app/(public)/sign-in`, `sign-up`. |
 | Identity | Call `GET /me/` after sign-in; cache role on client context |
 | Nav | Filter sidebar items by `isStaffOrAbove` / `isTerminalOrAbove` / etc. |
-| Page gate | Shared `<RequireRole minimum="staff" />` (or allow-list); `AppAccessGate` for terminal/pending redirects |
+| Page gate | Shared `<RequireRole mode="staff" />` (`mode`: `staff` \| `admin` \| `checkin` \| `any` \| `student`); `AppAccessGate` for terminal / pending / unmatched redirects |
 | Actions | Hide destructive buttons the role cannot call (still enforced by API) |
 
 Mirror backend helpers in `lib/roles.ts`:
 
 ```ts
-export const ROLE_RANK = { student: 1, teacher: 2, terminal: 3, staff: 4, admin: 5 } as const
+export const ROLE_RANK = { pending: 0, student: 1, teacher: 2, terminal: 3, staff: 4, admin: 5 } as const
 export function isStaffOrAbove(role: Role) { … }
-// isAdmin, isTerminalOrAbove, isTeacherOrAbove, isAtLeast
+// isAdmin, isTerminalOrAbove, isAtLeast, canCheckIn (admin | staff | terminal)
 ```
 
-Terminal UI: only check-in routes (+ read-only views if product wants). Teachers: own timetable / sessions / attendance (once API scopes exist).
+Terminal UI: only check-in routes (+ read-only views if product wants). Teachers: own hub timetable via `GET /timetable/teacher/{id}/`; students: enrolled class grids via `GET /timetable/class/{id}/`. Unmatched student/teacher stay on `/pending` until an admin links a profile.
+
+### Account matching & pending
+
+Admins match Clerk accounts to roster rows. Do not invent a second matching UI.
+
+| UI | API |
+|----|-----|
+| `/users/matching/students` | `POST /students/{id}/link_user/` `{ user_id }`; `POST …/unlink_user/`; `GET /users/?linked=&linked_target=student&linkable=&linkable_target=student` |
+| `/users/matching/teachers` | Same on `/teachers/{id}/…` with `linked_target=teacher` / `linkable_target=teacher` |
+
+Linkable roles: student `{pending, student}`, teacher `{pending, teacher}`, and no other profile already attached. Unlink returns a student/teacher-role account to `pending`.
 
 ### Data fetching
 
@@ -143,6 +159,21 @@ When adding a paginated list page:
 - Shared chrome: `StandardPageHeader`, KPI strip, confirm dialog (**one** shared `ConfirmDialog`, not per-page copies).
 - Forms: consistent required-field marking; no payroll fields on teachers/sessions.
 - Motion: wrap management pages in `StaggerContainer` / `StaggerItem` (include the header). Do not add decorative noise or page-level padding on the stagger root — app shell padding lives on the inner `main` wrapper (`p-4 pb-10 md:p-6 md:pb-12`).
+
+### Entity hub layout
+
+Student, teacher, and class hubs share one vertical order. Staff and owner see the same structure; only actions differ (edit / enroll / QR lifecycle stay staff+).
+
+1. **Identity row** — profile card. Student hub pairs it with **Student ID** (QR) on the same row (`lg:grid-cols-3`, details `col-span-2`). Teacher hub has no QR, so the profile card stays full width.
+2. **Weekly timetable** — `HubTimetableCard` / `TimetableWeekSnippet`. This is **weekly `TimetableSlot` rows**, never a dated session list. Data:
+   - Class hub: `GET /timetable/class/{id}/` (same helper as student hub)
+   - Student hub: `student.class_ids` → `GET /timetable/class/{id}/` (merge if several classes)
+   - Teacher hub: `GET /timetable/teacher/{id}/`
+   - Staff **editor** (`/timetable/[classId]/`, Find sessions): `GET /timetable-slots/?class_id=`
+3. **Compact related info** — short height. Student: class row cards (name + “View in classes”, staff remove on the right). Do not put enrollment beside the QR. Identity and Student ID cards on the same row **stretch to equal height**. Student ID: title only, code beside actions; action buttons stay default size (`h-9`) and do not grow to fill the card.
+4. **Analytics / recent work** — attendance charts, teacher accountability, recent sessions (read-only on the teacher hub). Staff-only CTA to `/sessions` for substitutes.
+
+Slot cell copy: subject + time; student/class views add **teacher**; teacher view adds **class**. “Open full timetable” only on the class hub (staff editor). Do not add a second week-grid component.
 
 ### Page header & reload contract
 
@@ -189,7 +220,7 @@ Example: a future `/audit-logs` page backed by `GET /api/v1/audit-logs/?page=&pa
 1. **Types** in `lib/types.ts` for the entity + `Paginated<T>`.
 2. **API** helper: `listAuditLogs({ page, page_size, …filters })` returning the envelope (do not auto-unwrap `results` only — expose `count`).
 3. **Page** `app/audit-logs/page.tsx`:
-   - `RequireRole minimum="staff"` (API is staff+, not admin-only)
+   - `RequireRole mode="staff"` (API is staff+, not admin-only)
    - Read `page` / filters from `useSearchParams`
    - `useEffect` load on param change
    - Table + `StandardTablePagination`
@@ -234,7 +265,9 @@ Teacher fields: **Assigned** (generation teacher) vs **Substitute** (`actual_tea
 ## 7. Design system & color tokens
 
 - Follow shadcn skill / CLI; project style is **base-vega** with **zinc** base (`components.json`). Preset code: **`bd1haIy0`**.
-- App palettes (orthogonal to light/dark): **`emerald`** (default) and **`mono`** via `data-palette` — pick on **Settings** (`/settings`). Static shell previews live in `public/themes/{palette}-{mode}.png` (regenerate with `npx tsx scripts/generate-theme-previews.ts`).
+- App palettes (orthogonal to light/dark): **`emerald`** (default), **`mono`**, and **`amoled`** via `data-palette` — pick on **Settings** (`/settings`). Static shell previews live in `public/themes/{palette}-{mode}.png` (regenerate with `npx tsx scripts/generate-theme-previews.ts`).
+- Brand mark: `components/hinthar-mark.tsx` (`HintharMark`). Crop viewBox `312 306 400×412.5` from `public/icon-transparent.svg` (1024² padded source). Fills are `currentColor` at 0.2 / 0.5 / 0.8. Sidebar tile: `bg-sidebar-primary text-sidebar-primary-foreground`, mark `size-5` in a `size-8` rounded tile. Bootstrap overlay keeps its own 1024 viewBox + light/dark tile recipe — do not unify it with the sidebar mark.
+- Historical cobalt/HSL spec: `docs/hinthar-dashboard-design-system.md` — **do not copy tokens from it**. Live truth is `app/globals.css`, the in-app Design System page, and this section.
 - **Do not invent one-off palette colors** (`emerald-*`, `rose-*`, `amber-*`, `sky-*`) in page CSS.
 - Use semantic tokens from `app/globals.css` (wired in `@theme inline`):
 

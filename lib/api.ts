@@ -238,6 +238,18 @@ async function cachedRequest<T>(
   return data
 }
 
+function unwrapResults<T>(data: import("./types").Paginated<T> | T[]): T[] {
+  if (Array.isArray(data)) return data
+  if (isPaginatedEnvelope<T>(data)) return data.results
+  return []
+}
+
+function clearTimetableCaches() {
+  clearApiCache("/timetable-slots/")
+  clearApiCache("/timetable/class/")
+  clearApiCache("/timetable/teacher/")
+}
+
 export function createApi(token: string) {
   return {
     // --- Classes ---
@@ -534,7 +546,7 @@ export function createApi(token: string) {
         method: "POST",
         body: JSON.stringify(data),
       })
-      clearApiCache("/timetable-slots/")
+      clearTimetableCaches()
       return res
     },
 
@@ -543,14 +555,28 @@ export function createApi(token: string) {
         method: "PUT",
         body: JSON.stringify(data),
       })
-      clearApiCache("/timetable-slots/")
+      clearTimetableCaches()
       return res
     },
 
     deleteTimetableSlot: async (id: number) => {
       const res = await request<void>(`/timetable-slots/${id}/`, token, { method: "DELETE" })
-      clearApiCache("/timetable-slots/")
+      clearTimetableCaches()
       return res
+    },
+
+    getClassTimetable: async (classId: number, forceRefresh = false) => {
+      const data = await cachedRequest<
+        import("./types").Paginated<import("./types").TimetableSlot> | import("./types").TimetableSlot[]
+      >(`/timetable/class/${classId}/`, token, {}, DEFAULT_TTL_MS, forceRefresh)
+      return unwrapResults(data)
+    },
+
+    getTeacherTimetable: async (teacherId: number, forceRefresh = false) => {
+      const data = await cachedRequest<
+        import("./types").Paginated<import("./types").TimetableSlot> | import("./types").TimetableSlot[]
+      >(`/timetable/teacher/${teacherId}/`, token, {}, DEFAULT_TTL_MS, forceRefresh)
+      return unwrapResults(data)
     },
 
     // --- Teachers ---

@@ -4,6 +4,9 @@
 **Scope:** `hinthar-dashboard` (Next.js 16 + Clerk) and `Hinthar-SMS` (Django REST + Clerk JWT)  
 **Method:** Static code review of auth, permissions, proxies, serializers, analytics, and hot paths. No production exploit attempts were run against live systems.
 
+> **Historical snapshot (2026-08-07).** Status table below is the audit follow-up as of that date.
+> Later product work (account matching, owner hubs, owner-read weekly timetables, unified `/pending`) is **not** reflected here — see `FRONTEND_STANDARDS.md` and SMS `API_STANDARDS.md`.
+
 Findings are ordered **critical → high → medium → low**, grouped from **system security** down to **performance**.
 
 ## Implementation status (2026-08-07)

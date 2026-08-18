@@ -30,6 +30,8 @@ const CACHEABLE_GET_PREFIXES = [
   "v1/teachers",
   "v1/stats",
   "v1/timetable-slots",
+  "v1/timetable/class",
+  "v1/timetable/teacher",
 ]
 
 function isSafeApiSlug(slugParts: string[]): boolean {
