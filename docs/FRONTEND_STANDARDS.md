@@ -43,7 +43,7 @@ Verdicts are for **front-office / academic staff**, not developers.
 |------|--------------|-------|
 | `/` | Dispatcher | Post-login role router: **deactivated** (`is_active=false`) → `/account-locked`, staff → `/overview`, linked student → own `/students/[id]`, linked teacher → own `/teachers/[id]`, unmatched student/teacher and pending → `/pending`, terminal → `/check-in/terminal`. `/dashboard` redirects to `/overview`. |
 | `/pending` | Good | Waiting-for-link home. Same page for `pending` role **and** unmatched student/teacher (role set, no profile id). |
-| `/account-locked` | Good | Own Django row is `is_active=false`. Sign out (or `/settings`). Not the admin **Users → Deactivated** list. |
+| `/account-locked` | Good | Own Django row is `is_active=false`. Sign out (or `/settings`). Not the admin user list. |
 | `/settings` | Good | Appearance (theme + palette). All signed-in roles. |
 | `/overview` | Good | Staff home: greeting, four 30-day trend KPIs, student enrollment line/area chart, compact recent-activity list from `GET /stats/`. |
 | `/classes` | Good | Enrollment dialogs are dense but learnable. |
@@ -55,7 +55,8 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/student` | Redirect | Legacy alias: student → `/`; staff+ → `/students/`. |
 | `/subjects` | Good | Simple catalog. |
 | `/users` | Redirect | Canonical list is `/users/management`. |
-| `/users/management` | Good | All accounts. Server `q` + role + **status** (`active` / `deactivated` / all). **Clerk Sync**. Deactivate / activate / delete with grey-out reasons. `/users/deactivated` redirects here with `?status=deactivated`. |
+| `/users/management` | Good | One admin list for every account. Server `q` + role + **status** (`active` / `deactivated` / all; omit `status` = all). **Clerk Sync**. Deactivate / activate / delete with grey-out reasons. Clerk ID is a truncated prefix; hover shows the full id, click copies it. |
+| `/users/deactivated` | Redirect | `?status=deactivated` on `/users/management`. Do not add a second users nav item. |
 | `/users/matching/students` | Good | Admin: link Clerk accounts to student rows. `/users/matching` redirects here. |
 | `/users/matching/teachers` | Good | Admin: link Clerk accounts to teacher rows. `/users/matching-teachers` re-exports this page. |
 | `/timetable` | Good | Landing → class week grid; empty states + week legend. |
@@ -110,8 +111,8 @@ Verdicts are for **front-office / academic staff**, not developers.
 |-------|----------|
 | Clerk | `proxy.ts` is session plumbing only (`clerkMiddleware()`). Do **not** use `createRouteMatcher` for auth gates. |
 | Resource auth | `await auth.protect()` in `app/(app)/layout.tsx`; API proxy checks session and returns 401. Public: `app/(public)/sign-in`, `sign-up`. |
-| Identity | Call `GET /me/` after sign-in; cache role on client context |
-| Nav | Filter sidebar items by `isStaffOrAbove` / `isTerminalOrAbove` / etc. |
+| Identity | Call `GET /me/` after sign-in; cache role **and** `is_active` on client context |
+| Nav | Filter sidebar items by `isStaffOrAbove` / `isTerminalOrAbove` / etc. Hide operational nav when `me.is_active === false`. |
 | Page gate | Shared `<RequireRole mode="staff" />` (`mode`: `staff` \| `admin` \| `checkin` \| `any` \| `student`); `AppAccessGate` for deactivated → `/account-locked`, plus terminal / pending / unmatched redirects |
 | Actions | Hide destructive buttons the role cannot call (still enforced by API) |
 
@@ -124,6 +125,14 @@ export function isStaffOrAbove(role: Role) { … }
 ```
 
 Terminal UI: only check-in routes (+ read-only views if product wants). Teachers: own hub timetable via `GET /timetable/teacher/{id}/`; students: enrolled class grids via `GET /timetable/class/{id}/`. Unmatched student/teacher stay on `/pending` until an admin links a profile.
+
+### Account lock (`is_active=false`)
+
+Deactivate is the default lock. A valid JWT may call `GET /me/` so the dashboard can render `/account-locked`. Other APIs stay 403. No token still fails auth.
+
+Do **not** send locked users to `/users/management` (admin list). Allowed routes: `/`, `/settings`, `/account-locked`. Command search is hidden.
+
+Admin restore/delete is the same Users management table (`status=deactivated` filter). There is no separate Deactivated page.
 
 ### Account matching & pending
 
