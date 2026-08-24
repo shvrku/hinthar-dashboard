@@ -10,23 +10,40 @@ export class ApiError extends Error {
   }
 }
 
-// Prefer browser → Django (NEXT_PUBLIC_API_ORIGIN) to avoid Vercel serverless
+// Prefer browser → Django (NEXT_PUBLIC_API_ORIGINS) to avoid Vercel serverless
 // invocations on every API call. Falls back to same-origin /api proxy.
-function resolveApiBase(): string {
-  const origin = (process.env.NEXT_PUBLIC_API_ORIGIN || "").replace(/\/+$/, "")
-  if (origin) return `${origin}/api/v1`
-  return "/api/v1"
+//
+// Multiple origins may be provided (comma-separated, in priority order). When
+// a GET fails at the network level, the next origin is tried transparently;
+// mutations never fail over (a dropped response after the server committed
+// would otherwise be retried and duplicate the write).
+function parseApiOrigins(): string[] {
+  const list = (process.env.NEXT_PUBLIC_API_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/+$/, ""))
+    .filter(Boolean)
+  const primary = (process.env.NEXT_PUBLIC_API_ORIGIN || "").trim().replace(/\/+$/, "")
+  if (primary && !list.includes(primary)) list.unshift(primary)
+  return list
 }
 
-const API_BASE = resolveApiBase()
+const API_ORIGINS = parseApiOrigins()
 
 export function getApiBase(): string {
-  return API_BASE
+  return activeOrigin()
+}
+
+/** Origin currently believed reachable; probes restart on next page load. */
+let preferredIndex = 0
+
+function activeOrigin(): string {
+  if (API_ORIGINS.length === 0) return "/api/v1"
+  return `${API_ORIGINS[Math.min(preferredIndex, API_ORIGINS.length - 1)]}/api/v1`
 }
 
 /** True when the browser talks to Django directly (CORS required on SMS). */
 export function isDirectApiMode(): boolean {
-  return Boolean((process.env.NEXT_PUBLIC_API_ORIGIN || "").trim())
+  return API_ORIGINS.length > 0
 }
 
 /** Builds a query string. The value `"all"` is omitted (UI filter sentinel =
@@ -61,29 +78,60 @@ async function request<T>(
   token: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE}${endpoint}`
-  let res: Response
-  try {
-    res = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
-    })
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : "Network error"
-    const corsHint =
-      typeof window !== "undefined" && isDirectApiMode()
-        ? ` If this is a CORS failure, add this dashboard origin to SMS CORS_ALLOWED_ORIGINS (and optionally CORS_ALLOWED_ORIGIN_REGEXES for Vercel previews). API base: ${API_BASE}.`
-        : ""
-    throw new ApiError(
-      0,
-      `Unable to connect to API server (${API_BASE}). Details: ${detail}.${corsHint}`
-    )
+  const method = (options.method || "GET").toUpperCase()
+  const canFailover = method === "GET"
+  const bases =
+    API_ORIGINS.length > 0 ? API_ORIGINS.map((origin) => `${origin}/api/v1`) : ["/api/v1"]
+  let lastNetworkError: unknown = undefined
+
+  // Network-level failover: try each origin in order. Only GETs retry — a
+  // mutation may have committed before its response was lost, so retrying it
+  // on another origin risks duplicate writes.
+  for (let attempt = Math.min(preferredIndex, bases.length - 1); attempt < bases.length; attempt++) {
+    const url = `${bases[attempt]}${endpoint}`
+    try {
+      const res = await fetchWithResponse(url, token, options)
+      if (canFailover && attempt !== preferredIndex) {
+        preferredIndex = attempt
+      }
+      return await parseResponse<T>(res)
+    } catch (err) {
+      if (!(err instanceof TypeError)) throw err
+      // TypeError from fetch = network/CORS-level failure, not an API error.
+      lastNetworkError = err
+      if (!canFailover) break
+    }
   }
 
+  const detail =
+    lastNetworkError instanceof Error ? lastNetworkError.message : "Network error"
+  const tried = isDirectApiMode() ? API_ORIGINS.join(", ") : "same-origin /api proxy"
+  const corsHint =
+    typeof window !== "undefined" && isDirectApiMode()
+      ? ` If this is a CORS failure, add this dashboard origin to SMS CORS_ALLOWED_ORIGINS (and optionally CORS_ALLOWED_ORIGIN_REGEXES for Vercel previews). API origins tried: ${tried}.`
+      : ""
+  throw new ApiError(
+    0,
+    `Unable to connect to API server (${tried}). Details: ${detail}.${corsHint}`
+  )
+}
+
+async function fetchWithResponse(
+  url: string,
+  token: string,
+  options: RequestInit
+): Promise<Response> {
+  return fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+  })
+}
+
+async function parseResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = "An error occurred"
     let payload: unknown = undefined
