@@ -37,6 +37,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { ConfirmDialog } from "@/components/confirm-dialog"
+import { toast } from "@/components/ui/toast"
 import { SearchableSelect } from "@/components/searchable-select"
 import {
   Empty,
@@ -114,6 +115,9 @@ export default function CheckInOverviewPage() {
   const [lastLoaded, setLastLoaded] = React.useState<string | null>(null)
   const [undoTarget, setUndoTarget] = React.useState<ClassRow | null>(null)
   const [undoing, setUndoing] = React.useState(false)
+  const [checkInTarget, setCheckInTarget] = React.useState<ClassRow | null>(null)
+  const [checkingIn, setCheckingIn] = React.useState(false)
+  const [checkingInId, setCheckingInId] = React.useState<number | null>(null)
   // Query the user is currently on, so out-of-order responses can be discarded.
   const latestSearchRef = React.useRef("")
 
@@ -408,6 +412,32 @@ export default function CheckInOverviewPage() {
 
   const openTerminal = () => router.push("/check-in/terminal")
 
+  const requestCheckIn = (row: ClassRow) => {
+    setCheckInTarget(row)
+  }
+
+  const confirmCheckIn = async () => {
+    if (!checkInTarget || !isSignedIn) return
+    setCheckingIn(true)
+    setCheckingInId(checkInTarget.studentId)
+    setError(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No authentication token is available.")
+      const result = await createApi(token).createCheckInManual(checkInTarget.studentId)
+      const name = result.student_name || checkInTarget.studentName
+      toast.add({ title: `${name} checked in successfully.`, type: "success" })
+      setCheckInTarget(null)
+      await Promise.all([loadClasses(), refreshRoster()])
+    } catch (err) {
+      const message = readError(err, "Failed to check in student.")
+      toast.add({ title: message, type: "error" })
+    } finally {
+      setCheckingIn(false)
+      setCheckingInId(null)
+    }
+  }
+
   const refreshRoster = React.useCallback(async () => {
     if (isSchoolWide) {
       await loadSchool(missingPage, arrivedPage)
@@ -615,12 +645,23 @@ export default function CheckInOverviewPage() {
                 <SearchResultsTable
                   data={null}
                   loading
+                  onCheckInStudent={() => {}}
                   onSelectClass={() => {}}
                 />
               ) : searchData && searchData.results.length > 0 ? (
                 <>
                   <SearchResultsTable
                     data={searchData}
+                    checkingInId={checkingInId}
+                    onCheckInStudent={(row) =>
+                      requestCheckIn({
+                        studentId: row.student_id,
+                        studentCode: row.unique_code,
+                        studentName: row.name,
+                        classLabel: row.class_label,
+                        checkIn: row.check_in,
+                      })
+                    }
                     onSelectClass={(classId) => {
                       selectClass(String(classId))
                       setSearchQuery("")
@@ -745,7 +786,8 @@ export default function CheckInOverviewPage() {
                         classLoading || (isSchoolWide && missingLoading)
                       }
                       showClass={isSchoolWide}
-                      onOpenTerminal={openTerminal}
+                      checkingInId={checkingInId}
+                      onCheckInStudent={requestCheckIn}
                     />
                   ) : (
                     <GroupEmptyState
@@ -801,7 +843,7 @@ export default function CheckInOverviewPage() {
                           ? undoTarget.checkIn.id
                           : null
                       }
-                      onOpenTerminal={openTerminal}
+                      onCheckInStudent={requestCheckIn}
                       onUndoCheckIn={setUndoTarget}
                     />
                   ) : (
@@ -831,6 +873,22 @@ export default function CheckInOverviewPage() {
 
         </>
       )}
+
+      <ConfirmDialog
+        open={checkInTarget !== null}
+        title="Check in student?"
+        description={
+          checkInTarget
+            ? `Mark ${checkInTarget.studentName} as checked in for ${selectedDate}?`
+            : ""
+        }
+        confirmLabel="Check in"
+        onConfirm={confirmCheckIn}
+        onCancel={() => {
+          if (!checkingIn) setCheckInTarget(null)
+        }}
+        loading={checkingIn}
+      />
 
       <ConfirmDialog
         open={undoTarget !== null}

@@ -14,6 +14,9 @@ import {
   ClipboardCheck,
   QrCode,
   Monitor,
+  Megaphone,
+  CalendarDays,
+  Settings2,
   LayoutDashboard,
   ChevronRight,
   UserCog,
@@ -67,6 +70,16 @@ import { canCheckIn, isAdmin, isStaffOrAbove } from "@/lib/roles"
 import { Badge } from "@/components/ui/badge"
 const overviewItems = [
   { title: "Dashboard", url: "/overview", icon: LayoutDashboard },
+]
+
+const schoolItems = [
+  { title: "Announcements", url: "/announcements", icon: Megaphone },
+  { title: "Events", url: "/events", icon: CalendarDays },
+]
+
+const schoolStaffItems = [
+  ...schoolItems,
+  { title: "Manage events", url: "/events/manage", icon: Settings2 },
 ]
 
 const managementItems = [
@@ -148,6 +161,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const showTeacherNav = !accountLocked && !accountLoading && role === "teacher"
   const showTerminalNav = !accountLocked && !accountLoading && canCheckIn(role) && !showStaffNav
   const checkInSubItems = showStaffNav ? checkInSubItemsStaff : checkInSubItemsTerminal
+  const unmatchedStudent = role === "student" && account?.student_profile_id == null
+  const unmatchedTeacher = role === "teacher" && account?.teacher_profile_id == null
+  const waitingForLink = role === "pending" || unmatchedStudent || unmatchedTeacher
   const teacherHomeHref = account?.teacher_profile_id
     ? `/teachers/${account.teacher_profile_id}`
     : "/pending"
@@ -226,6 +242,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenu>
                 {overviewItems.map((item) => {
                   const isActive = pathname === item.url
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>School</SidebarGroupLabel>
+              <SidebarMenu>
+                {schoolStaffItems.map((item) => {
+                  const isActive =
+                    pathname === item.url ||
+                    pathname === `${item.url}/` ||
+                    pathname.startsWith(`${item.url}/`)
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton tooltip={item.title} isActive={isActive} render={<Link href={item.url} onClick={handleNavClick} />}>
@@ -346,44 +382,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </SidebarGroup>
             ) : null}
           </>
-        ) : showTeacherNav ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Teacher</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Home"
-                  isActive={
-                    pathname === teacherHomeHref ||
-                    pathname === `${teacherHomeHref}/` ||
-                    pathname.startsWith("/teachers/")
-                  }
-                  render={<Link href={teacherHomeHref} onClick={handleNavClick} />}
-                >
-                  <QrCode />
-                  <span>Home</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        ) : showTerminalNav ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Check-In</SidebarGroupLabel>
-            <SidebarMenu>
-              {checkInSubItemsTerminal.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    isActive={pathname === item.url}
-                    render={<Link href={item.url} onClick={handleNavClick} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
         ) : showStudentNav ? (
           <SidebarGroup>
             <SidebarGroupLabel>Student</SidebarGroupLabel>
@@ -404,12 +402,100 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <span>Home</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {schoolItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                    render={<Link href={item.url} onClick={handleNavClick} />}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : showTeacherNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Teacher</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Home"
+                  isActive={
+                    pathname === teacherHomeHref ||
+                    pathname === `${teacherHomeHref}/` ||
+                    pathname.startsWith("/teachers/")
+                  }
+                  render={<Link href={teacherHomeHref} onClick={handleNavClick} />}
+                >
+                  <QrCode />
+                  <span>Home</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {schoolItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                    render={<Link href={item.url} onClick={handleNavClick} />}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : showTerminalNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Check-In</SidebarGroupLabel>
+            <SidebarMenu>
+              {checkInSubItemsTerminal.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={pathname === item.url}
+                    render={<Link href={item.url} onClick={handleNavClick} />}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroup>
         ) : accountLocked || role ? (
           <SidebarGroup>
             <SidebarGroupLabel>Account</SidebarGroupLabel>
             <SidebarMenu>
+              {!accountLocked && waitingForLink ? (
+                <>
+                  {schoolItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                        render={<Link href={item.url} onClick={handleNavClick} />}
+                      >
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip="Waiting for link"
+                      isActive={pathname === "/pending"}
+                      render={<Link href="/pending" onClick={handleNavClick} />}
+                    >
+                      <Link2 />
+                      <span>Waiting for link</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              ) : null}
               <SidebarMenuItem>
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">
                   {accountLocked ? (

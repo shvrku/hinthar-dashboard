@@ -43,6 +43,10 @@ function isAccountLockedPath(pathname: string): boolean {
   return pathname === "/account-locked"
 }
 
+function isAnnouncementsPath(pathname: string): boolean {
+  return pathname === "/announcements" || pathname.startsWith("/announcements/")
+}
+
 /**
  * Global access gate after Clerk sign-in:
  * - `/` is the post-login dispatcher (all signed-in roles)
@@ -84,7 +88,9 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (waitingForLink) {
-      if (!isPendingPath(pathname)) router.replace("/pending/")
+      if (!isPendingPath(pathname) && !isAnnouncementsPath(pathname)) {
+        router.replace("/pending/")
+      }
       return
     }
 
@@ -96,14 +102,20 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     }
 
     if (role === "student") {
-      if (!isOwnStudentHubPath(pathname, studentProfileId)) {
+      if (
+        !isOwnStudentHubPath(pathname, studentProfileId) &&
+        !isAnnouncementsPath(pathname)
+      ) {
         router.replace("/")
       }
       return
     }
 
     if (role === "teacher") {
-      if (!isOwnTeacherHubPath(pathname, teacherProfileId)) {
+      if (
+        !isOwnTeacherHubPath(pathname, teacherProfileId) &&
+        !isAnnouncementsPath(pathname)
+      ) {
         router.replace("/")
       }
       return
@@ -155,17 +167,21 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   }
 
   if (waitingForLink) {
-    if (!isPendingPath(pathname)) return null
+    if (!isPendingPath(pathname) && !isAnnouncementsPath(pathname)) return null
     return <>{children}</>
   }
 
   if (role === "teacher") {
-    if (!isOwnTeacherHubPath(pathname, teacherProfileId)) return null
+    if (!isOwnTeacherHubPath(pathname, teacherProfileId) && !isAnnouncementsPath(pathname)) {
+      return null
+    }
     return <>{children}</>
   }
 
   if (role === "student") {
-    if (!isOwnStudentHubPath(pathname, studentProfileId)) return null
+    if (!isOwnStudentHubPath(pathname, studentProfileId) && !isAnnouncementsPath(pathname)) {
+      return null
+    }
     return <>{children}</>
   }
 

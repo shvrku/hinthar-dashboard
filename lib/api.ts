@@ -49,7 +49,7 @@ export function isDirectApiMode(): boolean {
 /** Builds a query string. The value `"all"` is omitted (UI filter sentinel =
  * "no filter"). Callers that need a literal `all` (e.g. overview `class_id`)
  * must build that param themselves — see `overviewClass`. */
-function buildQueryString(params?: Record<string, string | number | undefined | null>): string {
+export function buildQueryString(params?: Record<string, string | number | undefined | null>): string {
   const query = new URLSearchParams()
   if (params) {
     for (const [key, val] of Object.entries(params)) {
@@ -76,6 +76,14 @@ function parseRetryAfterSeconds(res: Response, detail: string): number | undefin
 async function request<T>(
   endpoint: string,
   token: string,
+  options: RequestInit = {}
+): Promise<T> {
+  return requestWithToken<T>(endpoint, token, options)
+}
+
+async function requestWithToken<T>(
+  endpoint: string,
+  token: string | null,
   options: RequestInit = {}
 ): Promise<T> {
   const method = (options.method || "GET").toUpperCase()
@@ -118,16 +126,19 @@ async function request<T>(
 
 async function fetchWithResponse(
   url: string,
-  token: string,
+  token: string | null,
   options: RequestInit
 ): Promise<Response> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> | undefined),
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
   return fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
+    headers,
   })
 }
 
@@ -930,5 +941,111 @@ export function createApi(token: string) {
     // --- Stats ---
     getStats: () =>
       request<import("./types").Stats>(`/stats/`, token),
+
+    // --- Communications ---
+    listTags: (params?: { scope?: "announcement" | "event" }) =>
+      request<import("./types").CommTag[]>(`/tags${buildQueryString(params)}`, token),
+
+    listAnnouncements: (params?: { tag?: string; q?: string; page?: number }) =>
+      request<import("./types").Paginated<import("./types").Announcement>>(
+        `/announcements${buildQueryString(params)}`,
+        token
+      ),
+
+    getAnnouncement: (slug: string) =>
+      request<import("./types").Announcement>(`/announcements/${slug}/`, token),
+
+    createAnnouncement: (data: {
+      title: string
+      body: string
+      status?: import("./types").AnnouncementStatus
+      is_featured?: boolean
+      is_pinned?: boolean
+      tag_names?: string[]
+    }) =>
+      request<import("./types").Announcement>(`/announcements/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateAnnouncement: (
+      slug: string,
+      data: Partial<{
+        title: string
+        body: string
+        status: import("./types").AnnouncementStatus
+        is_featured: boolean
+        is_pinned: boolean
+        tag_names: string[]
+      }>
+    ) =>
+      request<import("./types").Announcement>(`/announcements/${slug}/`, token, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    deleteAnnouncement: (slug: string) =>
+      request<void>(`/announcements/${slug}/`, token, { method: "DELETE" }),
+
+    listEvents: (params?: { tag?: string; q?: string; when?: string; page?: number }, authToken?: string | null) =>
+      requestWithToken<import("./types").Paginated<import("./types").SchoolEvent>>(
+        `/events${buildQueryString(params)}`,
+        authToken ?? token
+      ),
+
+    getEvent: (slug: string, authToken?: string | null) =>
+      requestWithToken<import("./types").SchoolEvent>(
+        `/events/${slug}/`,
+        authToken ?? token
+      ),
+
+    createEvent: (data: Record<string, unknown>) =>
+      request<import("./types").SchoolEvent>(`/events/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateEvent: (slug: string, data: Record<string, unknown>) =>
+      request<import("./types").SchoolEvent>(`/events/${slug}/`, token, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    deleteEvent: (slug: string) =>
+      request<void>(`/events/${slug}/`, token, { method: "DELETE" }),
+
+    registerForEvent: (slug: string) =>
+      request<import("./types").EventRegistration>(`/events/${slug}/register/`, token, {
+        method: "POST",
+      }),
+
+    cancelEventRegistration: (slug: string) =>
+      request<import("./types").EventRegistration>(
+        `/events/${slug}/cancel-registration/`,
+        token,
+        { method: "POST" }
+      ),
+
+    myEventRegistrations: () =>
+      request<import("./types").MyEventRegistration[]>(`/events/my-registrations/`, token),
+
+    listEventRegistrations: (slug: string) =>
+      request<import("./types").EventRegistration[]>(`/events/${slug}/registrations/`, token),
+
+    reviewEventRegistration: (
+      slug: string,
+      registrationId: number,
+      data: { action: "approve" | "reject" | "promote"; staff_note?: string }
+    ) =>
+      request<import("./types").EventRegistration>(
+        `/events/${slug}/registrations/${registrationId}/review/`,
+        token,
+        { method: "POST", body: JSON.stringify(data) }
+      ),
   }
+}
+
+/** Unauthenticated GET for public external events. */
+export async function publicRequest<T>(endpoint: string): Promise<T> {
+  return requestWithToken<T>(endpoint, null, {})
 }

@@ -628,3 +628,75 @@ export interface Paginated<T> {
   previous: string | null
   results: T[]
 }
+
+/** Communications --- */
+export interface CommTag {
+  id: number
+  name: string
+  slug: string
+  scope?: "announcement" | "event"
+}
+
+export type AnnouncementStatus = "published" | "archived"
+
+export interface Announcement {
+  id: number
+  title: string
+  slug: string
+  body: string
+  status: AnnouncementStatus
+  is_featured: boolean
+  is_pinned: boolean
+  published_at: string | null
+  author: number | null
+  author_name: string | null
+  tags: CommTag[]
+  created_at: string
+  updated_at: string
+}
+
+export type EventAudience = "internal" | "external"
+export type EventRegistrationMode = "instant_waitlist" | "approval_required"
+export type EventStatus = "published" | "closed" | "cancelled"
+export type EventRegistrationStatus = "confirmed" | "waitlisted" | "pending" | "cancelled"
+
+export interface EventRegistration {
+  id: number
+  event: number
+  user: number
+  user_display: string | null
+  status: EventRegistrationStatus
+  staff_note: string
+  registered_at: string
+  reviewed_at: string | null
+  reviewed_by: number | null
+}
+
+export interface SchoolEvent {
+  id: number
+  title: string
+  slug: string
+  summary: string
+  body: string
+  audience: EventAudience
+  registration_mode: EventRegistrationMode
+  status: EventStatus
+  starts_at: string
+  ends_at: string | null
+  location: string
+  registration_opens_at: string | null
+  registration_closes_at: string | null
+  capacity: number | null
+  cover_image_url: string
+  created_by: number | null
+  created_by_name: string | null
+  tags: CommTag[]
+  registration_count: number
+  my_registration: EventRegistration | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MyEventRegistration extends EventRegistration {
+  event: SchoolEvent
+}

@@ -62,7 +62,8 @@ export function ClassStudentTable({
   loading = false,
   showClass = false,
   undoingId = null,
-  onOpenTerminal,
+  checkingInId = null,
+  onCheckInStudent,
   onUndoCheckIn,
 }: {
   rows: ClassRow[]
@@ -70,7 +71,8 @@ export function ClassStudentTable({
   loading?: boolean
   showClass?: boolean
   undoingId?: number | null
-  onOpenTerminal: () => void
+  checkingInId?: number | null
+  onCheckInStudent: (row: ClassRow) => void
   onUndoCheckIn?: (row: ClassRow) => void
 }) {
   const { items, requestSort, sortConfig } = useSortableData(
@@ -193,10 +195,15 @@ export function ClassStudentTable({
                           <Button
                             size="icon-xs"
                             variant="ghost"
-                            onClick={onOpenTerminal}
+                            disabled={checkingInId === row.studentId}
+                            onClick={() => onCheckInStudent(row)}
                             aria-label="Check in"
                           >
-                            <LogIn className="size-3.5" />
+                            {checkingInId === row.studentId ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <LogIn className="size-3.5" />
+                            )}
                           </Button>
                         )}
                       </TableCell>
@@ -232,10 +239,15 @@ export function ClassStudentTable({
                       <Button
                         size="icon-xs"
                         variant="ghost"
-                        onClick={onOpenTerminal}
+                        disabled={checkingInId === row.studentId}
+                        onClick={() => onCheckInStudent(row)}
                         aria-label="Check in"
                       >
-                        <LogIn className="size-3.5" />
+                        {checkingInId === row.studentId ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <LogIn className="size-3.5" />
+                        )}
                       </Button>
                     </TableCell>
                   )}
@@ -284,10 +296,15 @@ export function ClassStudentTable({
                       <Button
                         size="icon-xs"
                         variant="outline"
-                        onClick={onOpenTerminal}
+                        disabled={checkingInId === row.studentId}
+                        onClick={() => onCheckInStudent(row)}
                         aria-label="Check in"
                       >
-                        <LogIn className="size-3.5" />
+                        {checkingInId === row.studentId ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <LogIn className="size-3.5" />
+                        )}
                       </Button>
                     )}
                   </CardAction>
@@ -304,10 +321,20 @@ export function ClassStudentTable({
 export function SearchResultsTable({
   data,
   loading = false,
+  checkingInId = null,
+  onCheckInStudent,
   onSelectClass,
 }: {
   data: OverviewSearchResponse | null
   loading?: boolean
+  checkingInId?: number | null
+  onCheckInStudent: (row: {
+    student_id: number
+    unique_code: string | null
+    name: string
+    class_label: string
+    check_in: CheckInStatus | null
+  }) => void
   onSelectClass: (classId: number) => void
 }) {
   return (
@@ -357,14 +384,39 @@ export function SearchResultsTable({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  onClick={() => onSelectClass(row.class_id)}
-                  aria-label="View class"
-                >
-                  <Eye className="size-3.5" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  {!row.check_in && (
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      disabled={checkingInId === row.student_id}
+                      onClick={() =>
+                        onCheckInStudent({
+                          student_id: row.student_id,
+                          unique_code: row.unique_code,
+                          name: row.name,
+                          class_label: row.class_label,
+                          check_in: row.check_in,
+                        })
+                      }
+                      aria-label="Check in"
+                    >
+                      {checkingInId === row.student_id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <LogIn className="size-3.5" />
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    onClick={() => onSelectClass(row.class_id)}
+                    aria-label="View class"
+                  >
+                    <Eye className="size-3.5" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}

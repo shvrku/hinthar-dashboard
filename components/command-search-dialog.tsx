@@ -14,6 +14,8 @@ import {
   Search,
   LayoutDashboard,
   Monitor,
+  Megaphone,
+  CalendarDays,
   Palette,
   Link2,
   type LucideIcon,
@@ -47,6 +49,9 @@ type NavigationItem = {
 
 const navigationItems: NavigationItem[] = [
   { title: "Dashboard", href: "/overview", group: "Overview", icon: LayoutDashboard },
+  { title: "Announcements", href: "/announcements", group: "School", icon: Megaphone },
+  { title: "Events", href: "/events", group: "School", icon: CalendarDays },
+  { title: "Manage events", href: "/events/manage", group: "School", icon: Monitor, keywords: ["events", "registrations"] },
   { title: "Classes Roster", href: "/classes", group: "Management", icon: GraduationCap },
   { title: "Student Directory", href: "/students", group: "Management", icon: Users },
   { title: "Teacher Faculty", href: "/teachers", group: "Management", icon: UserCheck },
