@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs"
 
 import { EventComposeScreen } from "@/components/events/event-compose-screen"
 import { RequireRole } from "@/components/require-role"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EventComposeSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
 import { draftToApiPayload, createEmptyEventDraft, type EventDraft } from "@/lib/event-draft"
@@ -34,7 +35,13 @@ function NewEventContent() {
   }
 
   if (!isLoaded) {
-    return <EventComposeSkeleton label="Preparing editor…" />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EventComposeSkeleton label="Preparing editor…" />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   return (

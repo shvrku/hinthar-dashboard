@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs"
 
 import { EventComposeScreen } from "@/components/events/event-compose-screen"
 import { RequireRole } from "@/components/require-role"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EventComposeSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
 import { draftToApiPayload, eventToDraft, type EventDraft } from "@/lib/event-draft"
@@ -64,14 +65,24 @@ function EditEventContent({ params }: { params: Promise<{ slug: string }> }) {
   }
 
   if (!isLoaded || loading) {
-    return <EventComposeSkeleton label="Loading event…" />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EventComposeSkeleton label="Loading event…" />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   if (error || !initial) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <p className="text-sm text-destructive">{error || "Event not found."}</p>
-      </div>
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <div className="mx-auto max-w-lg py-16 text-center">
+            <p className="text-sm text-destructive">{error || "Event not found."}</p>
+          </div>
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 

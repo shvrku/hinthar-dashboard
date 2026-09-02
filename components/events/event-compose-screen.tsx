@@ -1,9 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import {
-  ArrowLeft,
   ChevronDown,
   Globe,
   Loader2,
@@ -14,10 +12,12 @@ import {
   UserPlus,
 } from "lucide-react"
 
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EventDateTimePicker } from "@/components/events/event-datetime-picker"
 import { EventDescriptionDialog } from "@/components/events/event-description-dialog"
 import { EventLocationField } from "@/components/events/event-location-field"
 import { EditorTitle } from "@/components/markdown/markdown-editor"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -229,19 +229,27 @@ export function EventComposeScreen({
   const requireApproval = draft.registration_mode === "approval_required"
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 pt-3 pb-6 sm:px-6 sm:pt-4 sm:pb-8">
+    <form ref={formRef} onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-6">
+      <StaggerContainer className="flex min-h-0 flex-1 flex-col gap-6">
+      <StaggerItem>
+      <StandardPageHeader
+        title={submitLabel === "Publish" ? "New event" : "Edit event"}
+        description="Set the schedule, location, and registration options."
+        back={{ href: backHref, label: backLabel }}
+      >
         <Button
           type="button"
-          variant="ghost"
           size="sm"
-          className="-ml-2 w-fit gap-1.5"
-          render={<Link href={backHref} />}
+          disabled={saving}
+          onClick={() => formRef.current?.requestSubmit()}
+          className="gap-1.5"
         >
-          <ArrowLeft className="size-4" />
-          {backLabel}
+          {saving ? <Loader2 className="size-4 animate-spin" /> : submitLabel}
         </Button>
+      </StandardPageHeader>
+      </StaggerItem>
 
+      <StaggerItem className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 pb-6">
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <AudienceMenu
@@ -336,7 +344,8 @@ export function EventComposeScreen({
             </div>
           </div>
         </div>
-      </div>
+      </StaggerItem>
+      </StaggerContainer>
     </form>
   )
 }

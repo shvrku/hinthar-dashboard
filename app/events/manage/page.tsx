@@ -5,9 +5,11 @@ import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import { CalendarDays, ChevronRight, Plus } from "lucide-react"
 
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EventDateIcon } from "@/components/events/event-meta-icons"
 import { RequireRole } from "@/components/require-role"
 import { EventsManageListSkeleton } from "@/components/skeleton/communications-skeleton"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import { ApiError, createApi } from "@/lib/api"
 import type { SchoolEvent } from "@/lib/types"
 import { EVENT_AUDIENCE_LABELS, EVENT_STATUS_LABELS } from "@/lib/communications-labels"
@@ -45,34 +47,42 @@ function ManageEventsContent() {
 
   if (!isLoaded || loading) {
     return (
-      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
-        </div>
-        <EventsManageListSkeleton />
-      </div>
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <StandardPageHeader
+            title="Events"
+            description="Create and manage school events."
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <EventsManageListSkeleton />
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-4 py-4 backdrop-blur-md sm:px-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
-          <p className="text-sm text-muted-foreground">Create and manage school events.</p>
-        </div>
-        <Button render={<Link href="/events/manage/new" />} className="gap-2">
-          <Plus className="size-4" />
-          Create event
-        </Button>
-      </div>
+    <StaggerContainer className="flex flex-col gap-6">
+      <StaggerItem>
+        <StandardPageHeader
+          title="Events"
+          description="Create and manage school events."
+        >
+          <Button render={<Link href="/events/manage/new" />} className="gap-2">
+            <Plus className="size-4" />
+            Create event
+          </Button>
+        </StandardPageHeader>
+      </StaggerItem>
 
-      <div className="flex-1 px-4 py-6 sm:px-6">
-        {loadError ? (
+      {loadError ? (
+        <StaggerItem>
           <Card>
             <CardContent className="py-10 text-center text-sm text-destructive">{loadError}</CardContent>
           </Card>
-        ) : events.length === 0 ? (
+        </StaggerItem>
+      ) : events.length === 0 ? (
+        <StaggerItem>
           <Card>
             <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
               <CalendarDays className="size-8 text-muted-foreground/50" />
@@ -84,33 +94,35 @@ function ManageEventsContent() {
               </Button>
             </CardContent>
           </Card>
-        ) : (
+        </StaggerItem>
+      ) : (
+        <StaggerItem>
           <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-xs">
             {events.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/events/manage/${event.slug}`}
-                  className="flex items-center gap-4 border-b border-border/80 px-4 py-4 transition-colors last:border-b-0 hover:bg-muted/20 sm:px-5"
-                >
-                  <EventDateIcon startsAt={event.starts_at} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{event.title}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>{formatBackendTime(event.starts_at)}</span>
-                      <Badge variant="outline">{EVENT_AUDIENCE_LABELS[event.audience]}</Badge>
-                      <Badge variant="outline">{EVENT_STATUS_LABELS[event.status]}</Badge>
-                    </div>
+              <Link
+                key={event.id}
+                href={`/events/manage/${event.slug}`}
+                className="flex items-center gap-4 border-b border-border/80 px-4 py-4 transition-colors last:border-b-0 hover:bg-muted/20 sm:px-5"
+              >
+                <EventDateIcon startsAt={event.starts_at} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{event.title}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{formatBackendTime(event.starts_at)}</span>
+                    <Badge variant="outline">{EVENT_AUDIENCE_LABELS[event.audience]}</Badge>
+                    <Badge variant="outline">{EVENT_STATUS_LABELS[event.status]}</Badge>
                   </div>
-                  <div className="hidden shrink-0 text-right text-sm text-muted-foreground sm:block">
-                    {event.registration_count} registered
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
+                </div>
+                <div className="hidden shrink-0 text-right text-sm text-muted-foreground sm:block">
+                  {event.registration_count} registered
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
             ))}
           </div>
-        )}
-      </div>
-    </div>
+        </StaggerItem>
+      )}
+    </StaggerContainer>
   )
 }
 

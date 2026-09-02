@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Check, ChevronDown, Loader2, Search, User } from "lucide-react"
 
+import { EventRegistrationRosterSkeleton } from "@/components/skeleton/communications-skeleton"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -123,6 +124,10 @@ export function EventRegistrationRoster({
 
   return (
     <div className="flex flex-col gap-4">
+      {loading ? (
+        <EventRegistrationRosterSkeleton />
+      ) : (
+        <>
       <InputGroup className="h-11 rounded-xl bg-background shadow-xs">
         <InputGroupAddon>
           <Search className="size-4 text-muted-foreground" />
@@ -159,12 +164,7 @@ export function EventRegistrationRoster({
         })}
       </div>
 
-      {loading ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
-          <Loader2 className="size-8 animate-spin" />
-          <p>Loading registrations…</p>
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
           {registrations.length === 0 ? "No registrations yet." : "No guests match your search."}
         </p>
@@ -206,6 +206,8 @@ export function EventRegistrationRoster({
             )
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   )

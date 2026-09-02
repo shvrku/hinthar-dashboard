@@ -9,6 +9,7 @@ import {
   type AnnouncementDraft,
 } from "@/components/announcements/announcement-editor-form"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
 import { notifySaveError, notifySaveSuccess } from "@/lib/editor-save"
@@ -83,7 +84,7 @@ export default function EditAnnouncementPage({
           .map((t) => t.trim())
           .filter(Boolean),
       })
-      notifySaveSuccess("Announcement updated.", () => router.push("/announcements"))
+      notifySaveSuccess("Announcement updated.", () => router.push(`/announcements/${slug}`))
     } catch (err) {
       notifySaveError(err, "Failed to save")
     } finally {
@@ -92,32 +93,46 @@ export default function EditAnnouncementPage({
   }
 
   if (!isLoaded || loading) {
-    return <EditorPageSkeleton label="Loading announcement…" />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EditorPageSkeleton label="Loading announcement…" />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   if (error || !initial) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <p className="text-sm text-destructive">{error || "Announcement not found."}</p>
-      </div>
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <div className="mx-auto max-w-lg py-16 text-center">
+            <p className="text-sm text-destructive">{error || "Announcement not found."}</p>
+          </div>
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <StandardPageHeader
-        title="Edit announcement"
-        description="Update content and visibility options."
-        back={{ href: "/announcements", label: "Announcements" }}
-      />
-      <AnnouncementEditorForm
-        editorKey={`announcement-edit-${slug}`}
-        initial={initial}
-        saving={saving}
-        submitLabel="Save changes"
-        onSubmit={save}
-        onCancel={() => router.push("/announcements")}
-      />
-    </div>
+    <StaggerContainer className="flex flex-col gap-6">
+      <StaggerItem>
+        <StandardPageHeader
+          title="Edit announcement"
+          description="Update content and visibility options."
+          back={{ href: `/announcements/${slug}`, label: "Announcement" }}
+        />
+      </StaggerItem>
+      <StaggerItem>
+        <AnnouncementEditorForm
+          editorKey={`announcement-edit-${slug}`}
+          initial={initial}
+          saving={saving}
+          submitLabel="Save changes"
+          onSubmit={save}
+          onCancel={() => router.push(`/announcements/${slug}`)}
+        />
+      </StaggerItem>
+    </StaggerContainer>
   )
 }

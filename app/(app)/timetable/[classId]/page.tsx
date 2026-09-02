@@ -18,7 +18,6 @@ import {
   X,
   Plus,
   Check,
-  Loader2,
   Trash2,
 } from "lucide-react"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -42,6 +41,7 @@ import { Card } from "@/components/ui/card"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { Badge } from "@/components/ui/badge"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { WeekGridSkeleton } from "@/components/page-skeletons"
 import { DAYS, HOURS, getClassName, getDurationMinutes, timeToMins } from "@/components/timetable/grid-utils"
 import { SlotModal, type ModalState } from "@/components/timetable/slot-editor"
 
@@ -336,9 +336,17 @@ export default function TimetableClassPage() {
 
   if (!isLoaded) {
     return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
+      <StaggerContainer className="space-y-6">
+        <StaggerItem>
+          <StandardPageHeader
+            title="Class Timetable"
+            back={{ href: "/timetable/", label: "Timetable" }}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <WeekGridSkeleton />
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 

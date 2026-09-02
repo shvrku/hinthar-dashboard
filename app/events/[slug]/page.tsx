@@ -8,10 +8,13 @@ import { ArrowLeft, ArrowUpRight, Loader2 } from "lucide-react"
 
 import { MarkdownContent } from "@/components/markdown-content"
 import { EventDateIcon, EventLocationIcon } from "@/components/events/event-meta-icons"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { EventDetailSkeleton } from "@/components/skeleton/communications-skeleton"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { ApiError, createApi, publicRequest } from "@/lib/api"
 import type { EventRegistrationStatus, SchoolEvent } from "@/lib/types"
+import { isEventRegistrationOpen } from "@/lib/communications-labels"
 import { formatBackendTime, parseBackendDateTime } from "@/lib/utils"
 
 function formatEventDateLabel(startsAt: string): string {
@@ -68,24 +71,6 @@ const REGISTRATION_STATUS_COPY: Record<
     title: "Cancelled",
     description: "You can register again if spots are still available.",
   },
-}
-
-function EventDetailSkeleton() {
-  return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <div className="h-8 w-24 animate-pulse rounded-lg bg-muted" />
-      <div className="space-y-3">
-        <div className="h-10 w-4/5 max-w-md animate-pulse rounded-lg bg-muted" />
-        <div className="h-4 w-56 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-      </div>
-      <div className="h-28 w-full animate-pulse rounded-2xl bg-muted" />
-      <div className="space-y-2">
-        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <div className="h-20 w-full animate-pulse rounded-xl bg-muted" />
-      </div>
-    </div>
-  )
 }
 
 export default function EventDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -172,15 +157,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   }
 
   if (!isLoaded || loading) {
-    return <EventDetailSkeleton />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EventDetailSkeleton />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   if (error || !event) {
-    return <p className="text-sm text-destructive">{error || "Event not found."}</p>
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <p className="text-sm text-destructive">{error || "Event not found."}</p>
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   const registration = event.my_registration
-  const canRegister = isSignedIn && !registration
+  const registrationOpen = isEventRegistrationOpen(event)
+  const canRegister = isSignedIn && !registration && registrationOpen
   const description = event.body.trim() || event.summary.trim()
   const location = event.location.trim()
   const isVirtualLocation = /^https?:\/\//i.test(location)
@@ -190,145 +188,162 @@ export default function EventDetailPage({ params }: { params: Promise<{ slug: st
   const startingIn = formatStartingIn(event.starts_at)
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-8 overflow-x-hidden">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="-ml-2 w-fit gap-1.5"
-        render={<Link href="/events" />}
-      >
-        <ArrowLeft className="size-4" />
-        Events
-      </Button>
+    <StaggerContainer className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-8">
+      <StaggerItem>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit gap-1.5"
+          render={<Link href="/events" />}
+        >
+          <ArrowLeft className="size-4" />
+          Events
+        </Button>
+      </StaggerItem>
 
-      <div className="min-w-0 space-y-5">
-        <h1 className="text-3xl font-bold tracking-tight break-words sm:text-4xl">{event.title}</h1>
+      <StaggerItem>
+        <div className="min-w-0 space-y-5">
+          <h1 className="text-3xl font-bold tracking-tight break-words sm:text-4xl">{event.title}</h1>
 
-        <div className="space-y-3.5 text-sm">
-          <div className="flex items-center gap-3">
-            <EventDateIcon startsAt={event.starts_at} />
-            <div className="min-w-0">
-              <p className="font-medium leading-tight text-foreground">{dateLabel}</p>
-              <p className="mt-0.5 text-muted-foreground">{timeLabel}</p>
-            </div>
-          </div>
-
-          {location ? (
+          <div className="space-y-3.5 text-sm">
             <div className="flex items-center gap-3">
-              <EventLocationIcon />
+              <EventDateIcon startsAt={event.starts_at} />
               <div className="min-w-0">
-                {isVirtualLocation ? (
-                  <>
-                    <a
-                      href={location}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
-                    >
-                      Online
-                      <ArrowUpRight className="size-3.5 shrink-0 opacity-70" />
-                    </a>
-                    <p className="mt-0.5 truncate text-muted-foreground">Join via link</p>
-                  </>
-                ) : (
-                  <p className="select-text break-words font-medium leading-snug text-foreground">
-                    {location}
-                  </p>
-                )}
+                <p className="font-medium leading-tight text-foreground">{dateLabel}</p>
+                <p className="mt-0.5 text-muted-foreground">{timeLabel}</p>
               </div>
             </div>
-          ) : null}
-        </div>
-      </div>
 
-      <div className="rounded-2xl border border-border/70 bg-muted/35 px-5 py-5 shadow-sm">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              {registration && registration.status !== "cancelled" ? (
-                <>
-                  <p className="font-semibold">{statusCopy?.title}</p>
-                  <p className="text-sm text-muted-foreground">{statusCopy?.description}</p>
-                </>
-              ) : !isSignedIn ? (
-                <>
-                  <p className="font-semibold">Sign in to register</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sign in to reserve your spot for this event.
-                  </p>
-                </>
-              ) : canRegister ? (
-                <>
-                  <p className="font-semibold">Registration open</p>
-                  <p className="text-sm text-muted-foreground">
-                    {event.capacity != null
-                      ? `${event.registration_count} of ${event.capacity} spots taken`
-                      : `${event.registration_count} registered`}
-                  </p>
-                </>
+            {location ? (
+              <div className="flex items-center gap-3">
+                <EventLocationIcon />
+                <div className="min-w-0">
+                  {isVirtualLocation ? (
+                    <>
+                      <a
+                        href={location}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
+                      >
+                        Online
+                        <ArrowUpRight className="size-3.5 shrink-0 opacity-70" />
+                      </a>
+                      <p className="mt-0.5 truncate text-muted-foreground">Join via link</p>
+                    </>
+                  ) : (
+                    <p className="select-text break-words font-medium leading-snug text-foreground">
+                      {location}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </StaggerItem>
+
+      <StaggerItem>
+        <div className="rounded-2xl border border-border/70 bg-muted/35 px-5 py-5 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                {registration && registration.status !== "cancelled" ? (
+                  <>
+                    <p className="font-semibold">{statusCopy?.title}</p>
+                    <p className="text-sm text-muted-foreground">{statusCopy?.description}</p>
+                  </>
+                ) : !registrationOpen ? (
+                  <>
+                    <p className="font-semibold">Registration closed</p>
+                    <p className="text-sm text-muted-foreground">
+                      This event is no longer accepting registrations.
+                    </p>
+                  </>
+                ) : !isSignedIn ? (
+                  <>
+                    <p className="font-semibold">Sign in to register</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sign in to reserve your spot for this event.
+                    </p>
+                  </>
+                ) : canRegister ? (
+                  <>
+                    <p className="font-semibold">Registration open</p>
+                    <p className="text-sm text-muted-foreground">
+                      {event.capacity != null
+                        ? `${event.registration_count} of ${event.capacity} spots taken`
+                        : `${event.registration_count} registered`}
+                    </p>
+                  </>
+                ) : null}
+              </div>
+
+              {startingIn ? (
+                <span className="inline-flex shrink-0 items-center rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+                  Starting in <span className="ml-1 font-medium text-foreground">{startingIn}</span>
+                </span>
               ) : null}
             </div>
 
-            {startingIn ? (
-              <span className="inline-flex shrink-0 items-center rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-                Starting in <span className="ml-1 font-medium text-foreground">{startingIn}</span>
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {canRegister ? (
-              <Button onClick={register} disabled={acting} className="rounded-full px-6">
-                {acting ? <Loader2 className="size-4 animate-spin" /> : "Register"}
-              </Button>
-            ) : null}
-            {registration && registration.status !== "cancelled" ? (
-              <Button variant="outline" onClick={cancel} disabled={acting} className="rounded-full px-6">
-                {acting ? <Loader2 className="size-4 animate-spin" /> : "Cancel"}
-              </Button>
-            ) : null}
-            {!isSignedIn ? (
-              <Button
-                className="rounded-full px-6"
-                render={<Link href={`/sign-in/?redirect_url=${encodeURIComponent(`/events/${event.slug}`)}`} />}
-              >
-                Sign in
-              </Button>
-            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {canRegister ? (
+                <Button onClick={register} disabled={acting} className="rounded-full px-6">
+                  {acting ? <Loader2 className="size-4 animate-spin" /> : "Register"}
+                </Button>
+              ) : null}
+              {registration && registration.status !== "cancelled" ? (
+                <Button variant="outline" onClick={cancel} disabled={acting} className="rounded-full px-6">
+                  {acting ? <Loader2 className="size-4 animate-spin" /> : "Cancel"}
+                </Button>
+              ) : null}
+              {!isSignedIn && registrationOpen ? (
+                <Button
+                  className="rounded-full px-6"
+                  render={<Link href={`/sign-in/?redirect_url=${encodeURIComponent(`/events/${event.slug}`)}`} />}
+                >
+                  Sign in
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
+      </StaggerItem>
 
       {description ? (
-        <section className="min-w-0 space-y-3 overflow-hidden">
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-            About event
-          </h2>
-          <MarkdownContent
-            source={description}
-            className="min-w-0 text-base leading-relaxed"
-          />
-        </section>
+        <StaggerItem>
+          <section className="min-w-0 space-y-3 overflow-hidden">
+            <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              About event
+            </h2>
+            <MarkdownContent
+              source={description}
+              className="min-w-0 text-base leading-relaxed"
+            />
+          </section>
+        </StaggerItem>
       ) : null}
 
       {location ? (
-        <section className="min-w-0 space-y-3">
-          <h2 className="border-b border-border/80 pb-2 text-base font-semibold">Location</h2>
-          {isVirtualLocation ? (
-            <a
-              href={location}
-              target="_blank"
-              rel="noreferrer"
-              className="block select-text break-all font-medium underline-offset-4 hover:underline"
-            >
-              {location}
-            </a>
-          ) : (
-            <p className="select-text break-words font-medium leading-relaxed">{location}</p>
-          )}
-        </section>
+        <StaggerItem>
+          <section className="min-w-0 space-y-3">
+            <h2 className="border-b border-border/80 pb-2 text-base font-semibold">Location</h2>
+            {isVirtualLocation ? (
+              <a
+                href={location}
+                target="_blank"
+                rel="noreferrer"
+                className="block select-text break-all font-medium underline-offset-4 hover:underline"
+              >
+                {location}
+              </a>
+            ) : (
+              <p className="select-text break-words font-medium leading-relaxed">{location}</p>
+            )}
+          </section>
+        </StaggerItem>
       ) : null}
-    </div>
+    </StaggerContainer>
   )
 }

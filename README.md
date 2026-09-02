@@ -1,12 +1,14 @@
 # Hinthar Dashboard
 
-Next.js App Router frontend for the Hinthar school management system (students, teachers, classes, timetable, session attendance, campus check-in). Backend: sibling repo **Hinthar-SMS**.
+Next.js App Router frontend for the Hinthar school management system (students, teachers, classes, timetable, session attendance, campus check-in, announcements, events). Backend: sibling repo **Hinthar-SMS**.
 
 ## Standards & plans
 
 | Doc | Purpose |
 |-----|---------|
 | [`docs/FRONTEND_STANDARDS.md`](docs/FRONTEND_STANDARDS.md) | UX review, role gates, paginated pages, attendance IA, payroll scrap list |
+| [`docs/ANIMATION_STANDARDS.md`](docs/ANIMATION_STANDARDS.md) | GSAP entrances, tables, skeletons, overflow rules |
+| [`docs/SCHOOL_COMMUNICATIONS.md`](docs/SCHOOL_COMMUNICATIONS.md) | Announcements + events routes, chips, registration, skeletons |
 | [`docs/SCALING_IMPLEMENTATION_PLAN.md`](docs/SCALING_IMPLEMENTATION_PLAN.md) | Cross-repo plan — **phases 0–9 complete** |
 | [`docs/hinthar-dashboard-design-system.md`](docs/hinthar-dashboard-design-system.md) | **Historical** — live tokens are `FRONTEND_STANDARDS.md` §7 + `globals.css` |
 
@@ -19,6 +21,7 @@ UI: shadcn/ui + Tailwind. Auth: Clerk. API calls go to `/api/v1/*` and are proxi
 - **Schedule** — timetable, generated sessions, Find sessions (slot-first), substitutes (`actual_teacher`)
 - **Lesson attendance** — class / ad-hoc matrices; unmarked cells vs stored absent
 - **Campus check-in** — school/class overview, terminal, QR activate/deactivate, corrections
+- **School communications** — announcements press feed + events timeline / registration / staff manage
 
 ## Getting Started
 

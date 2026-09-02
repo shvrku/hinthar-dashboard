@@ -144,6 +144,6 @@ export function descriptionPreview(description: string): string {
     .replace(/[#>*_`[\]()~-]/g, "")
     .replace(/\s+/g, " ")
     .trim()
-  if (!text) return "Add event description"
+  if (!text) return ""
   return text.length > 120 ? `${text.slice(0, 120)}…` : text
 }

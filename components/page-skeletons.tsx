@@ -187,6 +187,50 @@ export function DashboardOverviewSkeleton() {
   )
 }
 
+/** Select + primary CTA inside Ops class-picker cards. */
+export function ClassPickerCardSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+    </div>
+  )
+}
+
+/** Week timetable / find-sessions grid chrome. */
+export function WeekGridSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="flex border-b border-border bg-muted/40">
+        <div className="w-20 shrink-0 border-r border-border p-3">
+          <Skeleton className="mx-auto h-3 w-10" />
+        </div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="min-w-0 flex-1 border-r border-border p-3 last:border-r-0">
+            <Skeleton className="mx-auto h-3 w-12" />
+          </div>
+        ))}
+      </div>
+      <div className="divide-y divide-border">
+        {Array.from({ length: rows }).map((_, row) => (
+          <div key={row} className="flex min-h-16">
+            <div className="flex w-20 shrink-0 items-start justify-center border-r border-border p-3">
+              <Skeleton className="h-3 w-10" />
+            </div>
+            {Array.from({ length: 5 }).map((_, col) => (
+              <div key={col} className="min-w-0 flex-1 border-r border-border p-2 last:border-r-0">
+                {row % 2 === col % 2 ? (
+                  <Skeleton className="h-12 w-full rounded-md" />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export { AttendanceOverviewSkeleton } from "@/components/skeleton/attendance-overview-skeleton"
 export { PageSkeleton } from "@/components/skeleton/page-skeleton"
 export type { PageSkeletonBlock } from "@/components/skeleton/page-skeleton"

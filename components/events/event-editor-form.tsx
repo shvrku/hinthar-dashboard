@@ -149,11 +149,51 @@ export function EventEditorForm({
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="event-starts">Starts <span className="text-destructive">*</span></Label>
-                    <Input id="event-starts" type="datetime-local" value={draft.starts_at} onChange={(e) => patch({ starts_at: e.target.value })} className="h-10 rounded-xl" required />
+                    <Input
+                      id="event-starts"
+                      type="datetime-local"
+                      value={draft.starts_at}
+                      onChange={(e) => {
+                        const starts_at = e.target.value
+                        const patchData: Partial<EventDraft> = { starts_at }
+                        if (draft.ends_at && draft.ends_at <= starts_at) {
+                          const start = new Date(starts_at)
+                          if (!Number.isNaN(start.getTime())) {
+                            start.setHours(start.getHours() + 1)
+                            const pad = (n: number) => String(n).padStart(2, "0")
+                            patchData.ends_at = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}T${pad(start.getHours())}:${pad(start.getMinutes())}`
+                          }
+                        }
+                        patch(patchData)
+                      }}
+                      className="h-10 rounded-xl"
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="event-ends">Ends</Label>
-                    <Input id="event-ends" type="datetime-local" value={draft.ends_at} onChange={(e) => patch({ ends_at: e.target.value })} className="h-10 rounded-xl" />
+                    <Input
+                      id="event-ends"
+                      type="datetime-local"
+                      value={draft.ends_at}
+                      min={draft.starts_at || undefined}
+                      onChange={(e) => {
+                        const ends_at = e.target.value
+                        if (draft.starts_at && ends_at && ends_at <= draft.starts_at) {
+                          const start = new Date(draft.starts_at)
+                          if (!Number.isNaN(start.getTime())) {
+                            start.setHours(start.getHours() + 1)
+                            const pad = (n: number) => String(n).padStart(2, "0")
+                            patch({
+                              ends_at: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}T${pad(start.getHours())}:${pad(start.getMinutes())}`,
+                            })
+                            return
+                          }
+                        }
+                        patch({ ends_at })
+                      }}
+                      className="h-10 rounded-xl"
+                    />
                   </div>
                 </div>
               </EditorOptionChip>

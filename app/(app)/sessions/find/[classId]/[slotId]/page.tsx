@@ -55,6 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 import { AnimatedTableBody } from "@/components/animation/animated-table-body"
 import { SessionOccurrenceTableSkeletonRows } from "@/components/page-skeletons"
 
@@ -294,9 +295,36 @@ function FindSlotSessionsContent() {
 
   if (!isLoaded) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
+      <StaggerContainer className="space-y-6">
+        <StaggerItem>
+          <StandardPageHeader
+            title="Slot sessions"
+            back={{ href: "/sessions/find/", label: "Find sessions" }}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Card className="overflow-hidden border-border/80 p-0 shadow-xs">
+            <div className="space-y-3 border-b border-border/80 p-4">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-9 w-full max-w-sm rounded-lg" />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <tbody>
+                <SessionOccurrenceTableSkeletonRows rows={8} />
+              </tbody>
+            </Table>
+          </Card>
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 

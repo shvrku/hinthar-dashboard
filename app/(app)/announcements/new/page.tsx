@@ -9,6 +9,7 @@ import {
   type AnnouncementDraft,
 } from "@/components/announcements/announcement-editor-form"
 import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
 import { notifySaveError, notifySaveSuccess } from "@/lib/editor-save"
@@ -43,23 +44,33 @@ export default function NewAnnouncementPage() {
   }
 
   if (!isLoaded) {
-    return <EditorPageSkeleton label="Preparing editor…" />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EditorPageSkeleton label="Preparing editor…" />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <StandardPageHeader
-        title="New announcement"
-        description="Write school updates with live markdown preview."
-        back={{ href: "/announcements", label: "Announcements" }}
-      />
-      <AnnouncementEditorForm
-        editorKey="announcement-new"
-        saving={saving}
-        submitLabel="Publish"
-        onSubmit={publish}
-        onCancel={() => router.push("/announcements")}
-      />
-    </div>
+    <StaggerContainer className="flex flex-col gap-6">
+      <StaggerItem>
+        <StandardPageHeader
+          title="New announcement"
+          description="Write school updates with live markdown preview."
+          back={{ href: "/announcements", label: "Announcements" }}
+        />
+      </StaggerItem>
+      <StaggerItem>
+        <AnnouncementEditorForm
+          editorKey="announcement-new"
+          saving={saving}
+          submitLabel="Publish"
+          onSubmit={publish}
+          onCancel={() => router.push("/announcements")}
+        />
+      </StaggerItem>
+    </StaggerContainer>
   )
 }
