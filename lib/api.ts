@@ -946,7 +946,7 @@ export function createApi(token: string) {
     listTags: (params?: { scope?: "announcement" | "event" }) =>
       request<import("./types").CommTag[]>(`/tags${buildQueryString(params)}`, token),
 
-    listAnnouncements: (params?: { tag?: string; q?: string; page?: number }) =>
+    listAnnouncements: (params?: { tag?: string; q?: string; page?: number; page_size?: number }) =>
       request<import("./types").Paginated<import("./types").Announcement>>(
         `/announcements${buildQueryString(params)}`,
         token

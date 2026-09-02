@@ -4,7 +4,10 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 
-import { AnnouncementEditorForm } from "@/components/announcements/announcement-editor-form"
+import {
+  AnnouncementEditorForm,
+  type AnnouncementDraft,
+} from "@/components/announcements/announcement-editor-form"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
@@ -15,13 +18,7 @@ export default function NewAnnouncementPage() {
   const { getToken, isLoaded } = useAuth()
   const [saving, setSaving] = React.useState(false)
 
-  const publish = async (draft: {
-    title: string
-    body: string
-    is_featured: boolean
-    is_pinned: boolean
-    tag_names: string
-  }) => {
+  const publish = async (draft: AnnouncementDraft) => {
     setSaving(true)
     try {
       const token = await getToken()

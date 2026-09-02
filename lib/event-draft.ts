@@ -139,7 +139,7 @@ export function descriptionPreview(description: string): string {
     .replace(/^\s*[-*+]\s+/gm, "")
     .replace(/^\s*\d+\.\s+/gm, "")
     .replace(/^\s*>\s?/gm, "")
-    .replace(/(`{1,3})(.*?)\1/gs, "$2")
+    .replace(/(`{1,3})([\s\S]*?)\1/g, "$2")
     .replace(/(\*{1,3}|_{1,3}|~~)(.*?)\1/g, "$2")
     .replace(/[#>*_`[\]()~-]/g, "")
     .replace(/\s+/g, " ")

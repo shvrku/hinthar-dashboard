@@ -698,6 +698,6 @@ export interface SchoolEvent {
   updated_at: string
 }
 
-export interface MyEventRegistration extends EventRegistration {
+export interface MyEventRegistration extends Omit<EventRegistration, "event"> {
   event: SchoolEvent
 }
