@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarDays, Loader2, User } from "lucide-react"
+import { CalendarDays, User } from "lucide-react"
 import { ApiError, createApi } from "@/lib/api"
 import type { Class, TimetableSlot } from "@/lib/types"
 import { formatClassLabel } from "@/lib/format-class"
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/require-role"
 import { StandardPageHeader, buildReloadAction } from "@/components/standard-page-header"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { WeekGridSkeleton } from "@/components/page-skeletons"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -188,9 +189,18 @@ function FindSessionsClassContent() {
 
   if (!isLoaded) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
+      <StaggerContainer className="space-y-6">
+        <StaggerItem>
+          <StandardPageHeader
+            title="Find sessions"
+            description="Week grid of timetable slots — click a slot to open its sessions table."
+            back={{ href: "/sessions/find/", label: "Find sessions" }}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <WeekGridSkeleton />
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 
@@ -243,10 +253,7 @@ function FindSessionsClassContent() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading timetable…
-            </div>
+            <WeekGridSkeleton />
           ) : slots.length === 0 ? (
             <Empty className="border border-dashed bg-card/40 py-16">
               <EmptyHeader>

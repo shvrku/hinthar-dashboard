@@ -1,5 +1,11 @@
-import type { EventAudience, EventRegistrationMode, EventRegistrationStatus, EventStatus } from "@/lib/types"
-import { capitalizeMeridiem } from "@/lib/utils"
+import type {
+  EventAudience,
+  EventRegistrationMode,
+  EventRegistrationStatus,
+  EventStatus,
+  SchoolEvent,
+} from "@/lib/types"
+import { capitalizeMeridiem, parseBackendDateTime } from "@/lib/utils"
 
 export type CommTagScope = "announcement" | "event"
 
@@ -32,6 +38,30 @@ export function formatEventDateTimeLocal(iso: string | null | undefined): string
   if (Number.isNaN(date.getTime())) return ""
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** True when new registrations are still accepted for this event. */
+export function isEventRegistrationOpen(event: Pick<
+  SchoolEvent,
+  "status" | "starts_at" | "ends_at" | "registration_opens_at" | "registration_closes_at"
+>, now = new Date()): boolean {
+  if (event.status !== "published") return false
+
+  if (event.registration_opens_at) {
+    const opens = parseBackendDateTime(event.registration_opens_at)
+    if (!Number.isNaN(opens.getTime()) && now < opens) return false
+  }
+
+  if (event.registration_closes_at) {
+    const closes = parseBackendDateTime(event.registration_closes_at)
+    if (!Number.isNaN(closes.getTime()) && now > closes) return false
+  }
+
+  const cutoffIso = event.ends_at || event.starts_at
+  const cutoff = parseBackendDateTime(cutoffIso)
+  if (!Number.isNaN(cutoff.getTime()) && now >= cutoff) return false
+
+  return true
 }
 
 export function summarizeEventSchedule(startsAt: string, endsAt: string): string {

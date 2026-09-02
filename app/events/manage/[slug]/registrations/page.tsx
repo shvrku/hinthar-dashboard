@@ -1,16 +1,15 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
-import { ArrowLeft } from "lucide-react"
 
 import { EventRegistrationRoster } from "@/components/events/event-registration-roster"
 import { RequireRole } from "@/components/require-role"
-import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { EventRegistrationsSkeleton } from "@/components/skeleton/communications-skeleton"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import { ApiError, createApi } from "@/lib/api"
 import type { EventRegistration, EventRegistrationStatus, SchoolEvent } from "@/lib/types"
-import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 
 function RegistrationsContent({ params }: { params: Promise<{ slug: string }> }) {
@@ -102,51 +101,50 @@ function RegistrationsContent({ params }: { params: Promise<{ slug: string }> })
   }
 
   if (!isLoaded || loadingEvent) {
-    return <EditorPageSkeleton label="Loading registration roster…" />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EventRegistrationsSkeleton />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   if (error || !event) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <p className="text-sm text-destructive">{error || "Event not found."}</p>
-      </div>
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <div className="mx-auto max-w-lg py-16 text-center">
+            <p className="text-sm text-destructive">{error || "Event not found."}</p>
+          </div>
+        </StaggerItem>
+      </StaggerContainer>
     )
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="sticky top-0 z-20 flex items-center border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur-md sm:px-6">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="gap-1.5"
-          render={<Link href={`/events/manage/${event.slug}`} />}
-        >
-          <ArrowLeft className="size-4" />
-          Manage event
-        </Button>
-      </div>
-
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{event.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {event.registration_count} confirmed
-            {registrations.length > event.registration_count
+    <StaggerContainer className="flex flex-col gap-6">
+      <StaggerItem>
+        <StandardPageHeader
+          title={event.title}
+          description={`${event.registration_count} confirmed${
+            registrations.length > event.registration_count
               ? ` · ${registrations.length} total`
-              : ""}
-          </p>
-        </div>
+              : ""
+          }`}
+          back={{ href: `/events/manage/${event.slug}`, label: "Manage event" }}
+        />
+      </StaggerItem>
 
+      <StaggerItem className="mx-auto w-full max-w-2xl">
         <EventRegistrationRoster
           registrations={registrations}
           loading={loadingRegs}
           pendingIds={pendingIds}
           onStatusChange={setStatus}
         />
-      </div>
-    </div>
+      </StaggerItem>
+    </StaggerContainer>
   )
 }
 

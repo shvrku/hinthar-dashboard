@@ -4,13 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarCheck, GraduationCap, Loader2, ArrowRight, BookOpen } from "lucide-react"
+import { CalendarCheck, GraduationCap, ArrowRight, BookOpen } from "lucide-react"
 import { createApi, ApiError } from "@/lib/api"
 import type { Class } from "@/lib/types"
 import { formatClassLabel } from "@/lib/format-class"
 import { RequireRole } from "@/components/require-role"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { SearchableSelect } from "@/components/searchable-select"
+import { ClassPickerCardSkeleton } from "@/components/page-skeletons"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
@@ -106,10 +107,7 @@ function AttendanceLandingContent() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-              <Loader2 className="size-4 animate-spin" />
-              Loading classes…
-            </div>
+            <ClassPickerCardSkeleton />
           ) : (
             <>
               <SearchableSelect

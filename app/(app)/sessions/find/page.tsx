@@ -4,13 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { ArrowRight, Clock, GraduationCap, Loader2, Search } from "lucide-react"
+import { ArrowRight, Clock, GraduationCap, Search } from "lucide-react"
 import { ApiError, createApi } from "@/lib/api"
 import type { Class } from "@/lib/types"
 import { formatClassLabel } from "@/lib/format-class"
 import { RequireRole } from "@/components/require-role"
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { SearchableSelect } from "@/components/searchable-select"
+import { ClassPickerCardSkeleton } from "@/components/page-skeletons"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
@@ -103,10 +104,7 @@ function FindSessionsLandingContent() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading classes…
-            </div>
+            <ClassPickerCardSkeleton />
           ) : classes.length === 0 ? (
             <div className="space-y-3 text-sm text-muted-foreground">
               <p>No classes yet. Create a cohort and timetable before finding sessions.</p>

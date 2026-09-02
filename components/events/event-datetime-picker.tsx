@@ -89,6 +89,17 @@ function ensureDefaultStart(): string {
   return toDateTimeLocal(d)
 }
 
+/** Keep end strictly after start; bump by 1 hour when invalid/missing. */
+function ensureEndAfterStart(startValue: string, endValue: string): string {
+  const start = parseDateTimeLocal(startValue)
+  if (!start) return endValue
+  const end = parseDateTimeLocal(endValue)
+  if (end && end > start) return endValue
+  const next = new Date(start)
+  next.setHours(next.getHours() + 1)
+  return toDateTimeLocal(next)
+}
+
 function DateChip({
   value,
   onChange,
@@ -347,6 +358,19 @@ export function EventDateTimePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleStartChange = (next: string) => {
+    onStartsAtChange(next)
+    onEndsAtChange(ensureEndAfterStart(next, endsAt || next))
+  }
+
+  const handleEndChange = (next: string) => {
+    if (!startsAt) {
+      onEndsAtChange(next)
+      return
+    }
+    onEndsAtChange(ensureEndAfterStart(startsAt, next))
+  }
+
   return (
     <div
       className={cn(
@@ -359,20 +383,13 @@ export function EventDateTimePicker({
           rail="start"
           label="Start"
           value={startsAt}
-          onChange={(next) => {
-            onStartsAtChange(next)
-            if (endsAt) {
-              const end = parseDateTimeLocal(endsAt)
-              const start = parseDateTimeLocal(next)
-              if (end && start && end < start) onEndsAtChange(next)
-            }
-          }}
+          onChange={handleStartChange}
         />
         <ScheduleRow
           rail="end"
           label="End"
           value={endsAt || startsAt}
-          onChange={(next) => onEndsAtChange(next)}
+          onChange={handleEndChange}
         />
       </div>
     </div>

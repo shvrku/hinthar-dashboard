@@ -7,6 +7,9 @@ import { useAuth } from "@clerk/nextjs"
 import { CalendarDays, MapPin, Search } from "lucide-react"
 
 import { useCurrentUser } from "@/components/current-user-provider"
+import { StandardPageHeader } from "@/components/standard-page-header"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
+import { EventsHomeSkeleton } from "@/components/skeleton/communications-skeleton"
 import { TagChips } from "@/components/tag-chips"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -115,28 +118,6 @@ function EventListRow({
   )
 }
 
-function EventsHomeSkeleton() {
-  return (
-    <div className="space-y-8">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="grid grid-cols-[4.5rem_0.75rem_1fr] gap-x-3 sm:grid-cols-[5.5rem_1rem_1fr] sm:gap-x-4">
-          <div className="space-y-1.5 pt-1">
-            <div className="h-4 w-14 animate-pulse rounded bg-muted" />
-            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
-          </div>
-          <div className="flex justify-center pt-2">
-            <div className="size-2.5 animate-pulse rounded-full bg-muted" />
-          </div>
-          <div className="space-y-3">
-            <div className="h-28 w-full animate-pulse rounded-2xl bg-muted" />
-            {i === 0 ? <div className="h-28 w-full animate-pulse rounded-2xl bg-muted" /> : null}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export default function EventsPage() {
   const router = useRouter()
   const { getToken, isLoaded, isSignedIn } = useAuth()
@@ -198,54 +179,59 @@ export default function EventsPage() {
   const staff = isStaffOrAbove(role)
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Events</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {isSignedIn
-              ? "What’s happening at school — upcoming activities and gatherings."
-              : "Browse public school events. Sign in to register or see internal events."}
-          </p>
-        </div>
+    <StaggerContainer className="flex w-full flex-col gap-6">
+      <StaggerItem>
+        <div className="space-y-6">
+          <StandardPageHeader
+            className="mb-0 pb-4"
+            title="Events"
+            description={
+              isSignedIn
+                ? "What’s happening at school — upcoming activities and gatherings."
+                : "Browse public school events. Sign in to register or see internal events."
+            }
+          >
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search events"
+                className="h-9 rounded-full pl-9"
+              />
+            </div>
+          </StandardPageHeader>
 
-        <div className="relative w-full max-w-md sm:w-64">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search events"
-            className="h-10 rounded-full pl-9"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="h-auto rounded-full bg-muted/50 p-1">
-              <TabsTrigger value="open" className="rounded-full px-4">
-                Upcoming
-              </TabsTrigger>
-              {isSignedIn ? (
-                <TabsTrigger value="mine" className="rounded-full px-4">
-                  Going
+          <div className="flex flex-col gap-4 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="h-auto rounded-full bg-muted/50 p-1">
+                <TabsTrigger value="open" className="rounded-full px-4">
+                  Upcoming
                 </TabsTrigger>
-              ) : null}
-              <TabsTrigger value="past" className="rounded-full px-4">
-                Past
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {isSignedIn ? (
-            <TagChips tags={tags} selectedSlug={selectedTag} onSelect={setSelectedTag} />
-          ) : null}
+                {isSignedIn ? (
+                  <TabsTrigger value="mine" className="rounded-full px-4">
+                    Going
+                  </TabsTrigger>
+                ) : null}
+                <TabsTrigger value="past" className="rounded-full px-4">
+                  Past
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {isSignedIn ? (
+              <TagChips tags={tags} selectedSlug={selectedTag} onSelect={setSelectedTag} />
+            ) : null}
+          </div>
         </div>
+      </StaggerItem>
 
-        {loading ? (
+      {loading ? (
+        <StaggerItem className="mx-auto w-full max-w-4xl">
           <EventsHomeSkeleton />
-        ) : grouped.length === 0 ? (
+        </StaggerItem>
+      ) : grouped.length === 0 ? (
+        <StaggerItem className="mx-auto w-full max-w-4xl">
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/80 px-6 py-16 text-center">
             <CalendarDays className="size-8 text-muted-foreground/50" />
             <p className="font-medium">No events found</p>
@@ -260,52 +246,64 @@ export default function EventsPage() {
               </Button>
             ) : null}
           </div>
-        ) : (
-          <div>
-            {grouped.map(({ date, items }, index) => {
-              const label = formatDateGroupLabel(date)
-              const isLast = index === grouped.length - 1
-              return (
-                <section
-                  key={date}
-                  className="grid grid-cols-[4.5rem_0.75rem_1fr] gap-x-3 sm:grid-cols-[5.5rem_1rem_1fr] sm:gap-x-4"
-                >
-                  <div className="pt-1">
-                    <p className="text-sm font-semibold leading-tight tracking-tight sm:text-[15px]">
-                      {label.primary}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{label.weekday}</p>
-                  </div>
+        </StaggerItem>
+      ) : (
+        <div className="mx-auto w-full max-w-4xl">
+          {grouped.map(({ date, items }, index) => {
+            const label = formatDateGroupLabel(date)
+            const isFirst = index === 0
+            const isLast = index === grouped.length - 1
+            return (
+              <section
+                key={date}
+                className="grid grid-cols-[4.5rem_0.75rem_1fr] gap-x-3 sm:grid-cols-[5.5rem_1rem_1fr] sm:gap-x-4"
+              >
+                <div className="pt-1">
+                  <p className="text-sm font-semibold leading-tight tracking-tight sm:text-[15px]">
+                    {label.primary}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{label.weekday}</p>
+                </div>
 
-                  <div className="relative flex justify-center self-stretch" aria-hidden>
-                    <span className="mt-2 size-2.5 shrink-0 rounded-full border-2 border-muted-foreground/35 bg-background" />
-                    {!isLast ? (
-                      <span className="absolute top-5 bottom-0 w-px bg-border" />
-                    ) : null}
-                  </div>
+                <div className="relative flex justify-center self-stretch" aria-hidden>
+                  {/* Continuous rail through dots */}
+                  {!(isFirst && isLast) ? (
+                    <span
+                      className={[
+                        "absolute left-1/2 w-px -translate-x-1/2 bg-border",
+                        isFirst ? "top-[0.8125rem]" : "top-0",
+                        isLast ? "bottom-[calc(100%-0.8125rem)]" : "bottom-0",
+                      ].join(" ")}
+                    />
+                  ) : null}
+                  <span className="relative z-10 mt-2 size-2.5 shrink-0 rounded-full border-2 border-muted-foreground/35 bg-background" />
+                </div>
 
-                  <div className={`min-w-0 space-y-3 ${isLast ? "pb-0" : "pb-8"}`}>
-                    {items.map((event) => (
-                      <EventListRow key={event.id} event={event} showManage={staff} />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                <div className={`min-w-0 space-y-3 ${isLast ? "pb-0" : "pb-8"}`}>
+                  {items.map((event) => (
+                    <StaggerItem key={event.id}>
+                      <EventListRow event={event} showManage={staff} />
+                    </StaggerItem>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      )}
 
       {!isSignedIn ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-muted/20 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Sign in to register for events and view internal school events.
-          </p>
-          <Button className="rounded-full" render={<Link href="/sign-in/" />}>
-            Sign in
-          </Button>
-        </div>
+        <StaggerItem>
+          <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-muted/20 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Sign in to register for events and view internal school events.
+            </p>
+            <Button className="rounded-full" render={<Link href="/sign-in/" />}>
+              Sign in
+            </Button>
+          </div>
+        </StaggerItem>
       ) : null}
-    </div>
+    </StaggerContainer>
   )
 }

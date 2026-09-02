@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import {
-  ArrowLeft,
   ExternalLink,
   Loader2,
   Pencil,
@@ -22,12 +21,15 @@ import {
 } from "@/components/events/event-meta-icons"
 import { MarkdownContent } from "@/components/markdown-content"
 import { RequireRole } from "@/components/require-role"
+import { StaggerContainer, StaggerItem } from "@/components/animated-stagger"
 import { EventManageDashboardSkeleton } from "@/components/skeleton/communications-skeleton"
+import { StandardPageHeader } from "@/components/standard-page-header"
 import { ApiError, createApi } from "@/lib/api"
 import type { SchoolEvent } from "@/lib/types"
 import {
   EVENT_AUDIENCE_LABELS,
   EVENT_STATUS_LABELS,
+  isEventRegistrationOpen,
 } from "@/lib/communications-labels"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -128,11 +130,23 @@ function ManageEventContent({ params }: { params: Promise<{ slug: string }> }) {
   }
 
   if (!isLoaded || loading) {
-    return <EventManageDashboardSkeleton />
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <EventManageDashboardSkeleton />
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   if (error || !event) {
-    return <p className="px-4 text-sm text-destructive">{error || "Event not found."}</p>
+    return (
+      <StaggerContainer className="flex flex-col gap-6">
+        <StaggerItem>
+          <p className="px-4 text-sm text-destructive">{error || "Event not found."}</p>
+        </StaggerItem>
+      </StaggerContainer>
+    )
   }
 
   const description = event.body.trim() || event.summary.trim()
@@ -146,29 +160,35 @@ function ManageEventContent({ params }: { params: Promise<{ slug: string }> }) {
     ? "—"
     : start.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
   const slugDirty = slugDraft.trim().toLowerCase() !== event.slug
+  const registrationOpen = isEventRegistrationOpen(event)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur-md sm:px-6">
-        <Button type="button" variant="ghost" size="sm" className="gap-1.5" render={<Link href="/events/manage" />}>
-          <ArrowLeft className="size-4" />
-          Events
-        </Button>
-        <Button size="sm" variant="outline" className="gap-1.5" render={<Link href={`/events/${event.slug}`} />}>
-          <ExternalLink className="size-3.5" />
-          View page
-        </Button>
-      </div>
+    <StaggerContainer className="flex flex-col gap-6">
+      <StaggerItem>
+        <StandardPageHeader
+          title={event.title}
+          description={!registrationOpen ? "Registration closed" : "Event details and registration"}
+          back={{ href: "/events/manage", label: "Events" }}
+        >
+          <Button size="sm" variant="outline" className="gap-1.5" render={<Link href={`/events/${event.slug}`} />}>
+            <ExternalLink className="size-3.5" />
+            View page
+          </Button>
+        </StandardPageHeader>
+      </StaggerItem>
 
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <StaggerItem>
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6">
         <Card className="overflow-hidden">
           <CardContent className="grid gap-0 p-0 md:grid-cols-[1.2fr_0.9fr]">
             <div className="flex min-w-0 flex-col gap-4 overflow-hidden border-b border-border/80 p-5 sm:p-6 md:border-r md:border-b-0">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{EVENT_AUDIENCE_LABELS[event.audience]}</Badge>
                 <Badge variant="outline">{EVENT_STATUS_LABELS[event.status]}</Badge>
+                {!registrationOpen ? (
+                  <Badge variant="secondary">Registration closed</Badge>
+                ) : null}
               </div>
-              <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{event.title}</h1>
               {description ? (
                 <MarkdownContent
                   source={description}
@@ -235,6 +255,7 @@ function ManageEventContent({ params }: { params: Promise<{ slug: string }> }) {
                     {event.capacity != null
                       ? `${event.registration_count} / ${event.capacity} registered`
                       : `${event.registration_count} registered`}
+                    {!registrationOpen ? " · closed" : ""}
                   </p>
                 </div>
               </div>
@@ -310,7 +331,8 @@ function ManageEventContent({ params }: { params: Promise<{ slug: string }> }) {
           Delete event
         </Button>
       </div>
-    </div>
+      </StaggerItem>
+    </StaggerContainer>
   )
 }
 

@@ -60,7 +60,7 @@ export function MarkdownContent({
     <div
       className={cn(
         markdownProseClass,
-        "min-w-0 max-w-full overflow-hidden break-all [overflow-wrap:anywhere]",
+        "min-w-0 max-w-full overflow-x-clip break-all [overflow-wrap:anywhere]",
         "[&_*]:max-w-full [&_*]:break-all [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap",
         lineClamp != null && [
           lineClampClass,

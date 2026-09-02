@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 import { AppAccessGate } from "@/components/app-access-gate"
+import { AppMain } from "@/components/app-main"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -31,9 +32,9 @@ export default async function AppLayout({
         <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <SiteHeader />
           <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <div className="flex flex-1 flex-col p-4 pb-10 md:p-6 md:pb-12">
+            <AppMain>
               <AppAccessGate>{children}</AppAccessGate>
-            </div>
+            </AppMain>
           </main>
         </SidebarInset>
       </SidebarProvider>
