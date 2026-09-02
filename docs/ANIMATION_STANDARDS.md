@@ -86,11 +86,27 @@ Do not invent new durations in pages without updating `easings.ts`.
 
 - Prefer **shimmer** (`.skeleton-shimmer`), not `animate-pulse`.
 - Skeleton bars should be **column-aligned** (`w-full max-w-*`), not free-floating fixed widths that look jagged.
+- Skeletons must **reflect the loaded layout** (same columns, card chrome, timeline rail, press rows, roster filters). Communications: `components/skeleton/communications-skeleton.tsx`. Ops pickers / week grids: `ClassPickerCardSkeleton` / `WeekGridSkeleton`.
 - Reserve table height with ~**8 rows** (`TABLE_RESERVE_ROWS`), not full `pageSize` (avoids huge empty voids).
 - Shimmer count may be smaller than reserved height; fillers pad silently (`aria-hidden`).
 - **Idle (never loaded):** centered icon + title + short description — not a single divider line with “Click Load Data…”.
 - **Empty (loaded, zero rows):** same placeholder style with a search/empty icon.
 - **Reload with data:** keep rows, soft opacity pulse — do not collapse back to full skeleton.
+
+### 4.3a Feed / timeline lists (School)
+
+Announcements press rows and Events timeline cards:
+
+- Put **each row or card** in its own `StaggerItem` under one `StaggerContainer` (header first).
+- Do **not** wrap the entire feed in a single `StaggerItem` — that collapses the cascade to one beat.
+- Empty / loading: one `StaggerItem` around the empty card or skeleton.
+
+### 4.3b Overflow vs stagger translate
+
+`StaggerItem` enters with a short **`y` translate**. Do **not** put `overflow-x-hidden` on the same page root (or a parent of those items): browsers compute `overflow-y: auto`, which shows a vertical scrollbar on short pages during/after enter.
+
+- Prefer `min-w-0` + wrapping / `overflow-x-clip` on the markdown viewer only.
+- Table bodies still use opacity-only reveals (no `y`) for the same reason.
 
 ### 4.4 Tables
 
@@ -229,6 +245,7 @@ Staff can force motion on even if the OS asks for reduce (toggle sets `data-redu
 
 - Drive permanent visibility with React inline opacity.
 - Animate table rows with translate Y/X.
+- Put `overflow-x-hidden` on page roots that use section/card `y` stagger (causes phantom scrollbars).
 - Pad fillers to `pageSize` (50+).
 - Put ScrollTrigger / complex timelines on every list page.
 - Animate sidebar chrome or Clerk widgets with this system.
@@ -241,10 +258,12 @@ Staff can force motion on even if the OS asks for reduce (toggle sets `data-redu
 1. Wrap page body in `StaggerContainer`.
 2. `StaggerItem` for header / non-card sections.
 3. Let `Card`s auto-stagger (or wrap a group in one `StaggerItem` if they must move together).
-4. Lists: `AnimatedTableBody` + idle/empty copy + shimmer skeletons.
-5. Paginated lists: `TableRevealProvider` + top/bottom `placement`.
-6. Loading: shimmer + reserved height; reload keeps data when possible.
-7. No new timing constants outside `easings.ts`.
+4. Feed-style UIs (announcements, event cards): **one `StaggerItem` per item**.
+5. Lists: `AnimatedTableBody` + idle/empty copy + shimmer skeletons.
+6. Paginated lists: `TableRevealProvider` + top/bottom `placement`.
+7. Loading: shimmer + reserved height / layout-matched skeleton; reload keeps data when possible.
+8. No `overflow-x-hidden` on stagger roots that use `y` enters.
+9. No new timing constants outside `easings.ts`.
 
 ---
 
@@ -341,6 +360,12 @@ Completed (2026-08-18):
 5. **Bootstrap overlay** — full-page GSAP loading screen covering session + profile + routing phases (§4.5). Replaces all per-page `AccountBootstrapScreen` returns inside the `(app)` layout.
 6. **Navigation progress bar** — viewport-fixed 2 px top bar for in-session route changes (§4.5).
 
+Completed (2026-09-02):
+
+7. **School + Ops entrances** — announcements, events (incl. per-card timeline stagger), manage/compose, Ops landings / week grids use `StaggerContainer` / `StaggerItem` (§4.3a).
+8. **Content-matched skeletons** — `communications-skeleton.tsx`, `ClassPickerCardSkeleton`, `WeekGridSkeleton`, attendance view skeleton.
+9. **Overflow fix** — removed page-root `overflow-x-hidden` on announcement/event detail; markdown uses `overflow-x-clip` (§4.3b).
+
 ---
 
 ## 9. File map
@@ -362,8 +387,11 @@ components/motion-preference-provider.tsx
 components/motion-toggle.tsx       # header turtle/rabbit
 components/ui/card.tsx          # auto-stagger
 components/ui/skeleton.tsx      # shimmer class
+components/skeleton/communications-skeleton.tsx
+components/page-skeletons.tsx   # tables + ClassPickerCardSkeleton + WeekGridSkeleton
 components/standard-table-pagination.tsx  # placement
 app/(app)/template.tsx
 app/(app)/layout.tsx            # mounts BootstrapOverlay + NavigationProgress above sidebar
 app/globals.css                 # skeleton-shimmer + data-attribute hides + reduced-motion
+docs/SCHOOL_COMMUNICATIONS.md   # announcements + events product/UI contracts
 ```

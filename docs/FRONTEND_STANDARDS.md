@@ -18,9 +18,12 @@ Keep these **visually and verbally separate** in nav and page titles:
 | **Schedule** | Weekly slots → generated dated sessions; ad-hoc tutoring | `/timetable`, `/sessions`, `/sessions/find/` |
 | **Lesson attendance** | Present / late / absent / excused **per class or ad-hoc session** | `/attendance/`, `/attendance/class/[classId]/`, `/attendance/adhoc/` |
 | **Campus check-in** | Daily building presence via QR / terminal | `/check-in/overview`, `/management`, `/terminal`, `/corrections` |
+| **School communications** | Announcements feed + school events / registration | `/announcements`, `/events`, `/events/manage` |
 | **Payroll / finance** | **Out of scope** — residue removed from live UI/API | none |
 
 Staff confusion risk: keep **Session Attendance** vs **Check-In** verbally separate (campus presence ≠ lesson roll).
+
+School communications UI/API contracts: [`docs/SCHOOL_COMMUNICATIONS.md`](./SCHOOL_COMMUNICATIONS.md).
 
 Scaling plan (complete): `docs/SCALING_IMPLEMENTATION_PLAN.md`.
 
@@ -69,6 +72,12 @@ Verdicts are for **front-office / academic staff**, not developers.
 | `/check-in/management` | Good | QR view + regenerate (activate/deactivate lives on student hub). |
 | `/check-in/corrections` | Good | Undo mis-tap campus check-ins; auto-reverts lesson marks attributed to that check-in. |
 | `/check-in/terminal` | Good | Lookup → confirm → commit; deactivated QR/code shows confirmation-panel card (QR **and** unique-code paths blocked until reactivated). |
+| `/announcements` | Good | Press feed: date → title → preview → chips (pinned yellow + topic tones). Search + staff **+** only. |
+| `/announcements/[slug]` | Good | Blog column; staff Edit. Tags live on the list, not here. |
+| `/announcements/new`, `…/edit` | Good | Markdown editor under `StandardPageHeader`. |
+| `/events` | Good | Timeline groups; per-card stagger; Upcoming / Going / Past. |
+| `/events/[slug]` | Good | Register / cancel; closed when event has ended. |
+| `/events/manage` (+ nested) | Good | Staff compose, dashboard, registration roster. |
 | Auth / roles | Addressed | Resource `auth.protect` + gates. `/` is the Clerk force-redirect + dispatcher. Deactivated (`me.is_active=false`): `/`, `/settings`, `/account-locked` only — `GET /me/` still works with a JWT so this page can load. Waiting-for-link (`pending`, unmatched student/teacher): `/`, `/settings`, `/pending` only. Linked students: those plus own `/students/{id}`. Linked teachers: those plus own `/teachers/{id}`. New Clerk sign-ups JIT as `pending` on first `GET /me/` — no auto-link by email. |
 
 ### Attendance UX — current contract
@@ -89,6 +98,18 @@ Verdicts are for **front-office / academic staff**, not developers.
 4. Substitute edits live on Sessions / Find sessions only — teacher hub recent rows are read-only.
 5. UI copy: **Substitute** (not “cover”); Assigned teacher stays the generation teacher; empty `actual_teacher` = taught as assigned.
 6. Always pass `class_id` when loading timetable slots for a class-scoped UI.
+
+### School communications UX — current contract
+
+Full detail: [`docs/SCHOOL_COMMUNICATIONS.md`](./SCHOOL_COMMUNICATIONS.md).
+
+1. Announcements list: date → title → preview → chips under preview. Pinned = amber star pill; topic tags = hashed tone `#chips` from `announcement-tags.tsx`. No list tag-filter bar.
+2. Announcement detail: no tag chips — body only. Staff Edit returns to the slug page after save.
+3. Events home: timeline rail; wrap **each event card** in `StaggerItem` (same idea as announcement rows).
+4. Registration closed when `now >= (ends_at || starts_at)` (plus optional open/close window) — keep UI helper in sync with SMS.
+5. Event compose: end time strictly after start (picker + API).
+6. Skeletons must mirror the live layout (`components/skeleton/communications-skeleton.tsx`, Ops helpers in `page-skeletons.tsx`). Prefer shimmer; no full-page spinner for these feeds.
+7. Markdown detail: do not put `overflow-x-hidden` on the page root; `MarkdownContent` uses `overflow-x-clip`.
 
 ### Datetime handling
 
@@ -170,7 +191,8 @@ When adding a paginated list page:
 - Use shadcn primitives from `components/ui/` — do not reinvent Select/Dialog/Table.
 - Shared chrome: `StandardPageHeader`, KPI strip, confirm dialog (**one** shared `ConfirmDialog`, not per-page copies).
 - Forms: consistent required-field marking; no payroll fields on teachers/sessions.
-- Motion: wrap management pages in `StaggerContainer` / `StaggerItem` (include the header). Do not add decorative noise or page-level padding on the stagger root — app shell padding lives on the inner `main` wrapper (`p-4 pb-10 md:p-6 md:pb-12`).
+- Motion: wrap management **and** School communications pages in `StaggerContainer` / `StaggerItem` (include the header). Feed lists stagger **per row/card**. Do not add decorative noise or page-level padding on the stagger root — app shell padding lives on the inner `main` wrapper (`p-4 pb-10 md:p-6 md:pb-12`).
+- Content-shaped skeletons: communications → `components/skeleton/communications-skeleton.tsx`; Ops class pickers / week grids → `ClassPickerCardSkeleton` / `WeekGridSkeleton` in `page-skeletons.tsx`.
 
 ### Entity hub layout
 
@@ -207,9 +229,11 @@ Reload terminology (`buildReloadAction` / `reloadActionLabel`):
 Loading states:
 
 - Initial / empty table **and page changes**: shared skeletons from `components/page-skeletons.tsx` whenever `loading` is true (do not keep stale rows while page numbers move)
+- Announcements / events: layout-matched exports from `components/skeleton/communications-skeleton.tsx` (not generic pulse blocks or `Loader2` full-page spinners)
+- Ops landings (timetable / attendance / find sessions): `ClassPickerCardSkeleton` inside the picker card while classes load; week grids use `WeekGridSkeleton`
 - Pagination footer: pass `loading` to `StandardTablePagination` → **"Loading page…"** + spinner, disable page/size controls until the fetch finishes
 - Header reload: button spinner via `buildReloadAction` (label stays Load Data / Refresh)
-- Auth bootstrap only: full-page spinner OK
+- Auth bootstrap only: full-page spinner OK (normally covered by bootstrap overlay)
 
 ### Payroll UI scrap list
 
@@ -280,7 +304,7 @@ Teacher fields: **Assigned** (generation teacher) vs **Substitute** (`actual_tea
 - App palettes (orthogonal to light/dark): **`emerald`** (default), **`mono`**, and **`amoled`** via `data-palette` — pick on **Settings** (`/settings`). Static shell previews live in `public/themes/{palette}-{mode}.png` (regenerate with `npx tsx scripts/generate-theme-previews.ts`).
 - Brand mark: `components/hinthar-mark.tsx` (`HintharMark`). Crop viewBox `312 306 400×412.5` from `public/icon-transparent.svg` (1024² padded source). Fills are `currentColor` at 0.2 / 0.5 / 0.8. Sidebar tile: `bg-sidebar-primary text-sidebar-primary-foreground`, mark `size-5` in a `size-8` rounded tile. Bootstrap overlay keeps its own 1024 viewBox + light/dark tile recipe — do not unify it with the sidebar mark.
 - Historical cobalt/HSL spec: `docs/hinthar-dashboard-design-system.md` — **do not copy tokens from it**. Live truth is `app/globals.css`, the in-app Design System page, and this section.
-- **Do not invent one-off palette colors** (`emerald-*`, `rose-*`, `amber-*`, `sky-*`) in page CSS.
+- **Do not invent one-off palette colors** (`emerald-*`, `rose-*`, `amber-*`, `sky-*`) in page CSS — **exception:** announcement topic / pinned chips in `components/announcements/announcement-tags.tsx` (stable hash tones + amber pinned). Do not copy that pattern into unrelated surfaces.
 - Use semantic tokens from `app/globals.css` (wired in `@theme inline`):
 
 | Token | Use for |
