@@ -3,75 +3,90 @@
 import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import rehypeRaw from "rehype-raw"
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize"
 
+import { decodeMarkdownEntities } from "@/lib/event-draft"
+import { markdownProseClass } from "@/lib/markdown-prose"
 import { cn } from "@/lib/utils"
+
+/** Allow MDXEditor underline HTML while keeping other raw HTML locked down. */
+const markdownSanitizeSchema: typeof defaultSchema = {
+  ...defaultSchema,
+  tagNames: [...new Set([...(defaultSchema.tagNames ?? []), "u", "ins"])],
+}
+
+/** Normalize editor HTML so underline renders through react-markdown. */
+function prepareMarkdownSource(source: string): string {
+  return decodeMarkdownEntities(source)
+    .replace(/<u(\s[^>]*)?>/gi, "<u>")
+    .replace(/<\/u>/gi, "</u>")
+}
 
 export function MarkdownContent({
   source,
   className,
   emptyPlaceholder,
+  lineClamp,
 }: {
   source: string
   className?: string
   emptyPlaceholder?: string
+  /** Clamp rendered markdown to N lines (works across paragraphs). */
+  lineClamp?: 2 | 3 | 4 | 5 | 6
 }) {
-  const trimmed = source.trim()
+  const prepared = prepareMarkdownSource(source).trim()
 
-  if (!trimmed) {
+  if (!prepared) {
     return emptyPlaceholder ? (
       <p className={cn("text-muted-foreground/50", className)}>{emptyPlaceholder}</p>
     ) : null
   }
 
+  const lineClampClass =
+    lineClamp === 2
+      ? "line-clamp-2"
+      : lineClamp === 3
+        ? "line-clamp-3"
+        : lineClamp === 4
+          ? "line-clamp-4"
+          : lineClamp === 5
+            ? "line-clamp-5"
+            : lineClamp === 6
+              ? "line-clamp-6"
+              : undefined
+
   return (
-    <div className={cn("max-w-none text-[15px] leading-7 text-foreground", className)}>
+    <div
+      className={cn(
+        markdownProseClass,
+        "min-w-0 max-w-full overflow-hidden break-all [overflow-wrap:anywhere]",
+        "[&_*]:max-w-full [&_*]:break-all [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap",
+        lineClamp != null && [
+          lineClampClass,
+          "[&_*]:m-0 [&_*]:inline [&_li]:inline [&_ol]:inline [&_p]:mr-1 [&_ul]:inline",
+        ],
+        className
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema]]}
         components={{
-          h1: ({ children }) => (
-            <h1 className="mb-3 mt-6 text-2xl font-bold tracking-tight first:mt-0">{children}</h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="mb-2 mt-5 text-xl font-semibold tracking-tight first:mt-0">{children}</h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="mb-2 mt-4 text-lg font-semibold first:mt-0">{children}</h3>
-          ),
-          p: ({ children }) => <p className="my-2 leading-relaxed">{children}</p>,
-          ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>,
-          ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>,
-          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-          blockquote: ({ children }) => (
-            <blockquote className="my-3 border-l-2 border-primary/30 pl-4 text-muted-foreground">
-              {children}
-            </blockquote>
-          ),
           a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-primary underline underline-offset-4"
-            >
+            <a href={href} target="_blank" rel="noopener noreferrer">
               {children}
             </a>
           ),
           img: ({ src, alt }) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src ?? ""}
-              alt={alt ?? ""}
-              className="my-4 max-h-96 w-full rounded-xl border border-border/80 object-cover"
-            />
+            <img src={src ?? ""} alt={alt ?? ""} />
           ),
-          code: ({ children }) => (
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm">{children}</code>
-          ),
-          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-          em: ({ children }) => <em className="italic">{children}</em>,
+          u: ({ children }) => <span className="underline">{children}</span>,
+          ins: ({ children }) => <span className="underline">{children}</span>,
         }}
       >
-        {source}
+        {prepared}
       </ReactMarkdown>
     </div>
   )

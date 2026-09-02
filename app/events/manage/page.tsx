@@ -3,28 +3,24 @@
 import * as React from "react"
 import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarDays, Pencil, Plus, Ticket, Trash2 } from "lucide-react"
+import { CalendarDays, ChevronRight, Plus } from "lucide-react"
 
+import { EventDateIcon } from "@/components/events/event-meta-icons"
 import { RequireRole } from "@/components/require-role"
-import { StandardPageHeader } from "@/components/standard-page-header"
 import { EventsManageListSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
 import type { SchoolEvent } from "@/lib/types"
-import {
-  EVENT_AUDIENCE_LABELS,
-  EVENT_STATUS_LABELS,
-} from "@/lib/communications-labels"
+import { EVENT_AUDIENCE_LABELS, EVENT_STATUS_LABELS } from "@/lib/communications-labels"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { toast } from "@/components/ui/toast"
+import { formatBackendTime } from "@/lib/utils"
 
 function ManageEventsContent() {
   const { getToken, isLoaded } = useAuth()
   const [events, setEvents] = React.useState<SchoolEvent[]>([])
   const [loading, setLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState<string | null>(null)
-  const [deletingSlug, setDeletingSlug] = React.useState<string | null>(null)
 
   const loadEvents = React.useCallback(async () => {
     setLoading(true)
@@ -47,119 +43,73 @@ function ManageEventsContent() {
     return () => window.clearTimeout(timer)
   }, [isLoaded, loadEvents])
 
-  const removeEvent = async (slug: string) => {
-    setDeletingSlug(slug)
-    try {
-      const token = await getToken()
-      if (!token) return
-      await createApi(token).deleteEvent(slug)
-      toast.add({ title: "Event deleted.", type: "success" })
-      await loadEvents()
-    } catch (err) {
-      toast.add({
-        title: err instanceof ApiError ? err.userMessage : "Failed to delete event",
-        type: "error",
-      })
-    } finally {
-      setDeletingSlug(null)
-    }
-  }
-
   if (!isLoaded || loading) {
     return (
-      <div className="flex flex-col gap-6">
-        <StandardPageHeader
-          title="Manage events"
-          description="Create school events, set audience and registration mode, review sign-ups."
-          back={{ href: "/events", label: "Events" }}
-        />
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
+        </div>
         <EventsManageListSkeleton />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <StandardPageHeader
-        title="Manage events"
-        description="Create school events, set audience and registration mode, review sign-ups."
-        back={{ href: "/events", label: "Events" }}
-      >
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-4 py-4 backdrop-blur-md sm:px-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
+          <p className="text-sm text-muted-foreground">Create and manage school events.</p>
+        </div>
         <Button render={<Link href="/events/manage/new" />} className="gap-2">
           <Plus className="size-4" />
-          Add event
+          Create event
         </Button>
-      </StandardPageHeader>
+      </div>
 
-      {loadError ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-destructive">{loadError}</CardContent>
-        </Card>
-      ) : events.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <CalendarDays className="size-8 text-muted-foreground/50" />
-            <p className="font-medium">No events yet</p>
-            <p className="text-sm text-muted-foreground">
-              Create your first school event with the Notion-style editor.
-            </p>
-            <Button render={<Link href="/events/manage/new" />} className="gap-2">
-              <Plus className="size-4" />
-              Add event
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="divide-y rounded-2xl border border-border/80 bg-card shadow-xs">
-          {events.map((event) => (
-            <div
-              key={event.id}
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0 space-y-2">
-                <div className="font-semibold">{event.title}</div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="outline">{EVENT_AUDIENCE_LABELS[event.audience]}</Badge>
-                  <Badge variant="outline">{EVENT_STATUS_LABELS[event.status]}</Badge>
-                  <span>{new Date(event.starts_at).toLocaleString()}</span>
-                  <span>{event.registration_count} confirmed</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" render={<Link href={`/events/${event.slug}`} />}>
-                  View
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  render={<Link href={`/events/manage/${event.slug}/registrations`} />}
+      <div className="flex-1 px-4 py-6 sm:px-6">
+        {loadError ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-destructive">{loadError}</CardContent>
+          </Card>
+        ) : events.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+              <CalendarDays className="size-8 text-muted-foreground/50" />
+              <p className="font-medium">No events yet</p>
+              <p className="text-sm text-muted-foreground">Create your first event to get started.</p>
+              <Button render={<Link href="/events/manage/new" />} className="gap-2">
+                <Plus className="size-4" />
+                Create event
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-xs">
+            {events.map((event) => (
+                <Link
+                  key={event.id}
+                  href={`/events/manage/${event.slug}`}
+                  className="flex items-center gap-4 border-b border-border/80 px-4 py-4 transition-colors last:border-b-0 hover:bg-muted/20 sm:px-5"
                 >
-                  <Ticket className="size-3.5" />
-                  Registrations
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  render={<Link href={`/events/manage/${event.slug}/edit`} />}
-                >
-                  <Pencil className="size-3.5" />
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={deletingSlug === event.slug}
-                  onClick={() => void removeEvent(event.slug)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                  <EventDateIcon startsAt={event.starts_at} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{event.title}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>{formatBackendTime(event.starts_at)}</span>
+                      <Badge variant="outline">{EVENT_AUDIENCE_LABELS[event.audience]}</Badge>
+                      <Badge variant="outline">{EVENT_STATUS_LABELS[event.status]}</Badge>
+                    </div>
+                  </div>
+                  <div className="hidden shrink-0 text-right text-sm text-muted-foreground sm:block">
+                    {event.registration_count} registered
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

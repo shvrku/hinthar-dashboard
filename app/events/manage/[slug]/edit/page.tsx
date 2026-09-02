@@ -4,34 +4,12 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 
-import {
-  EventEditorForm,
-  emptyEventDraft,
-  type EventDraft,
-} from "@/components/events/event-editor-form"
+import { EventComposeScreen } from "@/components/events/event-compose-screen"
 import { RequireRole } from "@/components/require-role"
-import { StandardPageHeader } from "@/components/standard-page-header"
-import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
+import { EventComposeSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
-import type { SchoolEvent } from "@/lib/types"
-import { formatEventDateTimeLocal } from "@/lib/communications-labels"
-import { toast } from "@/components/ui/toast"
-
-function toDraft(event: SchoolEvent): EventDraft {
-  return {
-    title: event.title,
-    summary: event.summary,
-    body: event.body,
-    audience: event.audience,
-    registration_mode: event.registration_mode,
-    starts_at: formatEventDateTimeLocal(event.starts_at),
-    ends_at: formatEventDateTimeLocal(event.ends_at),
-    location: event.location,
-    capacity: event.capacity != null ? String(event.capacity) : "",
-    cover_image_url: event.cover_image_url,
-    tag_names: event.tags.map((tag) => tag.name).join(", "),
-  }
-}
+import { draftToApiPayload, eventToDraft, type EventDraft } from "@/lib/event-draft"
+import { notifySaveError, notifySaveSuccess } from "@/lib/editor-save"
 
 function EditEventContent({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
@@ -49,27 +27,24 @@ function EditEventContent({ params }: { params: Promise<{ slug: string }> }) {
   React.useEffect(() => {
     if (!isLoaded || !slug) return
     let cancelled = false
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        setLoading(true)
-        setError(null)
-        try {
-          const token = await getToken()
-          if (!token) throw new Error("No auth token available")
-          const event = await createApi(token).getEvent(slug)
-          if (!cancelled) setInitial(toDraft(event))
-        } catch (err) {
-          if (!cancelled) {
-            setError(err instanceof ApiError ? err.userMessage : "Failed to load event")
-          }
-        } finally {
-          if (!cancelled) setLoading(false)
+    void (async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = await getToken()
+        if (!token) throw new Error("No auth token available")
+        const event = await createApi(token).getEvent(slug)
+        if (!cancelled) setInitial(eventToDraft(event))
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.userMessage : "Failed to load event")
         }
-      })()
-    }, 0)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
     }
   }, [getToken, isLoaded, slug])
 
@@ -79,36 +54,17 @@ function EditEventContent({ params }: { params: Promise<{ slug: string }> }) {
     try {
       const token = await getToken()
       if (!token) throw new Error("No auth token available")
-      await createApi(token).updateEvent(slug, {
-        title: draft.title.trim(),
-        summary: draft.summary.trim(),
-        body: draft.body,
-        audience: draft.audience,
-        registration_mode: draft.registration_mode,
-        starts_at: new Date(draft.starts_at).toISOString(),
-        ends_at: draft.ends_at ? new Date(draft.ends_at).toISOString() : null,
-        location: draft.location,
-        capacity: draft.capacity ? Number(draft.capacity) : null,
-        cover_image_url: draft.cover_image_url,
-        tag_names: draft.tag_names
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-      })
-      toast.add({ title: "Event updated.", type: "success" })
-      router.push("/events/manage")
+      await createApi(token).updateEvent(slug, draftToApiPayload(draft))
+      notifySaveSuccess("Event updated.", () => router.push(`/events/manage/${slug}`))
     } catch (err) {
-      toast.add({
-        title: err instanceof ApiError ? err.userMessage : "Failed to save event",
-        type: "error",
-      })
+      notifySaveError(err, "Failed to save event")
     } finally {
       setSaving(false)
     }
   }
 
   if (!isLoaded || loading) {
-    return <EditorPageSkeleton label="Loading event…" />
+    return <EventComposeSkeleton label="Loading event…" />
   }
 
   if (error || !initial) {
@@ -120,21 +76,15 @@ function EditEventContent({ params }: { params: Promise<{ slug: string }> }) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <StandardPageHeader
-        title="Edit event"
-        description="Update event details and content."
-        back={{ href: "/events/manage", label: "Manage events" }}
-      />
-      <EventEditorForm
-        draftKey={`hinthar:draft:event:edit:${slug}`}
-        initial={initial ?? emptyEventDraft}
-        saving={saving}
-        submitLabel="Save changes"
-        onSubmit={save}
-        onCancel={() => router.push("/events/manage")}
-      />
-    </div>
+    <EventComposeScreen
+      editorKey={`event-edit-${slug}`}
+      initial={initial}
+      saving={saving}
+      submitLabel="Save changes"
+      backHref={`/events/manage/${slug}`}
+      backLabel="Manage"
+      onSubmit={save}
+    />
   )
 }
 

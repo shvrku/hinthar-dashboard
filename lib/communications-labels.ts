@@ -1,4 +1,5 @@
 import type { EventAudience, EventRegistrationMode, EventRegistrationStatus, EventStatus } from "@/lib/types"
+import { capitalizeMeridiem } from "@/lib/utils"
 
 export type CommTagScope = "announcement" | "event"
 
@@ -38,10 +39,14 @@ export function summarizeEventSchedule(startsAt: string, endsAt: string): string
   const start = new Date(startsAt)
   if (Number.isNaN(start.getTime())) return "Set date & time"
   const datePart = start.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-  const timePart = start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  const timePart = capitalizeMeridiem(
+    start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  )
   if (!endsAt) return `${datePart} · ${timePart}`
   const end = new Date(endsAt)
   if (Number.isNaN(end.getTime())) return `${datePart} · ${timePart}`
-  const endTime = end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  const endTime = capitalizeMeridiem(
+    end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  )
   return `${datePart} · ${timePart} – ${endTime}`
 }

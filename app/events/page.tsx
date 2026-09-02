@@ -2,82 +2,138 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useAuth } from "@clerk/nextjs"
-import { CalendarDays, Loader2, MapPin, Search } from "lucide-react"
-
 import { useRouter } from "next/navigation"
+import { useAuth } from "@clerk/nextjs"
+import { CalendarDays, MapPin, Search } from "lucide-react"
+
+import { useCurrentUser } from "@/components/current-user-provider"
+import { TagChips } from "@/components/tag-chips"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { toast } from "@/components/ui/toast"
 import { buildQueryString, createApi, publicRequest } from "@/lib/api"
-import type { CommTag, Paginated, SchoolEvent } from "@/lib/types"
 import {
   EVENT_AUDIENCE_LABELS,
   EVENT_REGISTRATION_STATUS_LABELS,
 } from "@/lib/communications-labels"
-import { formatBackendTime } from "@/lib/utils"
-import { StandardPageHeader } from "@/components/standard-page-header"
-import { TagBadges, TagChips } from "@/components/tag-chips"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "@/components/ui/toast"
 import { isStaffOrAbove } from "@/lib/roles"
-import { useCurrentUser } from "@/components/current-user-provider"
+import type { CommTag, Paginated, SchoolEvent } from "@/lib/types"
+import {
+  formatBackendTime,
+  parseBackendDateTime,
+  toLocalDateString,
+} from "@/lib/utils"
 
-function formatEventWhen(startsAt: string, endsAt: string | null): string {
-  const start = new Date(startsAt)
-  const date = start.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-  const time = formatBackendTime(startsAt)
-  if (!endsAt) return `${date} · ${time}`
-  return `${date} · ${time} – ${formatBackendTime(endsAt)}`
+function dateGroupKey(iso: string): string {
+  return toLocalDateString(parseBackendDateTime(iso))
 }
 
-function EventCard({ event }: { event: SchoolEvent }) {
+function formatDateGroupLabel(isoDate: string): { primary: string; weekday: string } {
+  const today = toLocalDateString()
+  const tomorrowDate = new Date()
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+  const tomorrow = toLocalDateString(tomorrowDate)
+
+  const date = new Date(`${isoDate}T12:00:00`)
+  const weekday = date.toLocaleDateString(undefined, { weekday: "long" })
+
+  if (isoDate === today) return { primary: "Today", weekday }
+  if (isoDate === tomorrow) return { primary: "Tomorrow", weekday }
+
+  return {
+    primary: date.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    weekday,
+  }
+}
+
+function groupEventsByDate(events: SchoolEvent[]) {
+  const groups = new Map<string, SchoolEvent[]>()
+  for (const event of events) {
+    const key = dateGroupKey(event.starts_at)
+    const list = groups.get(key) ?? []
+    list.push(event)
+    groups.set(key, list)
+  }
+  return Array.from(groups.entries()).map(([date, items]) => ({ date, items }))
+}
+
+function EventListRow({
+  event,
+  showManage,
+}: {
+  event: SchoolEvent
+  showManage?: boolean
+}) {
+  const location = event.location.trim()
+  const isVirtual = /^https?:\/\//i.test(location)
+  const startTime = formatBackendTime(event.starts_at)
+  const endTime = event.ends_at ? formatBackendTime(event.ends_at) : null
+  const timeLabel = endTime ? `${startTime} – ${endTime}` : startTime
+
   return (
-    <Link href={`/events/${event.slug}`} className="block">
-      <Card className="h-full transition-colors hover:bg-muted/30">
-      {event.cover_image_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={event.cover_image_url}
-          alt=""
-          className="h-40 w-full rounded-t-xl object-cover"
-        />
-      ) : null}
-      <CardHeader>
+    <div className="rounded-2xl border border-border/80 bg-card px-4 py-4 shadow-xs transition-colors hover:bg-muted/15 sm:px-5 sm:py-5">
+      <Link href={`/events/${event.slug}`} className="group block space-y-2 text-left">
+        <p className="text-sm font-medium text-muted-foreground">{timeLabel}</p>
+
+        <h3 className="text-lg font-semibold tracking-tight group-hover:underline sm:text-xl">
+          {event.title}
+        </h3>
+
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={event.audience === "external" ? "default" : "secondary"}>
+          <Badge variant={event.audience === "external" ? "default" : "secondary"} className="font-normal">
             {EVENT_AUDIENCE_LABELS[event.audience]}
           </Badge>
           {event.my_registration ? (
-            <Badge variant="outline">
+            <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
               {EVENT_REGISTRATION_STATUS_LABELS[event.my_registration.status]}
             </Badge>
           ) : null}
         </div>
-        <CardTitle>{event.title}</CardTitle>
-        <CardDescription>{event.summary || "School event"}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarDays className="size-4 shrink-0" />
-          <span>{formatEventWhen(event.starts_at, event.ends_at)}</span>
-        </div>
-        {event.location ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4 shrink-0" />
-            <span>{event.location}</span>
-          </div>
+
+        {location ? (
+          <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="size-3.5 shrink-0" />
+            <span className="truncate">{isVirtual ? "Online" : location}</span>
+          </p>
         ) : null}
-        <TagBadges tags={event.tags} />
-      </CardContent>
-      </Card>
-    </Link>
+      </Link>
+
+      {showManage ? (
+        <div className="mt-3">
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={`/events/manage/${event.slug}`} />}
+          >
+            Manage
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function EventsHomeSkeleton() {
+  return (
+    <div className="space-y-8">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="grid grid-cols-[4.5rem_0.75rem_1fr] gap-x-3 sm:grid-cols-[5.5rem_1rem_1fr] sm:gap-x-4">
+          <div className="space-y-1.5 pt-1">
+            <div className="h-4 w-14 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="flex justify-center pt-2">
+            <div className="size-2.5 animate-pulse rounded-full bg-muted" />
+          </div>
+          <div className="space-y-3">
+            <div className="h-28 w-full animate-pulse rounded-2xl bg-muted" />
+            {i === 0 ? <div className="h-28 w-full animate-pulse rounded-2xl bg-muted" /> : null}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -136,97 +192,119 @@ export default function EventsPage() {
     return () => window.clearTimeout(timer)
   }, [isLoaded, load])
 
-  const myRegistered = events.filter((event) => event.my_registration)
+  const visibleEvents =
+    tab === "mine" ? events.filter((event) => event.my_registration) : events
+  const grouped = groupEventsByDate(visibleEvents)
+  const staff = isStaffOrAbove(role)
 
   return (
-    <div className="flex flex-col gap-6">
-      <StandardPageHeader
-        title="Events"
-        description={
-          isSignedIn
-            ? "Browse public and internal school events in one place."
-            : "Browse public school events. Sign in to register or see internal events."
-        }
-        primaryAction={
-          isStaffOrAbove(role)
-            ? { label: "Manage events", onClick: () => router.push("/events/manage") }
-            : undefined
-        }
-      />
-
-      <Card className="border-border/80 bg-card p-4 shadow-2xs">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative min-w-0 flex-1 md:max-w-sm">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search events"
-              className="pl-9"
-            />
-          </div>
-          {isSignedIn ? <TagChips tags={tags} selectedSlug={selectedTag} onSelect={setSelectedTag} /> : null}
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Events</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isSignedIn
+              ? "What’s happening at school — upcoming activities and gatherings."
+              : "Browse public school events. Sign in to register or see internal events."}
+          </p>
         </div>
-      </Card>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="open">Open</TabsTrigger>
-          {isSignedIn ? <TabsTrigger value="mine">My registrations</TabsTrigger> : null}
-          <TabsTrigger value="past">Past</TabsTrigger>
-        </TabsList>
-        <TabsContent value="open" className="mt-4">
-          {loading ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
-              <Loader2 className="size-8 animate-spin" />
-              <p>Loading open events…</p>
-            </div>
-          ) : events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No events found.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {events.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-        {isSignedIn ? (
-          <TabsContent value="mine" className="mt-4">
-            {myRegistered.length === 0 ? (
-              <p className="text-sm text-muted-foreground">You have not registered for any open events yet.</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {myRegistered.map((event) => (
-                  <EventCard key={event.id} event={event} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        ) : null}
-        <TabsContent value="past" className="mt-4">
-          {!loading && events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No past events found.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {events.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        <div className="relative w-full max-w-md sm:w-64">
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search events"
+            className="h-10 rounded-full pl-9"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="h-auto rounded-full bg-muted/50 p-1">
+              <TabsTrigger value="open" className="rounded-full px-4">
+                Upcoming
+              </TabsTrigger>
+              {isSignedIn ? (
+                <TabsTrigger value="mine" className="rounded-full px-4">
+                  Going
+                </TabsTrigger>
+              ) : null}
+              <TabsTrigger value="past" className="rounded-full px-4">
+                Past
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {isSignedIn ? (
+            <TagChips tags={tags} selectedSlug={selectedTag} onSelect={setSelectedTag} />
+          ) : null}
+        </div>
+
+        {loading ? (
+          <EventsHomeSkeleton />
+        ) : grouped.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/80 px-6 py-16 text-center">
+            <CalendarDays className="size-8 text-muted-foreground/50" />
+            <p className="font-medium">No events found</p>
+            <p className="text-sm text-muted-foreground">
+              {tab === "mine"
+                ? "You haven’t registered for any upcoming events yet."
+                : "Check back soon or try a different search."}
+            </p>
+            {staff ? (
+              <Button className="mt-2 rounded-full" onClick={() => router.push("/events/manage")}>
+                Manage events
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div>
+            {grouped.map(({ date, items }, index) => {
+              const label = formatDateGroupLabel(date)
+              const isLast = index === grouped.length - 1
+              return (
+                <section
+                  key={date}
+                  className="grid grid-cols-[4.5rem_0.75rem_1fr] gap-x-3 sm:grid-cols-[5.5rem_1rem_1fr] sm:gap-x-4"
+                >
+                  <div className="pt-1">
+                    <p className="text-sm font-semibold leading-tight tracking-tight sm:text-[15px]">
+                      {label.primary}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{label.weekday}</p>
+                  </div>
+
+                  <div className="relative flex justify-center self-stretch" aria-hidden>
+                    <span className="mt-2 size-2.5 shrink-0 rounded-full border-2 border-muted-foreground/35 bg-background" />
+                    {!isLast ? (
+                      <span className="absolute top-5 bottom-0 w-px bg-border" />
+                    ) : null}
+                  </div>
+
+                  <div className={`min-w-0 space-y-3 ${isLast ? "pb-0" : "pb-8"}`}>
+                    {items.map((event) => (
+                      <EventListRow key={event.id} event={event} showManage={staff} />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {!isSignedIn ? (
-        <Card>
-          <CardContent className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Sign in to register for events and view internal school events.
-            </p>
-            <Button render={<Link href="/sign-in/" />}>Sign in</Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-muted/20 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Sign in to register for events and view internal school events.
+          </p>
+          <Button className="rounded-full" render={<Link href="/sign-in/" />}>
+            Sign in
+          </Button>
+        </div>
       ) : null}
     </div>
   )

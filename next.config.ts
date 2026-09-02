@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  transpilePackages: ["@mdxeditor/editor"],
   allowedDevOrigins: ["192.168.1.6"],
   // Prevent Next.js from redirecting trailing-slash API URLs (308).
   // Django uses APPEND_SLASH=True — all endpoints require trailing slashes.

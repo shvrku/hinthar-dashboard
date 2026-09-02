@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Pin } from "lucide-react"
+import { Loader2, Pin, Tag } from "lucide-react"
 
+import { EditorOptionChip } from "@/components/markdown/editor-option-chip"
 import { EditorTitle, MarkdownEditor } from "@/components/markdown/markdown-editor"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { useDebouncedDraft } from "@/lib/use-local-draft"
+import { Label } from "@/components/ui/label"
 
 export type AnnouncementDraft = {
   title: string
@@ -24,26 +25,26 @@ const emptyDraft: AnnouncementDraft = {
 }
 
 export function AnnouncementEditorForm({
-  draftKey,
+  editorKey,
   initial,
   saving,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
-  draftKey: string
+  editorKey: string
   initial?: AnnouncementDraft
   saving: boolean
   submitLabel: string
   onSubmit: (draft: AnnouncementDraft) => Promise<void>
   onCancel: () => void
 }) {
-  const seeded = initial ?? emptyDraft
-  const { draft, setDraft, clearDraft, ready } = useDebouncedDraft(draftKey, seeded)
+  const formRef = React.useRef<HTMLFormElement>(null)
+  const [draft, setDraft] = React.useState<AnnouncementDraft>(() => initial ?? emptyDraft)
 
   React.useEffect(() => {
     if (initial) setDraft(initial)
-  }, [initial, setDraft])
+  }, [initial])
 
   const patch = (updates: Partial<AnnouncementDraft>) => {
     setDraft((prev) => ({ ...prev, ...updates }))
@@ -53,21 +54,13 @@ export function AnnouncementEditorForm({
     event.preventDefault()
     if (!draft.title.trim()) return
     await onSubmit(draft)
-    if (!initial) clearDraft()
   }
 
-  if (!ready) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-24 text-sm text-muted-foreground">
-        <Loader2 className="size-8 animate-spin" />
-        <p>Loading editor…</p>
-      </div>
-    )
-  }
+  const bodySeed = initial?.body ?? draft.body
 
   return (
-    <form onSubmit={handleSubmit} className="relative pb-8">
-      <div className="mx-auto max-w-3xl space-y-4 px-1 pt-2 sm:px-4">
+    <form ref={formRef} onSubmit={handleSubmit}>
+      <div className="mx-auto w-full max-w-3xl space-y-3 px-1 pb-28 pt-2 sm:px-4">
         <EditorTitle
           value={draft.title}
           onChange={(title) => patch({ title })}
@@ -75,26 +68,46 @@ export function AnnouncementEditorForm({
           required
         />
 
-        <MarkdownEditor
-          key={`${draftKey}-${initial ? "loaded" : "new"}`}
-          defaultValue={draft.body}
-          onChange={(body) => patch({ body })}
-          placeholder="Write your announcement — **bold**, [links](url), and ![images](url) show in the preview above."
+        {initial === undefined || initial.body !== undefined ? (
+          <MarkdownEditor
+            key={editorKey}
+            defaultValue={bodySeed}
+            onChange={(body) => patch({ body })}
+          placeholder="Start writing…"
           optionsSlot={
             <>
-              <label className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs">
-                <Checkbox
-                  checked={draft.is_pinned}
-                  onCheckedChange={(checked) => patch({ is_pinned: checked === true })}
-                />
-                <Pin className="size-3.5" /> Pin to top
-              </label>
-              <Input
-                value={draft.tag_names}
-                onChange={(e) => patch({ tag_names: e.target.value })}
-                placeholder="Tags: Parent Info, Sports"
-                className="h-8 max-w-[14rem] rounded-full px-3 text-xs"
-              />
+              <EditorOptionChip
+                icon={Pin}
+                label="Pin"
+                value={draft.is_pinned ? "Pinned" : "Pin to top"}
+                active={draft.is_pinned}
+              >
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={draft.is_pinned}
+                    onCheckedChange={(checked) => patch({ is_pinned: checked === true })}
+                  />
+                  Pin this announcement to the top
+                </label>
+              </EditorOptionChip>
+
+              <EditorOptionChip
+                icon={Tag}
+                label="Tags"
+                value={draft.tag_names.trim() ? "Tags" : "Tags"}
+                active={Boolean(draft.tag_names.trim())}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="announcement-tags">Tags</Label>
+                  <Input
+                    id="announcement-tags"
+                    value={draft.tag_names}
+                    onChange={(e) => patch({ tag_names: e.target.value })}
+                    placeholder="Parent Info, Sports"
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+              </EditorOptionChip>
             </>
           }
           actions={
@@ -103,16 +116,18 @@ export function AnnouncementEditorForm({
                 Cancel
               </Button>
               <Button
-                type="submit"
+                type="button"
                 size="sm"
                 className="rounded-full px-4"
                 disabled={saving || !draft.title.trim()}
+                onClick={() => formRef.current?.requestSubmit()}
               >
                 {saving ? <Loader2 className="size-4 animate-spin" /> : submitLabel}
               </Button>
             </>
           }
-        />
+          />
+        ) : null}
       </div>
     </form>
   )

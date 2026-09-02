@@ -665,6 +665,7 @@ export interface EventRegistration {
   event: number
   user: number
   user_display: string | null
+  user_email: string
   status: EventRegistrationStatus
   staff_note: string
   registered_at: string

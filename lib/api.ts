@@ -987,7 +987,7 @@ export function createApi(token: string) {
     deleteAnnouncement: (slug: string) =>
       request<void>(`/announcements/${slug}/`, token, { method: "DELETE" }),
 
-    listEvents: (params?: { tag?: string; q?: string; when?: string; page?: number }, authToken?: string | null) =>
+    listEvents: (params?: { tag?: string; q?: string; when?: string; page?: number; page_size?: number }, authToken?: string | null) =>
       requestWithToken<import("./types").Paginated<import("./types").SchoolEvent>>(
         `/events${buildQueryString(params)}`,
         authToken ?? token
@@ -1035,7 +1035,9 @@ export function createApi(token: string) {
     reviewEventRegistration: (
       slug: string,
       registrationId: number,
-      data: { action: "approve" | "reject" | "promote"; staff_note?: string }
+      data:
+        | { action: "approve" | "reject" | "promote"; staff_note?: string }
+        | { status: import("./types").EventRegistrationStatus; staff_note?: string }
     ) =>
       request<import("./types").EventRegistration>(
         `/events/${slug}/registrations/${registrationId}/review/`,

@@ -11,8 +11,8 @@ import {
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
+import { notifySaveError, notifySaveSuccess } from "@/lib/editor-save"
 import type { Announcement } from "@/lib/types"
-import { toast } from "@/components/ui/toast"
 
 function toDraft(item: Announcement): AnnouncementDraft {
   return {
@@ -83,13 +83,9 @@ export default function EditAnnouncementPage({
           .map((t) => t.trim())
           .filter(Boolean),
       })
-      toast.add({ title: "Announcement updated.", type: "success" })
-      router.push("/announcements")
+      notifySaveSuccess("Announcement updated.", () => router.push("/announcements"))
     } catch (err) {
-      toast.add({
-        title: err instanceof ApiError ? err.userMessage : "Failed to save",
-        type: "error",
-      })
+      notifySaveError(err, "Failed to save")
     } finally {
       setSaving(false)
     }
@@ -115,7 +111,7 @@ export default function EditAnnouncementPage({
         back={{ href: "/announcements", label: "Announcements" }}
       />
       <AnnouncementEditorForm
-        draftKey={`hinthar:draft:announcement:edit:${slug}`}
+        editorKey={`announcement-edit-${slug}`}
         initial={initial}
         saving={saving}
         submitLabel="Save changes"

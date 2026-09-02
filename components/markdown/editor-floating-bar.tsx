@@ -1,145 +1,68 @@
 "use client"
 
 import * as React from "react"
-import {
-  Bold,
-  Heading1,
-  Heading2,
-  Heading3,
-  ImageIcon,
-  Italic,
-  Link2,
-  List,
-  Quote,
-  Settings2,
-  Type,
-} from "lucide-react"
+import { createPortal } from "react-dom"
 
-import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { useInsetCenter } from "@/lib/use-inset-center"
 import { cn } from "@/lib/utils"
-import { applyTextareaUpdate, insertAtCursor, wrapSelection } from "@/lib/markdown-editor-utils"
 
-const FORMAT_TOOLS = [
-  { label: "Bold", icon: Bold, wrap: ["**", "**"] as const },
-  { label: "Italic", icon: Italic, wrap: ["*", "*"] as const },
-  { label: "Heading 1", icon: Heading1, insert: "# " },
-  { label: "Heading 2", icon: Heading2, insert: "## " },
-  { label: "Heading 3", icon: Heading3, insert: "### " },
-  { label: "Bullet list", icon: List, insert: "- " },
-  { label: "Quote", icon: Quote, insert: "> " },
-  { label: "Link", icon: Link2, wrap: ["[", "](https://)"] as const },
-  { label: "Image", icon: ImageIcon, insert: "![description](https://)" },
-] as const
-
-export type EditorBarMode = "format" | "options"
+const TOOLBAR_BOTTOM = "calc(1.5rem + env(safe-area-inset-bottom, 0px))"
 
 export function EditorFloatingBar({
-  mode,
-  onModeChange,
-  textareaRef,
-  onMarkdownChange,
   optionsSlot,
   actions,
   className,
 }: {
-  mode: EditorBarMode
-  onModeChange: (mode: EditorBarMode) => void
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>
-  onMarkdownChange: (value: string) => void
   optionsSlot?: React.ReactNode
   actions: React.ReactNode
   className?: string
 }) {
-  const applyFormat = React.useCallback(
-    (fn: (textarea: HTMLTextAreaElement) => { next: string; cursorStart: number; cursorEnd: number }) => {
-      const textarea = textareaRef.current
-      if (!textarea) return
-      const result = fn(textarea)
-      onMarkdownChange(result.next)
-      requestAnimationFrame(() =>
-        applyTextareaUpdate(textarea, result.next, result.cursorStart, result.cursorEnd)
-      )
-    },
-    [onMarkdownChange, textareaRef]
-  )
+  const [mounted, setMounted] = React.useState(false)
+  const optionsScrollRef = React.useRef<HTMLDivElement>(null)
+  const centerX = useInsetCenter()
+  const dockStyle = centerX
+    ? ({ left: centerX, transform: "translateX(-50%)" } as const)
+    : ({ left: "50%", transform: "translateX(-50%)" } as const)
 
-  return (
-    <div className={cn("sticky bottom-4 z-40 flex w-full justify-center pt-6", className)}>
-      <div className="flex max-w-[min(100%,48rem)] flex-wrap items-center justify-center gap-1 rounded-full border border-border/80 bg-background/95 px-2 py-1.5 shadow-lg backdrop-blur-md">
-        <Popover>
-          <PopoverTrigger
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              mode === "format"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted"
-            )}
-            onClick={() => onModeChange("format")}
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleOptionsWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const element = optionsScrollRef.current
+    if (!element || element.scrollWidth <= element.clientWidth) return
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+    element.scrollLeft += event.deltaY
+    event.preventDefault()
+  }
+
+  if (!mounted) return null
+
+  return createPortal(
+    <div
+      className={cn(
+        "pointer-events-auto fixed z-50 w-[min(56rem,calc(100vw-1rem))] px-2",
+        className
+      )}
+      style={{ ...dockStyle, bottom: TOOLBAR_BOTTOM }}
+    >
+      <div className="flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-full border border-border/80 bg-background/95 py-1 pl-2 pr-1 shadow-lg backdrop-blur-md">
+        {optionsSlot ? (
+          <div
+            ref={optionsScrollRef}
+            onWheel={handleOptionsWheel}
+            className="scroll-fade-x hinthar-scrollbar min-w-0 flex-1 touch-pan-x overflow-x-auto overscroll-x-contain"
           >
-            <Type className="size-3.5" />
-            Format
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2" align="center" side="top" sideOffset={12}>
-            <PopoverHeader className="px-1 pb-1">
-              <PopoverTitle className="text-xs">Formatting</PopoverTitle>
-            </PopoverHeader>
-            <div className="flex flex-wrap gap-0.5">
-              {FORMAT_TOOLS.map(({ label, icon: Icon, ...tool }) => (
-                <Button
-                  key={label}
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="size-8 rounded-full"
-                  title={label}
-                  onClick={() => {
-                    if ("wrap" in tool && tool.wrap) {
-                      applyFormat((ta) => wrapSelection(ta, tool.wrap[0], tool.wrap[1]))
-                      return
-                    }
-                    if ("insert" in tool && tool.insert) {
-                      applyFormat((ta) => insertAtCursor(ta, tool.insert))
-                    }
-                  }}
-                >
-                  <Icon className="size-4" />
-                </Button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+            <div className="flex w-max items-center gap-1 px-1 py-0.5">{optionsSlot}</div>
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-8 gap-1.5 rounded-full px-3 text-xs",
-            mode === "options" && "bg-primary/10 text-primary"
-          )}
-          onClick={() => onModeChange("options")}
-        >
-          <Settings2 className="size-3.5" />
-          Options
-        </Button>
-
-        {mode === "options" && optionsSlot ? (
-          <>
-            <div className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
-            <div className="flex max-w-full flex-wrap items-center gap-1">{optionsSlot}</div>
-          </>
-        ) : null}
-
-        <div className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
-        <div className="flex items-center gap-1">{actions}</div>
+        <div className="mx-0.5 h-5 w-px shrink-0 bg-border" />
+        <div className="flex shrink-0 items-center gap-1">{actions}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

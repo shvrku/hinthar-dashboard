@@ -8,7 +8,7 @@ import { AnnouncementEditorForm } from "@/components/announcements/announcement-
 import { StandardPageHeader } from "@/components/standard-page-header"
 import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
-import { toast } from "@/components/ui/toast"
+import { notifySaveError, notifySaveSuccess } from "@/lib/editor-save"
 
 export default function NewAnnouncementPage() {
   const router = useRouter()
@@ -37,13 +37,9 @@ export default function NewAnnouncementPage() {
           .map((t) => t.trim())
           .filter(Boolean),
       })
-      toast.add({ title: "Announcement published.", type: "success" })
-      router.push("/announcements")
+      notifySaveSuccess("Announcement published.", () => router.push("/announcements"))
     } catch (err) {
-      toast.add({
-        title: err instanceof ApiError ? err.userMessage : "Failed to publish",
-        type: "error",
-      })
+      notifySaveError(err, "Failed to publish")
     } finally {
       setSaving(false)
     }
@@ -61,7 +57,7 @@ export default function NewAnnouncementPage() {
         back={{ href: "/announcements", label: "Announcements" }}
       />
       <AnnouncementEditorForm
-        draftKey="hinthar:draft:announcement:new"
+        editorKey="announcement-new"
         saving={saving}
         submitLabel="Publish"
         onSubmit={publish}

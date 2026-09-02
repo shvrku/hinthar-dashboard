@@ -95,16 +95,23 @@ export function parseDateAndClock(date: string, clock: string): Date {
   return parseBackendDateTime(`${datePart} ${timePart}`)
 }
 
+/** Force AM/PM meridiems to uppercase in locale time strings. */
+export function capitalizeMeridiem(value: string): string {
+  return value.replace(/\b(am|pm)\b/gi, (match) => match.toUpperCase())
+}
+
 /** Display datetime for tables (e.g. session start/end). */
 export function formatBackendDateTime(value: string): string {
   const d = parseBackendDateTime(value)
   if (isNaN(d.getTime())) return value || "—"
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
+  return capitalizeMeridiem(
+    d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  )
 }
 
 /** Display date only (e.g. chart axis, check-in day). */
@@ -128,10 +135,46 @@ export function formatBackendTime(value: string): string {
   }
   const d = parseBackendDateTime(value)
   if (isNaN(d.getTime())) return value || "—"
-  return d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
+  return capitalizeMeridiem(
+    d.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  )
+}
+
+/** Event schedule line with date + times (e.g. "Wed, Sep 2, 2026 · 11:00 PM – 12:00 AM"). */
+export function formatEventSchedule(startsAt: string, endsAt?: string | null): string {
+  const start = parseBackendDateTime(startsAt)
+  if (isNaN(start.getTime())) return "—"
+
+  const datePart = start.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   })
+  const startTime = formatBackendTime(startsAt)
+  if (!endsAt) return `${datePart} · ${startTime}`
+
+  const end = parseBackendDateTime(endsAt)
+  if (isNaN(end.getTime())) return `${datePart} · ${startTime}`
+
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate()
+
+  const endTime = formatBackendTime(endsAt)
+  if (sameDay) return `${datePart} · ${startTime} – ${endTime}`
+
+  const endDate = end.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+  return `${datePart} · ${startTime} – ${endDate} · ${endTime}`
 }
 
 /** Compact relative time for activity feeds (e.g. "3h ago"). */

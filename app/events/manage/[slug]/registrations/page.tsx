@@ -3,17 +3,15 @@
 import * as React from "react"
 import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
-import { CalendarDays } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 import { EventRegistrationRoster } from "@/components/events/event-registration-roster"
 import { RequireRole } from "@/components/require-role"
-import { StandardPageHeader } from "@/components/standard-page-header"
 import { EditorPageSkeleton } from "@/components/skeleton/communications-skeleton"
 import { ApiError, createApi } from "@/lib/api"
-import type { EventRegistration, SchoolEvent } from "@/lib/types"
-import { Badge } from "@/components/ui/badge"
+import type { EventRegistration, EventRegistrationStatus, SchoolEvent } from "@/lib/types"
+import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
-import { EVENT_REGISTRATION_STATUS_LABELS } from "@/lib/communications-labels"
 
 function RegistrationsContent({ params }: { params: Promise<{ slug: string }> }) {
   const { getToken, isLoaded } = useAuth()
@@ -77,16 +75,16 @@ function RegistrationsContent({ params }: { params: Promise<{ slug: string }> })
     }
   }, [getToken, isLoaded, slug])
 
-  const review = async (
+  const setStatus = async (
     registrationId: number,
-    action: "approve" | "reject" | "promote"
+    status: EventRegistrationStatus
   ) => {
     if (!slug) return
     setPendingIds((prev) => ({ ...prev, [registrationId]: true }))
     try {
       const token = await getToken()
       if (!token) return
-      await createApi(token).reviewEventRegistration(slug, registrationId, { action })
+      await createApi(token).reviewEventRegistration(slug, registrationId, { status })
       toast.add({ title: "Registration updated.", type: "success" })
       await loadRegistrations()
     } catch (err) {
@@ -116,42 +114,38 @@ function RegistrationsContent({ params }: { params: Promise<{ slug: string }> })
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <StandardPageHeader
-        title={event.title}
-        description="Review and manage event sign-ups."
-        back={{ href: "/events/manage", label: "Manage events" }}
-        primaryAction={{
-          label: "Edit event",
-          onClick: () => {
-            window.location.href = `/events/manage/${event.slug}/edit`
-          },
-        }}
-      />
-
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-muted/20 px-4 py-3 text-sm">
-        <span className="inline-flex items-center gap-2 text-muted-foreground">
-          <CalendarDays className="size-4" />
-          {new Date(event.starts_at).toLocaleString()}
-        </span>
-        <Badge variant="outline">{event.registration_count} confirmed</Badge>
-        <Link href={`/events/${event.slug}`} className="text-primary underline-offset-4 hover:underline">
-          View public page
-        </Link>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="sticky top-0 z-20 flex items-center border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur-md sm:px-6">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="gap-1.5"
+          render={<Link href={`/events/manage/${event.slug}`} />}
+        >
+          <ArrowLeft className="size-4" />
+          Manage event
+        </Button>
       </div>
 
-      <EventRegistrationRoster
-        registrations={registrations}
-        loading={loadingRegs}
-        pendingIds={pendingIds}
-        onReview={review}
-      />
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{event.title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {event.registration_count} confirmed
+            {registrations.length > event.registration_count
+              ? ` · ${registrations.length} total`
+              : ""}
+          </p>
+        </div>
 
-      {loadingRegs ? null : (
-        <p className="text-center text-xs text-muted-foreground">
-          Status labels: {Object.values(EVENT_REGISTRATION_STATUS_LABELS).join(" · ")}
-        </p>
-      )}
+        <EventRegistrationRoster
+          registrations={registrations}
+          loading={loadingRegs}
+          pendingIds={pendingIds}
+          onStatusChange={setStatus}
+        />
+      </div>
     </div>
   )
 }

@@ -1,12 +1,11 @@
 "use client"
 
 import * as React from "react"
+import type { MDXEditorMethods } from "@mdxeditor/editor"
 
-import { MarkdownContent } from "@/components/markdown-content"
-import {
-  EditorFloatingBar,
-  type EditorBarMode,
-} from "@/components/markdown/editor-floating-bar"
+import { FormatAnchorProvider } from "@/components/markdown/editor-format-anchor"
+import { ForwardRefEditor } from "@/components/markdown/forward-ref-editor"
+import { markdownProseClass } from "@/lib/markdown-prose"
 import { cn } from "@/lib/utils"
 
 export function EditorTitle({
@@ -14,11 +13,15 @@ export function EditorTitle({
   onChange,
   placeholder = "Untitled",
   required,
+  invalid,
+  className,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   required?: boolean
+  invalid?: boolean
+  className?: string
 }) {
   return (
     <input
@@ -27,9 +30,12 @@ export function EditorTitle({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       required={required}
+      aria-invalid={invalid || undefined}
       className={cn(
         "w-full border-0 bg-transparent text-4xl font-bold tracking-tight shadow-none outline-none",
-        "placeholder:text-muted-foreground/40 focus:ring-0 sm:text-5xl"
+        "placeholder:text-muted-foreground/40 focus:ring-0 sm:text-5xl",
+        invalid && "text-destructive placeholder:text-destructive/70",
+        className
       )}
     />
   )
@@ -61,78 +67,58 @@ export function EditorSummary({
 export function MarkdownEditor({
   defaultValue = "",
   onChange,
-  placeholder = "Write in markdown — use Format for bold, links, images, and headings…",
-  minHeight = "min-h-[12rem]",
+  placeholder = "Start writing…",
   optionsSlot,
   actions,
   hint,
+  showFloatingBar = true,
+  className,
+  contentClassName,
 }: {
   defaultValue?: string
   onChange: (value: string) => void
   placeholder?: string
-  minHeight?: string
   optionsSlot?: React.ReactNode
-  actions: React.ReactNode
+  actions?: React.ReactNode
   hint?: React.ReactNode
+  showFloatingBar?: boolean
+  className?: string
+  contentClassName?: string
 }) {
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
-  const [text, setText] = React.useState(defaultValue)
-  const [mode, setMode] = React.useState<EditorBarMode>("format")
-  const [focused, setFocused] = React.useState(false)
+  const editorRef = React.useRef<MDXEditorMethods>(null)
+  const [formatAnchor, setFormatAnchor] = React.useState<HTMLDivElement | null>(null)
+  const [markdownSeed] = React.useState(defaultValue)
+  const seededBodyRef = React.useRef(defaultValue)
+  const hasSyncedInitialChangeRef = React.useRef(false)
 
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const next = event.target.value
-    setText(next)
-    onChange(next)
-  }
-
-  const handleMarkdownChange = (next: string) => {
-    setText(next)
-    onChange(next)
-  }
+  const handleChange = React.useCallback(
+    (value: string) => {
+      if (!hasSyncedInitialChangeRef.current && value === "" && seededBodyRef.current) {
+        return
+      }
+      hasSyncedInitialChangeRef.current = true
+      onChange(value)
+    },
+    [onChange]
+  )
 
   return (
-    <div className="relative space-y-3">
-      <div
-        className={cn(
-          "overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs transition-shadow",
-          focused && "border-primary/30 ring-2 ring-primary/10"
-        )}
-      >
-        <div className={cn("border-b border-border/50 bg-muted/10 px-5 py-4 sm:px-6", minHeight)}>
-          <MarkdownContent
-            source={text}
-            emptyPlaceholder={placeholder}
-            className="text-[15px] leading-7"
-          />
-        </div>
-
-        <textarea
-          ref={textareaRef}
-          value={text}
+    <FormatAnchorProvider anchor={formatAnchor}>
+      <div className={cn("relative", className)}>
+        <div ref={setFormatAnchor} className="min-h-0" />
+        <ForwardRefEditor
+          ref={editorRef}
+          markdown={markdownSeed}
           onChange={handleChange}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          optionsSlot={optionsSlot}
+          actions={actions}
+          showFloatingBar={showFloatingBar}
           placeholder={placeholder}
-          spellCheck
-          rows={4}
-          className={cn(
-            "w-full resize-y border-0 bg-transparent px-5 py-3 text-[15px] leading-7 shadow-none outline-none sm:px-6",
-            "placeholder:text-muted-foreground/40"
-          )}
+          className="hinthar-mdx-editor"
+          contentEditableClassName={cn(markdownProseClass, "outline-none", contentClassName)}
         />
+        {hint ? <div className="pt-2">{hint}</div> : null}
       </div>
-
-      <EditorFloatingBar
-        mode={mode}
-        onModeChange={setMode}
-        textareaRef={textareaRef}
-        onMarkdownChange={handleMarkdownChange}
-        optionsSlot={optionsSlot}
-        actions={actions}
-      />
-
-      {hint}
-    </div>
+    </FormatAnchorProvider>
   )
 }
