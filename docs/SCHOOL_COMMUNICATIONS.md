@@ -4,7 +4,7 @@ Product and UI contracts for the **School** sidebar domain in Hinthar-Dashboard,
 
 Related: [`FRONTEND_STANDARDS.md`](./FRONTEND_STANDARDS.md), [`ANIMATION_STANDARDS.md`](./ANIMATION_STANDARDS.md). Backend: SMS `communications/` + OpenAPI at `/api/v1/docs/`.
 
-Last updated: **2026-09-02**.
+Last updated: **2026-09-14**.
 
 ---
 
@@ -72,8 +72,37 @@ Source: `components/skeleton/communications-skeleton.tsx`.
 ### Manage
 
 - List: `StandardPageHeader` + bordered rows (`EventsManageListSkeleton` is **list body only** — header is real chrome while loading).
-- Compose: `EventComposeScreen` with staggered header + form body; end time must be after start (UI clamp + API validation).
 - Registrations: search + filter pills + guest rows (`EventRegistrationRosterSkeleton`).
+
+### Compose (`EventComposeScreen`)
+
+Staff new (`/events/manage/new`) and edit (`/events/manage/[slug]/edit`) share one screen. Draft shape: `lib/event-draft.ts`. Pages wrap loading in `EventComposeSkeleton`.
+
+**Chrome**
+
+- `StandardPageHeader`: “New event” / “Edit event”; back is Events (new) or Manage (edit).
+- Header action + a full-width button under Event Options both submit the form (`Publish` / `Save changes`).
+- Title is required (`EditorTitle` invalid state). Description is optional markdown via dialog.
+
+**Layout** (top → bottom; `lg` two columns)
+
+1. **Audience** menu — `internal` (school members only) or `external` (public listing; signed-in people can register).
+2. **Title** — large `EditorTitle`, placeholder “Event Name”. On `lg` the title column is half-width so it lines up with the left stack.
+3. **Left column** (`lg` row 2):
+   - `EventDateTimePicker` — start + end; end is clamped strictly after start (missing/invalid end bumps by 1 hour). API also rejects `ends_at <= starts_at`.
+   - `EventLocationField` — In person vs Virtual toggle; place name or meeting URL.
+   - `EventDescriptionDialog` — closed row shows “Add Description” + 2-line markdown preview (or helper copy); dialog is the markdown editor.
+4. **Right column**
+   - Label “Event Options”.
+   - Bordered options card:
+     - **Require Approval** — switch: on → `approval_required`, off → `instant_waitlist`.
+     - **Capacity** — popover; digits only; empty = unlimited.
+     - **Tags** — popover; comma-separated names (`Sports, Club`).
+   - Full-width submit button (same label as the header).
+
+Motion: header in the first `StaggerItem`, form body in the second. Skeleton mirrors this: audience pill, title, left stack, “Event Options” label, options card + submit.
+
+`components/events/event-editor-form.tsx` is unused leftover — do not wire new pages to it.
 
 ### Skeletons
 
@@ -81,7 +110,7 @@ Source: `components/skeleton/communications-skeleton.tsx`.
 |--------|---------|
 | `EventsHomeSkeleton` | Timeline columns |
 | `EventDetailSkeleton` | Back + title + meta + registration card |
-| `EventComposeSkeleton` | Header + two-column compose |
+| `EventComposeSkeleton` | Header + audience pill + title + two-column compose (left stack, options card, submit) |
 | `EventManageDashboardSkeleton` | Header + split detail card |
 | `EventsManageListSkeleton` | Manage list rows |
 | `EventRegistrationsSkeleton` | Header + roster |
@@ -128,10 +157,13 @@ Frontend helper: `isEventRegistrationOpen(event)` must stay aligned with SMS `_r
 
 ```text
 app/(app)/announcements/...
-app/events/...
+app/events/...                         # public + manage (compose at manage/new and manage/[slug]/edit)
 components/announcements/announcement-tags.tsx
 components/announcements/announcement-editor-form.tsx
-components/events/...
+components/events/event-compose-screen.tsx
+components/events/event-datetime-picker.tsx
+components/events/event-location-field.tsx
+components/events/event-description-dialog.tsx
 components/skeleton/communications-skeleton.tsx
 components/page-skeletons.tsx          # ClassPickerCardSkeleton, WeekGridSkeleton
 lib/communications-labels.ts
