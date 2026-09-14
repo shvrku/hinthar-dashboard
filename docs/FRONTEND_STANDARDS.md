@@ -107,7 +107,7 @@ Full detail: [`docs/SCHOOL_COMMUNICATIONS.md`](./SCHOOL_COMMUNICATIONS.md).
 2. Announcement detail: no tag chips — body only. Staff Edit returns to the slug page after save.
 3. Events home: timeline rail; wrap **each event card** in `StaggerItem` (same idea as announcement rows).
 4. Registration closed when `now >= (ends_at || starts_at)` (plus optional open/close window) — keep UI helper in sync with SMS.
-5. Event compose: end time strictly after start (picker + API).
+5. Event compose (`EventComposeScreen`): audience + title; left column schedule / location / description dialog; right **Event Options** (approval, capacity, tags) + submit. End time strictly after start (picker clamp + API).
 6. Skeletons must mirror the live layout (`components/skeleton/communications-skeleton.tsx`, Ops helpers in `page-skeletons.tsx`). Prefer shimmer; no full-page spinner for these feeds.
 7. Markdown detail: do not put `overflow-x-hidden` on the page root; `MarkdownContent` uses `overflow-x-clip`.
 
