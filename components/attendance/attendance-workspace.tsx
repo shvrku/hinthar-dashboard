@@ -70,6 +70,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   cn,
   toLocalDateString,
@@ -233,7 +234,12 @@ export function AttendanceWorkspace({
   // Interactive Roll State: studentId -> status
   const [rollStatuses, setRollStatuses] = React.useState<Record<number, RollAttendanceStatus>>({})
   const [remarks, setRemarks] = React.useState<Record<number, string>>({})
+  const [excludedStudentIds, setExcludedStudentIds] = React.useState<number[]>([])
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
+
+  // Session Delete Confirmation State (Regular & Ad-Hoc)
+  const [deleteSessionConfirmOpen, setDeleteSessionConfirmOpen] = React.useState(false)
+  const [deletingActiveSession, setDeletingActiveSession] = React.useState(false)
 
   // UI status
   const [loading, setLoading] = React.useState(false)
@@ -252,24 +258,31 @@ export function AttendanceWorkspace({
       if (!sessId) {
         setRollStatuses({})
         setRemarks({})
+        setExcludedStudentIds([])
         setHasUnsavedChanges(false)
         return
       }
 
+      const sessionAttendances = attendancesList.filter((a) => {
+        return (
+          a.session_id === sessId ||
+          (typeof a.session === "object" && a.session?.id === sessId) ||
+          a.session === sessId
+        )
+      })
+      const hasAnySavedAttendances = sessionAttendances.length > 0
+
       const statusMap: Record<number, RollAttendanceStatus> = {}
       const remarksMap: Record<number, string> = {}
+      const excluded: number[] = []
 
       studentsList.forEach((stu) => {
-        const att = attendancesList.find((a) => {
-          const studentMatch =
+        const att = sessionAttendances.find((a) => {
+          return (
             a.student_id === stu.id ||
             (typeof a.student === "object" && a.student?.id === stu.id) ||
             a.student === stu.id
-          const sessionMatch =
-            a.session_id === sessId ||
-            (typeof a.session === "object" && a.session?.id === sessId) ||
-            a.session === sessId
-          return studentMatch && sessionMatch
+          )
         })
 
         if (att) {
@@ -280,6 +293,9 @@ export function AttendanceWorkspace({
           else statusMap[stu.id] = "present"
 
           if (att.remarks) remarksMap[stu.id] = att.remarks
+        } else if (hasAnySavedAttendances) {
+          // Student has no attendance record for this session (removed or enrolled later)
+          excluded.push(stu.id)
         } else {
           statusMap[stu.id] = "present"
         }
@@ -287,6 +303,7 @@ export function AttendanceWorkspace({
 
       setRollStatuses(statusMap)
       setRemarks(remarksMap)
+      setExcludedStudentIds(excluded)
       setHasUnsavedChanges(false)
     },
     []
@@ -378,17 +395,99 @@ export function AttendanceWorkspace({
     setHasUnsavedChanges(true)
   }
 
-  // Bulk mark all students present
+  // Active (non-excluded) students for the current regular session
+  const activeRegularStudents = React.useMemo(() => {
+    if (excludedStudentIds.length === 0) return matrixStudents
+    const excludedSet = new Set(excludedStudentIds)
+    return matrixStudents.filter((s) => !excludedSet.has(s.id))
+  }, [matrixStudents, excludedStudentIds])
+
+  const excludedRegularStudents = React.useMemo(() => {
+    if (excludedStudentIds.length === 0) return []
+    const excludedSet = new Set(excludedStudentIds)
+    return matrixStudents.filter((s) => excludedSet.has(s.id))
+  }, [matrixStudents, excludedStudentIds])
+
+  // Bulk mark all active students present
   const handleMarkAllPresent = () => {
-    const next: Record<number, RollAttendanceStatus> = {}
-    matrixStudents.forEach((stu) => {
+    const next: Record<number, RollAttendanceStatus> = { ...rollStatuses }
+    activeRegularStudents.forEach((stu) => {
       next[stu.id] = "present"
     })
     setRollStatuses(next)
     setHasUnsavedChanges(true)
   }
 
-  // Save regular session roll
+  // Remove a student from the active regular session's attendance record
+  const handleRemoveRegularStudent = async (studentId: number) => {
+    if (!selectedSessionId || !isSignedIn) return
+    try {
+      const token = await getToken()
+      if (!token) return
+      const api = createApi(token)
+      const att = matrixAttendances.find((a) => {
+        const studentMatch =
+          a.student_id === studentId ||
+          (typeof a.student === "object" && a.student?.id === studentId) ||
+          a.student === studentId
+        const sessionMatch =
+          a.session_id === selectedSessionId ||
+          (typeof a.session === "object" && a.session?.id === selectedSessionId) ||
+          a.session === selectedSessionId
+        return studentMatch && sessionMatch
+      })
+
+      if (att && att.id) {
+        await api.deleteSessionAttendance(att.id)
+        setMatrixAttendances((prev) => prev.filter((item) => item.id !== att.id))
+      }
+      setExcludedStudentIds((prev) => (prev.includes(studentId) ? prev : [...prev, studentId]))
+      toast.add({
+        title: "Student Removed from Session",
+        description: "Removed student from this session's attendance roll",
+        type: "success",
+      })
+    } catch (err) {
+      toast.add({
+        title: "Removal Failed",
+        description: err instanceof ApiError ? err.userMessage : "Failed to remove student from session",
+        type: "error",
+      })
+    }
+  }
+
+  // Restore an excluded cohort student back into the active regular session
+  const handleRestoreRegularStudent = async (studentId: number) => {
+    if (!selectedSessionId || !isSignedIn) return
+    try {
+      const token = await getToken()
+      if (!token) return
+      const api = createApi(token)
+      await api.bulkUpsertSessionAttendances([
+        {
+          session_id: selectedSessionId,
+          student_id: studentId,
+          status: "present",
+        },
+      ])
+      setExcludedStudentIds((prev) => prev.filter((id) => id !== studentId))
+      setRollStatuses((prev) => ({ ...prev, [studentId]: "present" }))
+      await fetchCohortRoll()
+      toast.add({
+        title: "Student Restored",
+        description: "Added student back to this session's roll",
+        type: "success",
+      })
+    } catch (err) {
+      toast.add({
+        title: "Restore Failed",
+        description: err instanceof ApiError ? err.userMessage : "Failed to restore student",
+        type: "error",
+      })
+    }
+  }
+
+  // Save regular session roll (only active non-excluded students)
   const handleSaveRoll = async () => {
     if (!selectedSessionId || !isSignedIn) return
     setSavingRoll(true)
@@ -397,7 +496,7 @@ export function AttendanceWorkspace({
       if (!token) throw new Error("No token")
       const api = createApi(token)
 
-      const records = matrixStudents.map((stu) => ({
+      const records = activeRegularStudents.map((stu) => ({
         session_id: selectedSessionId,
         student_id: stu.id,
         status: rollStatuses[stu.id] || "present",
@@ -406,6 +505,7 @@ export function AttendanceWorkspace({
 
       await api.bulkUpsertSessionAttendances(records)
       setHasUnsavedChanges(false)
+      await fetchCohortRoll()
       toast.add({
         title: "Roll Saved",
         description: "Attendance roll saved successfully",
@@ -419,6 +519,46 @@ export function AttendanceWorkspace({
       })
     } finally {
       setSavingRoll(false)
+    }
+  }
+
+  // Delete the currently selected Regular or Ad-Hoc session
+  const handleConfirmDeleteActiveSession = async () => {
+    if (!isSignedIn) return
+    const isAdhoc = selectedCohortCode === "ADHOC"
+    const targetId = isAdhoc ? selectedAdhocId : selectedSessionId
+    if (!targetId) return
+
+    setDeletingActiveSession(true)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No token")
+      const api = createApi(token)
+
+      if (isAdhoc) {
+        await api.deleteAdHocSession(targetId)
+        setSelectedAdhocId(null)
+        await fetchAdhocData()
+      } else {
+        await api.deleteSession(targetId)
+        setSelectedSessionId(null)
+        await fetchCohortRoll()
+      }
+
+      setDeleteSessionConfirmOpen(false)
+      toast.add({
+        title: "Session Deleted",
+        description: "The session and its attendance records have been deleted",
+        type: "success",
+      })
+    } catch (err) {
+      toast.add({
+        title: "Delete Failed",
+        description: err instanceof ApiError ? err.userMessage : "Failed to delete session",
+        type: "error",
+      })
+    } finally {
+      setDeletingActiveSession(false)
     }
   }
 
@@ -453,16 +593,16 @@ export function AttendanceWorkspace({
     }
   }
 
-  // Filtered Students list
+  // Filtered Students list (only active students in this session)
   const filteredStudents = React.useMemo(() => {
     const q = studentSearch.toLowerCase().trim()
-    if (!q) return matrixStudents
-    return matrixStudents.filter(
+    if (!q) return activeRegularStudents
+    return activeRegularStudents.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
         (s.unique_code && s.unique_code.toLowerCase().includes(q))
     )
-  }, [matrixStudents, studentSearch])
+  }, [activeRegularStudents, studentSearch])
 
   // Summary Metrics for Active Session
   const activeSession = React.useMemo(() => {
@@ -815,7 +955,7 @@ export function AttendanceWorkspace({
     let a = 0
     let e = 0
     const isAdhoc = selectedCohortCode === "ADHOC"
-    const currentStudents = isAdhoc ? adhocStudents : matrixStudents
+    const currentStudents = isAdhoc ? adhocStudents : activeRegularStudents
     const currentRoll = isAdhoc ? adhocRoll : rollStatuses
 
     currentStudents.forEach((stu) => {
@@ -825,11 +965,11 @@ export function AttendanceWorkspace({
       else if (st === "absent") a++
       else if (st === "excused") e++
     })
-    const total = currentStudents.length
+    const total = isAdhoc ? adhocStudents.length : activeRegularStudents.length
     const rate = total > 0 ? Math.round(((p + l) / total) * 100) : 0
     const gateArrived = isAdhoc ? 0 : gateStudents.filter((gs) => Boolean(gs.check_in)).length
     return { p, l, a, e, total, rate, gateArrived }
-  }, [selectedCohortCode, adhocStudents, adhocRoll, matrixStudents, rollStatuses, gateStudents])
+  }, [selectedCohortCode, adhocStudents, adhocRoll, activeRegularStudents, rollStatuses, gateStudents])
 
   return (
     <div className="space-y-4 min-w-0 w-full">
@@ -1028,37 +1168,51 @@ export function AttendanceWorkspace({
                   SESSION //
                 </span>
                 {matrixSessions.length > 0 ? (
-                  <Select
-                    value={selectedSessionId ? String(selectedSessionId) : ""}
-                    onValueChange={(val) => handleSessionChange(Number(val))}
-                  >
-                    <SelectTrigger className="h-8 min-w-[280px] rounded-sm font-mono text-xs">
-                      <span className="truncate">
-                        {(() => {
-                          const sess = matrixSessions.find((s) => s.id === selectedSessionId)
-                          if (!sess) return "Select session occurrence..."
+                  <>
+                    <Select
+                      value={selectedSessionId ? String(selectedSessionId) : ""}
+                      onValueChange={(val) => handleSessionChange(Number(val))}
+                    >
+                      <SelectTrigger className="h-8 min-w-[280px] rounded-sm font-mono text-xs">
+                        <span className="truncate">
+                          {(() => {
+                            const sess = matrixSessions.find((s) => s.id === selectedSessionId)
+                            if (!sess) return "Select session occurrence..."
+                            const timeStart = formatBackendTime(sess.start_time)
+                            const timeEnd = formatBackendTime(sess.end_time)
+                            return `${timeStart}–${timeEnd} · ${sess.subject || "Session"} (${sess.teacher_name || "Teacher"})`
+                          })()}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {matrixSessions.map((sess) => {
                           const timeStart = formatBackendTime(sess.start_time)
                           const timeEnd = formatBackendTime(sess.end_time)
-                          return `${timeStart}–${timeEnd} · ${sess.subject || "Session"} (${sess.teacher_name || "Teacher"})`
-                        })()}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {matrixSessions.map((sess) => {
-                        const timeStart = formatBackendTime(sess.start_time)
-                        const timeEnd = formatBackendTime(sess.end_time)
-                        return (
-                          <SelectItem
-                            key={sess.id}
-                            value={String(sess.id)}
-                            className="font-mono text-xs"
-                          >
-                            {sess.subject || "Session"} · {sess.teacher_name || "Teacher"} ({timeStart}–{timeEnd})
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
+                          return (
+                            <SelectItem
+                              key={sess.id}
+                              value={String(sess.id)}
+                              className="font-mono text-xs"
+                            >
+                              {sess.subject || "Session"} · {sess.teacher_name || "Teacher"} ({timeStart}–{timeEnd})
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setDeleteSessionConfirmOpen(true)}
+                      disabled={!selectedSessionId || deletingActiveSession}
+                      title="Delete selected session"
+                      aria-label="Delete selected session"
+                      className="h-8 w-8 p-0 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </>
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground">
@@ -1137,6 +1291,9 @@ export function AttendanceWorkspace({
                   <TableHead className="font-mono text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                     Remarks / Notes
                   </TableHead>
+                  <TableHead className="w-16 px-4 py-3 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Action
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1179,6 +1336,20 @@ export function AttendanceWorkspace({
                           className="h-7 text-xs bg-background rounded-sm"
                         />
                       </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleRemoveRegularStudent(stu.id)}
+                          disabled={savingRoll || deletingActiveSession || !selectedSessionId}
+                          title="Remove from session"
+                          aria-label={`Remove ${stu.name} from session`}
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -1186,7 +1357,7 @@ export function AttendanceWorkspace({
                 {filteredStudents.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="py-8 text-center font-mono text-xs text-muted-foreground"
                     >
                       {!activeClass
@@ -1200,6 +1371,38 @@ export function AttendanceWorkspace({
               </TableBody>
             </Table>
           </DataModule>
+
+          {excludedRegularStudents.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-border bg-muted/20 px-3.5 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  EXCLUDED FROM SESSION ({excludedRegularStudents.length}):
+                </span>
+                {excludedRegularStudents.map((stu) => (
+                  <div
+                    key={stu.id}
+                    className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1 text-xs"
+                  >
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {stu.unique_code || `STU-${stu.id}`}
+                    </span>
+                    <span className="font-medium text-foreground">{stu.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => handleRestoreRegularStudent(stu.id)}
+                      disabled={savingRoll || deletingActiveSession}
+                      className="h-5 px-1.5 font-mono text-[10px] text-primary hover:bg-primary/10"
+                    >
+                      <RefreshCw className="mr-1 size-2.5" />
+                      Restore
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1258,6 +1461,18 @@ export function AttendanceWorkspace({
                     })}
                   </SelectContent>
                 </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => setDeleteSessionConfirmOpen(true)}
+                  disabled={!selectedAdhocId || deletingActiveSession}
+                  title="Delete selected ad-hoc session"
+                  aria-label="Delete selected ad-hoc session"
+                  className="h-8 w-8 p-0 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
               </div>
             </div>
 
@@ -1672,6 +1887,17 @@ export function AttendanceWorkspace({
           </div>
         </div>
       </InspectorSheet>
+
+      <ConfirmDialog
+        open={deleteSessionConfirmOpen}
+        title="Delete Class Session?"
+        description="This will permanently delete the selected class session and all of its attendance records. This action cannot be undone."
+        confirmLabel="Delete Session"
+        variant="destructive"
+        loading={deletingActiveSession}
+        onConfirm={handleConfirmDeleteActiveSession}
+        onCancel={() => setDeleteSessionConfirmOpen(false)}
+      />
     </div>
   )
 }
