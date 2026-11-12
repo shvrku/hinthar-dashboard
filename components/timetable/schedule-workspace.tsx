@@ -63,8 +63,23 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ConfirmDialog } from "@/components/confirm-dialog"
-import { cn, toLocalDateString, toMonthEndDateString, parseBackendDateTime, formatBackendTime, formatBackendDate } from "@/lib/utils"
+import {
+  cn,
+  toLocalDateString,
+  toMonthEndDateString,
+  parseBackendDateTime,
+  parseDateAndClock,
+  formatBackendTime,
+  formatBackendDate,
+} from "@/lib/utils"
+
+function extractTimeHHMM(value: string): string {
+  const d = parseBackendDateTime(value)
+  if (isNaN(d.getTime())) return "09:00"
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+}
 
 export const DAYS_CONFIG = [
   { index: 0, label: "MON", full: "Monday", isWeekend: false },
@@ -248,6 +263,7 @@ export function ScheduleWorkspace({
 
   // Substitute override form in sheet
   const [selectedSubTeacherId, setSelectedSubTeacherId] = React.useState<string>("")
+  const [subTargetScope, setSubTargetScope] = React.useState<string>("week")
   const [submittingSub, setSubmittingSub] = React.useState(false)
 
   // Edit slot form state
@@ -260,6 +276,22 @@ export function ScheduleWorkspace({
   const [savingSlot, setSavingSlot] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
 
+  // Edit & Delete Dated Session state
+  const [editingSession, setEditingSession] = React.useState<Session | null>(null)
+  const [editSessDate, setEditSessDate] = React.useState<string>("")
+  const [editSessStartTime, setEditSessStartTime] = React.useState<string>("09:00")
+  const [editSessEndTime, setEditSessEndTime] = React.useState<string>("10:30")
+  const [editSessStatus, setEditSessStatus] = React.useState<SessionStatus>("scheduled")
+  const [editSessTeacherId, setEditSessTeacherId] = React.useState<string>("")
+  const [editSessSubTeacherId, setEditSessSubTeacherId] = React.useState<string>("__none__")
+  const [savingSession, setSavingSession] = React.useState(false)
+
+  const [sessionToDelete, setSessionToDelete] = React.useState<Session | null>(null)
+  const [deletingSession, setDeletingSession] = React.useState(false)
+  const [selectedSessionIds, setSelectedSessionIds] = React.useState<number[]>([])
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = React.useState(false)
+  const [bulkDeletingSessions, setBulkDeletingSessions] = React.useState(false)
+
   // Sync edit form when inspectedSlot opens
   React.useEffect(() => {
     if (inspectedSlot) {
@@ -270,8 +302,25 @@ export function ScheduleWorkspace({
       setEditRoom(inspectedSlot.room ?? "")
       setEditDayOfWeek(inspectedSlot.day_of_week ?? 0)
       setSelectedSubTeacherId("")
+      setSubTargetScope("week")
     }
   }, [inspectedSlot])
+
+  // Sync edit session form when editingSession opens
+  const openEditSession = React.useCallback((sess: Session) => {
+    const startObj = parseBackendDateTime(sess.start_time)
+    setEditSessDate(isNaN(startObj.getTime()) ? toLocalDateString() : toLocalDateString(startObj))
+    setEditSessStartTime(extractTimeHHMM(sess.start_time))
+    setEditSessEndTime(extractTimeHHMM(sess.end_time))
+    setEditSessStatus((sess.status as SessionStatus) || "scheduled")
+    setEditSessTeacherId(sess.teacher?.id ? String(sess.teacher.id) : "")
+    setEditSessSubTeacherId(
+      sess.actual_teacher?.id && sess.actual_teacher.id !== sess.teacher?.id
+        ? String(sess.actual_teacher.id)
+        : "__none__"
+    )
+    setEditingSession(sess)
+  }, [])
 
   // New slot form state
   const [newSubjectId, setNewSubjectId] = React.useState<string>("")
@@ -398,24 +447,34 @@ export function ScheduleWorkspace({
     }
   }
 
-  // Handle Substitute Override on a session
-  const handleAssignSubstitute = async (sessionId: number, teacherId: number | null) => {
+  // Handle Substitute Override on one or more sessions
+  const handleAssignSubstitute = async (
+    targetIds: number | number[],
+    teacherId: number | null
+  ) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds]
+    if (ids.length === 0) return
     setSubmittingSub(true)
     try {
       const token = await getToken()
       if (!token) throw new Error("No token")
       const api = createApi(token)
 
-      const updated = await api.patchSession(sessionId, {
-        actual_teacher_id: teacherId,
-      })
+      const updatedList = await Promise.all(
+        ids.map((id) =>
+          api.patchSession(id, {
+            actual_teacher_id: teacherId,
+          })
+        )
+      )
+      const updatedMap = new Map(updatedList.map((u) => [u.id, u]))
+      setSessions((prev) => prev.map((s) => updatedMap.get(s.id) ?? s))
 
-      setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
       toast.add({
         title: teacherId ? "Substitute Assigned" : "Substitute Cleared",
         description: teacherId
-          ? "Substitute teacher assigned successfully"
-          : "Reverted to assigned teacher",
+          ? `Assigned substitute teacher to ${ids.length} session${ids.length === 1 ? "" : "s"}`
+          : `Reverted ${ids.length} session${ids.length === 1 ? "" : "s"} to assigned teacher`,
         type: "success",
       })
     } catch (err) {
@@ -426,6 +485,121 @@ export function ScheduleWorkspace({
       })
     } finally {
       setSubmittingSub(false)
+    }
+  }
+
+  // Handle Save Edited Session
+  const handleSaveSessionEdit = async () => {
+    if (!editingSession || !editSessDate || !editSessStartTime || !editSessEndTime) return
+    setSavingSession(true)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No token")
+      const api = createApi(token)
+
+      const startIso = parseDateAndClock(editSessDate, editSessStartTime).toISOString()
+      const endIso = parseDateAndClock(editSessDate, editSessEndTime).toISOString()
+      const assignedTeacherId = editSessTeacherId ? Number(editSessTeacherId) : undefined
+      const subTeacherId =
+        editSessSubTeacherId === "__none__" || !editSessSubTeacherId
+          ? null
+          : Number(editSessSubTeacherId)
+
+      const updated = await api.patchSession(editingSession.id, {
+        start_time: startIso,
+        end_time: endIso,
+        status: editSessStatus,
+        teacher_id: assignedTeacherId,
+        actual_teacher_id: subTeacherId,
+      })
+
+      setSessions((prev) =>
+        prev
+          .map((s) => (s.id === editingSession.id ? updated : s))
+          .sort(
+            (a, b) =>
+              parseBackendDateTime(b.start_time).getTime() -
+              parseBackendDateTime(a.start_time).getTime()
+          )
+      )
+      setEditingSession(null)
+      toast.add({
+        title: "Session Updated",
+        description: "Dated session updated successfully",
+        type: "success",
+      })
+    } catch (err) {
+      toast.add({
+        title: "Update Failed",
+        description: err instanceof ApiError ? err.userMessage : "Failed to update session",
+        type: "error",
+      })
+    } finally {
+      setSavingSession(false)
+    }
+  }
+
+  // Handle Single Session Delete
+  const handleDeleteSingleSession = async () => {
+    if (!sessionToDelete) return
+    setDeletingSession(true)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No token")
+      const api = createApi(token)
+
+      await api.deleteSession(sessionToDelete.id)
+      const deletedId = sessionToDelete.id
+      setSessions((prev) => prev.filter((s) => s.id !== deletedId))
+      setSelectedSessionIds((prev) => prev.filter((id) => id !== deletedId))
+      if (editingSession?.id === deletedId) {
+        setEditingSession(null)
+      }
+      setSessionToDelete(null)
+      toast.add({
+        title: "Session Deleted",
+        description: "Dated session deleted successfully",
+        type: "success",
+      })
+    } catch (err) {
+      toast.add({
+        title: "Delete Failed",
+        description: err instanceof ApiError ? err.userMessage : "Failed to delete session",
+        type: "error",
+      })
+    } finally {
+      setDeletingSession(false)
+    }
+  }
+
+  // Handle Bulk Delete Sessions
+  const handleBulkDeleteSessions = async () => {
+    if (selectedSessionIds.length === 0) return
+    setBulkDeletingSessions(true)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("No token")
+      const api = createApi(token)
+
+      const idsToDelete = [...selectedSessionIds]
+      await api.bulkDeleteSessions(idsToDelete)
+      const idSet = new Set(idsToDelete)
+      setSessions((prev) => prev.filter((s) => !idSet.has(s.id)))
+      setSelectedSessionIds([])
+      setBulkDeleteConfirmOpen(false)
+      toast.add({
+        title: "Sessions Deleted",
+        description: `Deleted ${idsToDelete.length} dated session${idsToDelete.length === 1 ? "" : "s"}`,
+        type: "success",
+      })
+    } catch (err) {
+      toast.add({
+        title: "Bulk Delete Failed",
+        description: err instanceof ApiError ? err.userMessage : "Failed to delete selected sessions",
+        type: "error",
+      })
+    } finally {
+      setBulkDeletingSessions(false)
     }
   }
 
@@ -472,6 +646,40 @@ export function ScheduleWorkspace({
       .filter((s) => s.timetable_slot?.id === inspectedSlot.id)
       .sort((a, b) => b.start_time.localeCompare(a.start_time))
   }, [sessions, inspectedSlot])
+
+  // Compute target sessions for substitute assignment based on subTargetScope
+  const targetSubSessions = React.useMemo(() => {
+    if (slotSessions.length === 0) return []
+    const todayStr = toLocalDateString()
+    const next7Date = new Date()
+    next7Date.setDate(next7Date.getDate() + 7)
+    const next7Str = toLocalDateString(next7Date)
+
+    if (subTargetScope === "week") {
+      const inNext7Days = slotSessions.filter((s) => {
+        const dStr = toLocalDateString(parseBackendDateTime(s.start_time))
+        return dStr >= todayStr && dStr <= next7Str && s.status !== "cancelled"
+      })
+      if (inNext7Days.length > 0) return inNext7Days
+      // Fallback: nearest upcoming session, or latest session if all are in the past
+      const upcoming = [...slotSessions]
+        .filter((s) => toLocalDateString(parseBackendDateTime(s.start_time)) >= todayStr)
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))
+      return upcoming.length > 0 ? [upcoming[0]] : [slotSessions[0]]
+    }
+
+    if (subTargetScope === "all_upcoming") {
+      const upcoming = slotSessions.filter(
+        (s) =>
+          toLocalDateString(parseBackendDateTime(s.start_time)) >= todayStr &&
+          s.status !== "cancelled"
+      )
+      return upcoming.length > 0 ? upcoming : [slotSessions[0]]
+    }
+
+    const specific = slotSessions.find((s) => String(s.id) === subTargetScope)
+    return specific ? [specific] : [slotSessions[0]]
+  }, [slotSessions, subTargetScope])
 
   // Check if slot currently has substitute active
   const hasSubstituteOnInspected = slotSessions.some(
@@ -798,29 +1006,43 @@ export function ScheduleWorkspace({
                 <SelectItem value="scheduled" className="font-mono text-xs">
                   SCHEDULED
                 </SelectItem>
-                <SelectItem value="in_progress" className="font-mono text-xs">
-                  IN PROGRESS
-                </SelectItem>
                 <SelectItem value="completed" className="font-mono text-xs">
                   COMPLETED
                 </SelectItem>
                 <SelectItem value="cancelled" className="font-mono text-xs">
                   CANCELLED
                 </SelectItem>
+                <SelectItem value="no_show" className="font-mono text-xs">
+                  NO SHOW
+                </SelectItem>
               </SelectContent>
             </Select>
           }
           toolbarRight={
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => setGenerateDrawerOpen(true)}
-              disabled={generatingSessions || !activeClass}
-              className="gap-1 font-mono text-xs"
-            >
-              <Sparkles className="size-3.5 text-warning" />
-              Generate Sessions
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedSessionIds.length > 0 && (
+                <Button
+                  size="xs"
+                  variant="destructive"
+                  onClick={() => setBulkDeleteConfirmOpen(true)}
+                  disabled={bulkDeletingSessions}
+                  className="gap-1 font-mono text-xs"
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete Selected ({selectedSessionIds.length})
+                </Button>
+              )}
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setGenerateDrawerOpen(true)}
+                disabled={generatingSessions || !activeClass}
+                className="gap-1 font-mono text-xs"
+              >
+                <Sparkles className="size-3.5 text-warning" />
+                Generate Sessions
+              </Button>
+            </div>
           }
           totalCount={filteredSessions.length}
           countLabel="DATED SESSIONS"
@@ -828,6 +1050,28 @@ export function ScheduleWorkspace({
           <Table>
             <TableHeader>
               <TableRow className="h-9 bg-muted/30 hover:bg-muted/30">
+                <TableHead className="w-10 px-3.5">
+                  <Checkbox
+                    checked={
+                      filteredSessions.length > 0 &&
+                      filteredSessions.every((s) => selectedSessionIds.includes(s.id))
+                    }
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        const visibleIds = filteredSessions.map((s) => s.id)
+                        setSelectedSessionIds((prev) =>
+                          Array.from(new Set([...prev, ...visibleIds]))
+                        )
+                      } else {
+                        const visibleSet = new Set(filteredSessions.map((s) => s.id))
+                        setSelectedSessionIds((prev) =>
+                          prev.filter((id) => !visibleSet.has(id))
+                        )
+                      }
+                    }}
+                    aria-label="Select all visible sessions"
+                  />
+                </TableHead>
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                   Date & Time
                 </TableHead>
@@ -855,9 +1099,26 @@ export function ScheduleWorkspace({
                 const timeStart = formatBackendTime(sess.start_time)
                 const timeEnd = formatBackendTime(sess.end_time)
                 const hasSub = sess.actual_teacher && sess.actual_teacher.id !== sess.teacher?.id
+                const isSelected = selectedSessionIds.includes(sess.id)
 
                 return (
-                  <TableRow key={sess.id} className="h-11 hover:bg-muted/40">
+                  <TableRow
+                    key={sess.id}
+                    className={cn("h-11 hover:bg-muted/40", isSelected && "bg-primary/5")}
+                  >
+                    <TableCell className="w-10 px-3.5">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          setSelectedSessionIds((prev) =>
+                            checked
+                              ? [...prev, sess.id]
+                              : prev.filter((id) => id !== sess.id)
+                          )
+                        }}
+                        aria-label={`Select session on ${dateStr}`}
+                      />
+                    </TableCell>
                     <TableCell className="px-3.5 font-mono text-xs tabular-nums text-foreground">
                       <div className="font-semibold">{dateStr}</div>
                       <div className="text-[11px] text-muted-foreground">
@@ -910,19 +1171,39 @@ export function ScheduleWorkspace({
                       </TelemetryTag>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={() =>
-                          router.push(
-                            `/attendance?classId=${activeClass?.id}&sessionId=${sess.id}&date=${dateStr}`
-                          )
-                        }
-                        className="gap-1 font-mono text-xs"
-                      >
-                        <span>Take Roll</span>
-                        <ArrowRight className="size-3" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => openEditSession(sess)}
+                          title="Edit session"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <Edit3 className="size-3.5" />
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => setSessionToDelete(sess)}
+                          title="Delete session"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          onClick={() =>
+                            router.push(
+                              `/attendance?classId=${activeClass?.id}&sessionId=${sess.id}&date=${dateStr}`
+                            )
+                          }
+                          className="gap-1 font-mono text-xs"
+                        >
+                          <span>Take Roll</span>
+                          <ArrowRight className="size-3" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -931,7 +1212,7 @@ export function ScheduleWorkspace({
               {filteredSessions.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="py-8 text-center font-mono text-xs text-muted-foreground"
                   >
                     {!activeClass
@@ -1051,49 +1332,111 @@ export function ScheduleWorkspace({
                     SUBSTITUTE TEACHER DISPATCH (INLINE OVERRIDE)
                   </span>
                   <p className="text-xs text-muted-foreground">
-                    Override the regular teacher on dated occurrences when the assigned teacher is absent or on leave.
+                    Assign a substitute teacher for the next 7 days (1 week ahead) or a specific dated occurrence.
                   </p>
-                  <div className="flex items-center gap-2 pt-1">
-                    <Select
-                      value={selectedSubTeacherId}
-                      onValueChange={(val) => {
-                        if (val != null) setSelectedSubTeacherId(val)
-                      }}
-                    >
-                      <SelectTrigger size="sm" className="h-8 flex-1 rounded-sm bg-background font-mono text-xs">
-                        <span className="truncate">
-                          {teachers.find((t) => String(t.id) === selectedSubTeacherId)?.name || "Select substitute teacher..."}
-                        </span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teachers.map((t) => (
-                          <SelectItem key={t.id} value={String(t.id)} className="font-mono text-xs">
-                            {t.name}
+                  <div className="space-y-2 pt-1">
+                    <div className="space-y-1">
+                      <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Target Occurrence Window
+                      </label>
+                      <Select
+                        value={subTargetScope}
+                        onValueChange={(val) => {
+                          if (val != null) setSubTargetScope(val)
+                        }}
+                      >
+                        <SelectTrigger size="sm" className="h-8 w-full rounded-sm bg-background font-mono text-xs">
+                          <span className="truncate">
+                            {subTargetScope === "week"
+                              ? `Next 7 Days / 1 Week Ahead (${targetSubSessions.length} session${targetSubSessions.length === 1 ? "" : "s"})`
+                              : subTargetScope === "all_upcoming"
+                                ? `All Upcoming Scheduled (${targetSubSessions.length} session${targetSubSessions.length === 1 ? "" : "s"})`
+                                : (() => {
+                                    const s = slotSessions.find((item) => String(item.id) === subTargetScope)
+                                    if (!s) return "Select occurrence..."
+                                    const dStr = toLocalDateString(parseBackendDateTime(s.start_time))
+                                    return `Specific Date: ${dStr} (${formatBackendTime(s.start_time)} – ${formatBackendTime(s.end_time)})`
+                                  })()}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="week" className="font-mono text-xs">
+                            Next 7 Days (1 Week Ahead)
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      disabled={!selectedSubTeacherId || submittingSub || slotSessions.length === 0}
-                      onClick={() => {
-                        if (slotSessions[0]) {
-                          handleAssignSubstitute(slotSessions[0].id, Number(selectedSubTeacherId))
-                        }
-                      }}
-                      className="h-8 shrink-0 rounded-sm font-mono text-xs"
-                    >
-                      {submittingSub ? "Assigning..." : "Assign Sub"}
-                    </Button>
+                          <SelectItem value="all_upcoming" className="font-mono text-xs">
+                            All Upcoming Scheduled
+                          </SelectItem>
+                          {slotSessions.map((s) => {
+                            const dStr = toLocalDateString(parseBackendDateTime(s.start_time))
+                            return (
+                              <SelectItem key={s.id} value={String(s.id)} className="font-mono text-xs">
+                                {dStr} ({formatBackendTime(s.start_time)} – {formatBackendTime(s.end_time)})
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={selectedSubTeacherId}
+                        onValueChange={(val) => {
+                          if (val != null) setSelectedSubTeacherId(val)
+                        }}
+                      >
+                        <SelectTrigger size="sm" className="h-8 flex-1 rounded-sm bg-background font-mono text-xs">
+                          <span className="truncate">
+                            {teachers.find((t) => String(t.id) === selectedSubTeacherId)?.name || "Select substitute teacher..."}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teachers.map((t) => (
+                            <SelectItem key={t.id} value={String(t.id)} className="font-mono text-xs">
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        disabled={!selectedSubTeacherId || submittingSub || targetSubSessions.length === 0}
+                        onClick={() => {
+                          if (targetSubSessions.length > 0) {
+                            handleAssignSubstitute(
+                              targetSubSessions.map((s) => s.id),
+                              Number(selectedSubTeacherId)
+                            )
+                          }
+                        }}
+                        className="h-8 shrink-0 rounded-sm font-mono text-xs"
+                      >
+                        {submittingSub ? "Assigning..." : "Assign Sub"}
+                      </Button>
+                    </div>
                   </div>
-                  {slotSessions[0]?.actual_teacher && slotSessions[0].actual_teacher.id !== slotSessions[0].teacher?.id && (
+                  {targetSubSessions.some(
+                    (s) => s.actual_teacher && s.actual_teacher.id !== s.teacher?.id
+                  ) && (
                     <div className="flex items-center justify-between border-t border-border/70 pt-2 text-xs">
                       <span className="text-warning">
-                        Current substitute: <strong>{slotSessions[0].actual_teacher.name}</strong>
+                        Current substitute:{" "}
+                        <strong>
+                          {
+                            targetSubSessions.find(
+                              (s) => s.actual_teacher && s.actual_teacher.id !== s.teacher?.id
+                            )?.actual_teacher?.name
+                          }
+                        </strong>
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleAssignSubstitute(slotSessions[0].id, null)}
+                        onClick={() =>
+                          handleAssignSubstitute(
+                            targetSubSessions.map((s) => s.id),
+                            null
+                          )
+                        }
                         disabled={submittingSub}
                         className="font-mono text-[11px] font-semibold text-muted-foreground underline hover:text-foreground"
                       >
@@ -1139,30 +1482,62 @@ export function ScheduleWorkspace({
                                 {timeStart} – {timeEnd}
                               </span>
                             </div>
-                            <div className="mt-0.5 text-[11px] text-muted-foreground">
-                              Teacher:{" "}
-                              {hasSub ? (
-                                <span className="font-medium text-warning">
-                                  {sess.actual_teacher?.name} (Sub)
-                                </span>
-                              ) : (
-                                <span>{sess.teacher?.name}</span>
+                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span>
+                                Teacher:{" "}
+                                {hasSub ? (
+                                  <span className="font-medium text-warning">
+                                    {sess.actual_teacher?.name} (Sub)
+                                  </span>
+                                ) : (
+                                  <span>{sess.teacher?.name}</span>
+                                )}
+                              </span>
+                              {hasSub && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAssignSubstitute(sess.id, null)}
+                                  disabled={submittingSub}
+                                  className="font-mono text-[10px] underline hover:text-foreground"
+                                >
+                                  Revert
+                                </button>
                               )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <TelemetryTag
                               status={
                                 sess.status === "completed"
                                   ? "present"
                                   : sess.status === "no_show"
                                     ? "late"
-                                    : "info"
+                                    : sess.status === "cancelled"
+                                      ? "absent"
+                                      : "info"
                               }
                             >
                               {(sess.status || "scheduled").toUpperCase()}
                             </TelemetryTag>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => openEditSession(sess)}
+                              title="Edit session"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            >
+                              <Edit3 className="size-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => setSessionToDelete(sess)}
+                              title="Delete session"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
                             <Button
                               variant="outline"
                               size="xs"
@@ -1618,6 +1993,198 @@ export function ScheduleWorkspace({
         </div>
       </InspectorSheet>
 
+      {/* --------------------------------------------------------------------- */}
+      {/* INSPECTOR SHEET: EDIT DATED SESSION                                    */}
+      {/* --------------------------------------------------------------------- */}
+      <InspectorSheet
+        open={Boolean(editingSession)}
+        onOpenChange={(open) => {
+          if (!open) setEditingSession(null)
+        }}
+        code={editingSession ? `SESSION // #${editingSession.id}` : "SESSION"}
+        title={
+          editingSession?.timetable_slot?.subject?.name
+            ? `Edit Session · ${editingSession.timetable_slot.subject.name}`
+            : "Edit Dated Session"
+        }
+        subtitle="Update date, hours, status, assigned teacher, or substitute teacher"
+        fields={
+          editingSession
+            ? [
+                { label: "COHORT", value: selectedCohortCode, mono: true },
+                {
+                  label: "SUBJECT",
+                  value: editingSession.timetable_slot?.subject?.name || "—",
+                },
+                {
+                  label: "ROOM",
+                  value: editingSession.timetable_slot?.room || "Unassigned",
+                  mono: true,
+                },
+              ]
+            : []
+        }
+        footerActions={
+          <div className="flex w-full items-center justify-between gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (editingSession) setSessionToDelete(editingSession)
+              }}
+              className="gap-1 font-mono text-xs"
+            >
+              <Trash2 className="size-3.5" />
+              Delete Session
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingSession(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveSessionEdit}
+                disabled={savingSession || !editSessDate || !editSessStartTime || !editSessEndTime}
+                className="gap-1 font-mono text-xs"
+              >
+                <Check className="size-3.5" />
+                {savingSession ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {editingSession && (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Session Date
+              </label>
+              <Input
+                type="date"
+                value={editSessDate}
+                onChange={(e) => setEditSessDate(e.target.value)}
+                className="h-8 rounded-sm font-mono text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Start Time
+                </label>
+                <Input
+                  type="time"
+                  value={editSessStartTime}
+                  onChange={(e) => setEditSessStartTime(e.target.value)}
+                  className="h-8 rounded-sm font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  End Time
+                </label>
+                <Input
+                  type="time"
+                  value={editSessEndTime}
+                  onChange={(e) => setEditSessEndTime(e.target.value)}
+                  className="h-8 rounded-sm font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Session Status
+              </label>
+              <Select
+                value={editSessStatus}
+                onValueChange={(val) => {
+                  if (val != null) setEditSessStatus(val as SessionStatus)
+                }}
+              >
+                <SelectTrigger className="h-8 rounded-sm font-mono text-xs">
+                  <span className="truncate">{editSessStatus.toUpperCase()}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="scheduled" className="font-mono text-xs">
+                    SCHEDULED
+                  </SelectItem>
+                  <SelectItem value="completed" className="font-mono text-xs">
+                    COMPLETED
+                  </SelectItem>
+                  <SelectItem value="cancelled" className="font-mono text-xs">
+                    CANCELLED
+                  </SelectItem>
+                  <SelectItem value="no_show" className="font-mono text-xs">
+                    NO SHOW
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Assigned Regular Teacher
+              </label>
+              <Select
+                value={editSessTeacherId}
+                onValueChange={(val) => {
+                  if (val != null) setEditSessTeacherId(val)
+                }}
+              >
+                <SelectTrigger className="h-8 rounded-sm font-mono text-xs">
+                  <span className="truncate">
+                    {teachers.find((t) => String(t.id) === editSessTeacherId)?.name || "Select assigned teacher..."}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)} className="font-mono text-xs">
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Actual / Substitute Teacher
+              </label>
+              <Select
+                value={editSessSubTeacherId}
+                onValueChange={(val) => {
+                  if (val != null) setEditSessSubTeacherId(val)
+                }}
+              >
+                <SelectTrigger className="h-8 rounded-sm font-mono text-xs">
+                  <span className="truncate">
+                    {editSessSubTeacherId === "__none__"
+                      ? "As Assigned (No Substitute)"
+                      : teachers.find((t) => String(t.id) === editSessSubTeacherId)?.name || "Select substitute..."}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="font-mono text-xs">
+                    As Assigned (No Substitute)
+                  </SelectItem>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)} className="font-mono text-xs">
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+      </InspectorSheet>
+
       {/* Delete Slot Confirmation Dialog */}
       <ConfirmDialog
         open={deleteConfirmOpen}
@@ -1627,6 +2194,34 @@ export function ScheduleWorkspace({
         variant="destructive"
         onConfirm={handleDeleteSlot}
         onCancel={() => setDeleteConfirmOpen(false)}
+      />
+
+      {/* Delete Single Session Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(sessionToDelete)}
+        title="Delete Dated Session"
+        description={
+          sessionToDelete
+            ? `Are you sure you want to delete the ${sessionToDelete.timetable_slot?.subject?.name || "session"} occurrence on ${toLocalDateString(parseBackendDateTime(sessionToDelete.start_time))} (${formatBackendTime(sessionToDelete.start_time)} – ${formatBackendTime(sessionToDelete.end_time)})? Any attendance marks recorded for this session will also be removed.`
+            : "Are you sure you want to delete this dated session?"
+        }
+        confirmLabel="Delete Session"
+        loading={deletingSession}
+        variant="destructive"
+        onConfirm={handleDeleteSingleSession}
+        onCancel={() => setSessionToDelete(null)}
+      />
+
+      {/* Bulk Delete Sessions Confirmation Dialog */}
+      <ConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        title={`Delete ${selectedSessionIds.length} Selected Session${selectedSessionIds.length === 1 ? "" : "s"}`}
+        description={`Are you sure you want to permanently delete ${selectedSessionIds.length} dated session${selectedSessionIds.length === 1 ? "" : "s"}? Any attendance marks recorded for these sessions will also be removed.`}
+        confirmLabel={`Delete ${selectedSessionIds.length} Session${selectedSessionIds.length === 1 ? "" : "s"}`}
+        loading={bulkDeletingSessions}
+        variant="destructive"
+        onConfirm={handleBulkDeleteSessions}
+        onCancel={() => setBulkDeleteConfirmOpen(false)}
       />
     </div>
   )
