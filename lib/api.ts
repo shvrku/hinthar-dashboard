@@ -1,3 +1,5 @@
+import { sysLog } from "@/lib/sys-log"
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -91,37 +93,88 @@ async function requestWithToken<T>(
   const bases =
     API_ORIGINS.length > 0 ? API_ORIGINS.map((origin) => `${origin}/api/v1`) : ["/api/v1"]
   let lastNetworkError: unknown = undefined
+  const isBrowser = typeof window !== "undefined"
+  const startedAt = isBrowser ? performance.now() : 0
 
-  // Network-level failover: try each origin in order. Only GETs retry — a
-  // mutation may have committed before its response was lost, so retrying it
-  // on another origin risks duplicate writes.
-  for (let attempt = Math.min(preferredIndex, bases.length - 1); attempt < bases.length; attempt++) {
-    const url = `${bases[attempt]}${endpoint}`
-    try {
-      const res = await fetchWithResponse(url, token, options)
-      if (canFailover && attempt !== preferredIndex) {
-        preferredIndex = attempt
+  if (isBrowser) sysLog.startRequest()
+
+  try {
+    // Network-level failover: try each origin in order. Only GETs retry — a
+    // mutation may have committed before its response was lost, so retrying it
+    // on another origin risks duplicate writes.
+    for (let attempt = Math.min(preferredIndex, bases.length - 1); attempt < bases.length; attempt++) {
+      const url = `${bases[attempt]}${endpoint}`
+      try {
+        const res = await fetchWithResponse(url, token, options)
+        if (canFailover && attempt !== preferredIndex) {
+          preferredIndex = attempt
+        }
+        const durationMs = isBrowser ? Math.round(performance.now() - startedAt) : undefined
+        const data = await parseResponse<T>(res)
+        if (isBrowser) {
+          sysLog.add({
+            level: "API",
+            title: `${method} ${endpoint}`,
+            status: res.status,
+            durationMs,
+            detail: attempt > 0 ? `failover origin #${attempt + 1}` : undefined,
+          })
+        }
+        return data
+      } catch (err) {
+        if (!(err instanceof TypeError)) {
+          if (isBrowser) {
+            const durationMs = Math.round(performance.now() - startedAt)
+            const status = err instanceof ApiError ? err.status : undefined
+            const detail = err instanceof Error ? err.message : "Request failed"
+            sysLog.add({
+              level: "ERR",
+              title: `${method} ${endpoint}`,
+              status,
+              durationMs,
+              detail,
+            })
+          }
+          throw err
+        }
+        // TypeError from fetch = network/CORS-level failure, not an API error.
+        lastNetworkError = err
+        if (isBrowser && canFailover && attempt + 1 < bases.length) {
+          sysLog.add({
+            level: "API",
+            title: `${method} ${endpoint}`,
+            status: 0,
+            detail: `origin #${attempt + 1} unreachable, trying next`,
+          })
+        }
+        if (!canFailover) break
       }
-      return await parseResponse<T>(res)
-    } catch (err) {
-      if (!(err instanceof TypeError)) throw err
-      // TypeError from fetch = network/CORS-level failure, not an API error.
-      lastNetworkError = err
-      if (!canFailover) break
     }
-  }
 
-  const detail =
-    lastNetworkError instanceof Error ? lastNetworkError.message : "Network error"
-  const tried = isDirectApiMode() ? API_ORIGINS.join(", ") : "same-origin /api proxy"
-  const corsHint =
-    typeof window !== "undefined" && isDirectApiMode()
-      ? ` If this is a CORS failure, add this dashboard origin to SMS CORS_ALLOWED_ORIGINS (and optionally CORS_ALLOWED_ORIGIN_REGEXES for Vercel previews). API origins tried: ${tried}.`
-      : ""
-  throw new ApiError(
-    0,
-    `Unable to connect to API server (${tried}). Details: ${detail}.${corsHint}`
-  )
+    const detail =
+      lastNetworkError instanceof Error ? lastNetworkError.message : "Network error"
+    const tried = isDirectApiMode() ? API_ORIGINS.join(", ") : "same-origin /api proxy"
+    const corsHint =
+      typeof window !== "undefined" && isDirectApiMode()
+        ? ` If this is a CORS failure, add this dashboard origin to SMS CORS_ALLOWED_ORIGINS (and optionally CORS_ALLOWED_ORIGIN_REGEXES for Vercel previews). API origins tried: ${tried}.`
+        : ""
+    const durationMs = isBrowser ? Math.round(performance.now() - startedAt) : undefined
+    if (isBrowser) {
+      sysLog.add({
+        level: "ERR",
+        title: `${method} ${endpoint}`,
+        status: 0,
+        durationMs,
+        detail: `${detail} (${tried})`,
+      })
+    }
+    throw new ApiError(
+      0,
+      `Unable to connect to API server (${tried}). Details: ${detail}.${corsHint}`
+    )
+  } finally {
+    if (isBrowser) sysLog.endRequest()
+  }
 }
 
 async function fetchWithResponse(

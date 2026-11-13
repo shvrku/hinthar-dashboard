@@ -8,6 +8,7 @@ import { CurrentUserProvider } from "@/components/current-user-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toast";
+import { SysConsole } from "@/components/sys-console";
 import { cn } from "@/lib/utils";
 
 import Script from "next/script";
@@ -127,6 +128,7 @@ export default function RootLayout({
                   <TooltipProvider>
                     {children}
                     <Toaster />
+                    <SysConsole />
                   </TooltipProvider>
                 </CurrentUserProvider>
               </QueryProvider>

@@ -1378,15 +1378,15 @@ export function ScheduleWorkspace({
                       </Select>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <Select
                         value={selectedSubTeacherId}
                         onValueChange={(val) => {
                           if (val != null) setSelectedSubTeacherId(val)
                         }}
                       >
-                        <SelectTrigger size="sm" className="h-8 flex-1 rounded-sm bg-background font-mono text-xs">
-                          <span className="truncate">
+                        <SelectTrigger size="sm" className="h-8 w-full min-w-0 flex-1 rounded-sm bg-background font-mono text-xs">
+                          <span className="min-w-0 truncate">
                             {teachers.find((t) => String(t.id) === selectedSubTeacherId)?.name || "Select substitute teacher..."}
                           </span>
                         </SelectTrigger>
@@ -1472,18 +1472,36 @@ export function ScheduleWorkspace({
                       return (
                         <div
                           key={sess.id}
-                          className="flex items-center justify-between rounded-sm border border-border bg-card p-2.5 text-xs"
+                          className="flex flex-col gap-2 rounded-sm border border-border bg-card p-2.5 text-xs"
                         >
-                          <div>
-                            <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
-                              <span>{dateStr}</span>
-                              <span className="text-muted-foreground">·</span>
-                              <span className="font-normal text-muted-foreground">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-1.5 font-mono text-xs font-bold text-foreground">
+                              <span className="shrink-0">{dateStr}</span>
+                              <span className="shrink-0 text-muted-foreground">·</span>
+                              <span className="truncate font-normal text-muted-foreground">
                                 {timeStart} – {timeEnd}
                               </span>
                             </div>
-                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>
+
+                            <TelemetryTag
+                              status={
+                                sess.status === "completed"
+                                  ? "present"
+                                  : sess.status === "no_show"
+                                    ? "late"
+                                    : sess.status === "cancelled"
+                                      ? "absent"
+                                      : "info"
+                              }
+                              className="shrink-0"
+                            >
+                              {(sess.status || "scheduled").toUpperCase()}
+                            </TelemetryTag>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="truncate">
                                 Teacher:{" "}
                                 {hasSub ? (
                                   <span className="font-medium text-warning">
@@ -1498,58 +1516,45 @@ export function ScheduleWorkspace({
                                   type="button"
                                   onClick={() => handleAssignSubstitute(sess.id, null)}
                                   disabled={submittingSub}
-                                  className="font-mono text-[10px] underline hover:text-foreground"
+                                  className="shrink-0 font-mono text-[10px] underline hover:text-foreground"
                                 >
                                   Revert
                                 </button>
                               )}
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-1.5">
-                            <TelemetryTag
-                              status={
-                                sess.status === "completed"
-                                  ? "present"
-                                  : sess.status === "no_show"
-                                    ? "late"
-                                    : sess.status === "cancelled"
-                                      ? "absent"
-                                      : "info"
-                              }
-                            >
-                              {(sess.status || "scheduled").toUpperCase()}
-                            </TelemetryTag>
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              onClick={() => openEditSession(sess)}
-                              title="Edit session"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                            >
-                              <Edit3 className="size-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              onClick={() => setSessionToDelete(sess)}
-                              title="Delete session"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="size-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="xs"
-                              onClick={() => {
-                                router.push(
-                                  `/attendance?classId=${activeClass?.id}&sessionId=${sess.id}&date=${dateStr}`
-                                )
-                              }}
-                              className="h-6 font-mono text-[10px]"
-                            >
-                              Take Roll →
-                            </Button>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => openEditSession(sess)}
+                                title="Edit session"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                              >
+                                <Edit3 className="size-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => setSessionToDelete(sess)}
+                                title="Delete session"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="size-3" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                onClick={() => {
+                                  router.push(
+                                    `/attendance?classId=${activeClass?.id}&sessionId=${sess.id}&date=${dateStr}`
+                                  )
+                                }}
+                                className="h-6 font-mono text-[10px]"
+                              >
+                                Take Roll →
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )
@@ -2037,24 +2042,15 @@ export function ScheduleWorkspace({
               <Trash2 className="size-3.5" />
               Delete Session
             </Button>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditingSession(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSaveSessionEdit}
-                disabled={savingSession || !editSessDate || !editSessStartTime || !editSessEndTime}
-                className="gap-1 font-mono text-xs"
-              >
-                <Check className="size-3.5" />
-                {savingSession ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              onClick={handleSaveSessionEdit}
+              disabled={savingSession || !editSessDate || !editSessStartTime || !editSessEndTime}
+              className="gap-1 font-mono text-xs"
+            >
+              <Check className="size-3.5" />
+              {savingSession ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
         }
       >

@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/components/current-user-provider"
 import { prefersReducedMotion } from "@/lib/gsap/reduced-motion"
 import { easeOutSoft, easeOutSnap, durations } from "@/lib/gsap/easings"
 import { cn } from "@/lib/utils"
+import { sysLog } from "@/lib/sys-log"
 
 gsap.registerPlugin(useGSAP)
 
@@ -20,6 +21,19 @@ const PHASE_LABELS: Record<Phase, string> = {
   profile: "Fetching your profile…",
   routing: "Routing…",
   done: "Done",
+}
+
+const PHASE_BADGE_STYLES: Record<Phase, string> = {
+  session: "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  profile: "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  routing: "border-warning/30 bg-warning/10 text-warning",
+  done: "border-success/30 bg-success/10 text-success",
+}
+
+interface BootLogEntry {
+  elapsedSec: string
+  phase: Phase
+  label: string
 }
 
 // ─── Indeterminate progress animation values per phase ─────────────────────
@@ -56,6 +70,31 @@ export function BootstrapOverlay() {
   const slowTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const startedAt = React.useRef(Date.now())
   const exitingRef = React.useRef(false)
+  const [bootLog, setBootLog] = React.useState<BootLogEntry[]>(() => [
+    { elapsedSec: "0.00s", phase: "session", label: PHASE_LABELS.session },
+  ])
+  const lastLoggedPhaseRef = React.useRef<Phase | null>(null)
+
+  React.useEffect(() => {
+    const active = visible && (isSignedIn || !clerkLoaded)
+    sysLog.setBootstrapActive(active)
+    return () => sysLog.setBootstrapActive(false)
+  }, [visible, isSignedIn, clerkLoaded])
+
+  React.useEffect(() => {
+    if (lastLoggedPhaseRef.current === phase) return
+    lastLoggedPhaseRef.current = phase
+    const elapsedSec = `${((Date.now() - startedAt.current) / 1000).toFixed(2)}s`
+    sysLog.add({
+      level: "BOOT",
+      title: `stage:${phase} (${PHASE_PROGRESS[phase]}%)`,
+      detail: PHASE_LABELS[phase],
+    })
+    setBootLog((prev) => {
+      if (prev.some((item) => item.phase === phase)) return prev
+      return [...prev, { elapsedSec, phase, label: PHASE_LABELS[phase] }]
+    })
+  }, [phase])
 
   // ── Phase transitions ──────────────────────────────────────────────────
   React.useEffect(() => {
@@ -159,7 +198,7 @@ export function BootstrapOverlay() {
   // ── Hidden keybind: Shift+D ────────────────────────────────────────────
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.shiftKey && e.key === "D") {
+      if (e.shiftKey && (e.key === "D" || e.key === "d")) {
         setDebugVisible((v) => !v)
       }
     }
@@ -229,27 +268,16 @@ export function BootstrapOverlay() {
         </svg>
       </div>
 
-      {/* Progress bar */}
-      <div className="w-48 space-y-3">
-        <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-foreground/10">
+      {/* Progress bar — thin solid rectangle */}
+      <div className="w-56 space-y-3">
+        <div className="relative h-[3px] w-full overflow-hidden rounded-none bg-foreground/10">
           <div
             ref={progressBarRef}
-            className="absolute left-0 top-0 h-full rounded-full bg-foreground/70 transition-none"
+            className="absolute left-0 top-0 h-full rounded-none bg-foreground/80 transition-none"
             style={{ width: `${PHASE_PROGRESS[phase]}%` }}
             aria-hidden
           />
         </div>
-
-        {/* Debug label — Shift+D to toggle */}
-        <p
-          className={cn(
-            "text-center text-xs text-muted-foreground transition-opacity duration-300",
-            debugVisible ? "opacity-100" : "opacity-0 select-none pointer-events-none"
-          )}
-          aria-hidden={!debugVisible}
-        >
-          {PHASE_LABELS[phase]}
-        </p>
 
         {/* Slow-network hint */}
         {showSlow && phase !== "done" && (
@@ -265,6 +293,58 @@ export function BootstrapOverlay() {
           </div>
         )}
       </div>
+
+      {/* Boot telemetry log — Shift+D to toggle */}
+      {debugVisible && (
+        <div
+          className="fixed bottom-3 left-3 z-10 w-[min(21rem,calc(100vw-1.5rem))] rounded-sm border border-border bg-card/95 p-2.5 font-mono text-[10px] text-foreground shadow-2xl backdrop-blur-md"
+          aria-live="off"
+        >
+          <div className="mb-1.5 flex items-center justify-between border-b border-border pb-1">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block size-1.5 bg-success" />
+              <span className="font-bold tracking-wider text-foreground">BOOT LOG</span>
+            </div>
+            <span className="rounded-xs border border-border bg-muted px-1 py-0.5 text-[9px] text-muted-foreground">
+              SHIFT+D
+            </span>
+          </div>
+
+          <div className="mb-1.5 grid grid-cols-2 gap-x-2 gap-y-0.5 border-b border-border/60 pb-1.5 text-[9px] text-muted-foreground">
+            <div>
+              STAGE: <span className="font-semibold text-foreground">{phase}</span>
+            </div>
+            <div className="text-right">
+              PROGRESS: <span className="font-semibold text-foreground">{PHASE_PROGRESS[phase]}%</span>
+            </div>
+            <div>
+              CLERK: <span className="text-foreground">{clerkLoaded ? (isSignedIn ? "signed-in" : "signed-out") : "loading"}</span>
+            </div>
+            <div className="text-right">
+              ROLE: <span className="text-foreground">{role ?? (profileLoading ? "fetching" : "none")}</span>
+            </div>
+          </div>
+
+          <div className="space-y-0.5">
+            {bootLog.map((entry) => (
+              <div key={entry.phase} className="flex items-center gap-1.5 leading-tight">
+                <span className="w-10 shrink-0 text-[9px] text-muted-foreground tabular-nums">
+                  {entry.elapsedSec}
+                </span>
+                <span
+                  className={cn(
+                    "w-14 shrink-0 border px-1 py-0 text-center text-[8px] font-bold uppercase tracking-wider",
+                    PHASE_BADGE_STYLES[entry.phase]
+                  )}
+                >
+                  {entry.phase}
+                </span>
+                <span className="truncate text-[10px] text-foreground/90">{entry.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

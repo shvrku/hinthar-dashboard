@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import type { User } from "@/lib/types"
 import type { Role } from "@/lib/roles"
 import { apiQueryKeys, useMeQuery } from "@/hooks/use-api-queries"
+import { sysLog } from "@/lib/sys-log"
 
 type CurrentUserContextValue = {
   user: User | null
@@ -23,6 +24,29 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   const meQuery = useMeQuery(isLoaded && !!isSignedIn, userId)
 
   const prevUserIdRef = React.useRef<string | null | undefined>(undefined)
+  const loggedClerkRef = React.useRef(false)
+  const loggedRoleRef = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    if (!isLoaded || loggedClerkRef.current) return
+    loggedClerkRef.current = true
+    sysLog.add({
+      level: "AUTH",
+      title: isSignedIn ? "Clerk session verified" : "Clerk loaded (signed out)",
+      detail: userId ? `uid: ${userId}` : undefined,
+    })
+  }, [isLoaded, isSignedIn, userId])
+
+  React.useEffect(() => {
+    const role = meQuery.data?.role
+    if (!role || loggedRoleRef.current === role) return
+    loggedRoleRef.current = role
+    sysLog.add({
+      level: "AUTH",
+      title: `Profile resolved (${role})`,
+      detail: meQuery.data?.email || undefined,
+    })
+  }, [meQuery.data])
 
   // Clerk identity changed (sign-in, sign-out, account switch) — drop stale API cache.
   React.useEffect(() => {
