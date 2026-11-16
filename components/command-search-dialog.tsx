@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Palette,
   Link2,
+  Banknote,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -44,11 +45,16 @@ type NavigationItem = {
   studentOnly?: boolean
   /** When true, only teacher-role accounts see this row. */
   teacherOnly?: boolean
+  /** When true, only parent-role accounts see this row. */
+  parentOnly?: boolean
   keywords?: string[]
 }
 
 const navigationItems: NavigationItem[] = [
   { title: "Dashboard", href: "/overview", group: "Overview", icon: LayoutDashboard },
+  { title: "Academics & Exam Broadsheet", href: "/academics", group: "Academics", icon: GraduationCap, keywords: ["exam", "midterm", "final", "broadsheet", "marks", "grades"] },
+  { title: "Parent Results Preview", href: "/academics/parent", group: "Academics", icon: Users, keywords: ["parent", "portal", "results", "comparison"] },
+  { title: "Payroll & Teacher Rates", href: "/payroll", group: "Finance", icon: Banknote, keywords: ["payroll", "rate", "payout", "sessions", "salary", "teacher"] },
   { title: "Announcements", href: "/announcements", group: "School", icon: Megaphone },
   { title: "Events", href: "/events", group: "School", icon: CalendarDays },
   { title: "Manage events", href: "/events/manage", group: "School", icon: Monitor, keywords: ["events", "registrations"] },
@@ -111,6 +117,14 @@ const navigationItems: NavigationItem[] = [
     teacherOnly: true,
     keywords: ["teacher", "profile", "hub", "attendance", "sessions"],
   },
+  {
+    title: "Child Exam Results & Schedule",
+    href: "/academics/parent",
+    group: "Parent Portal",
+    icon: GraduationCap,
+    parentOnly: true,
+    keywords: ["exam", "results", "midterm", "final", "schedule", "grades"],
+  },
 ]
 
 interface CommandSearchDialogProps {
@@ -140,12 +154,19 @@ export function CommandSearchDialog({ open, onOpenChange }: CommandSearchDialogP
         .filter((item) => item.teacherOnly)
         .map((item) => ({ ...item, href: teacherHref }))
     }
+    if (role === "parent") {
+      return navigationItems.filter((item) => item.parentOnly)
+    }
     if (!isStaffOrAbove(role)) {
       return []
     }
     const admin = isAdmin(role)
     return navigationItems.filter(
-      (item) => !item.studentOnly && !item.teacherOnly && (!item.adminOnly || admin)
+      (item) =>
+        !item.studentOnly &&
+        !item.teacherOnly &&
+        !item.parentOnly &&
+        (!item.adminOnly || admin)
     )
   }, [role, studentHref, teacherHref, user?.is_active])
 

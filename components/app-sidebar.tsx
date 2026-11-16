@@ -28,6 +28,8 @@ import {
   Search,
   Settings,
   MoreVertical,
+  Banknote,
+  Layers,
 } from "lucide-react"
 
 import {
@@ -106,13 +108,27 @@ const staffWorkspaces = [
   },
   {
     title: "Academics",
-    url: "/classes",
+    url: "/academics",
     icon: GraduationCap,
+    isActive: (pathname: string) =>
+      pathname === "/academics" || pathname.startsWith("/academics/"),
+  },
+  {
+    title: "Cohorts & Classes",
+    url: "/classes",
+    icon: Layers,
     isActive: (pathname: string) =>
       pathname === "/classes" ||
       pathname.startsWith("/classes/") ||
       pathname === "/subjects" ||
       pathname.startsWith("/subjects/"),
+  },
+  {
+    title: "Payroll",
+    url: "/payroll",
+    icon: Banknote,
+    isActive: (pathname: string) =>
+      pathname === "/payroll" || pathname.startsWith("/payroll/"),
   },
   {
     title: "Directory",
@@ -196,6 +212,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const showStaffNav = !accountLocked && !accountLoading && isStaffOrAbove(role)
   const showAdminNav = !accountLocked && !accountLoading && isAdmin(role)
   const showStudentNav = !accountLocked && !accountLoading && role === "student"
+  const showParentNav = !accountLocked && !accountLoading && role === "parent"
   const showTeacherNav = !accountLocked && !accountLoading && role === "teacher"
   const showTerminalNav = !accountLocked && !accountLoading && canCheckIn(role) && !showStaffNav
   const unmatchedStudent = role === "student" && account?.student_profile_id == null
@@ -359,6 +376,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 >
                   <QrCode />
                   <span>Home</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Exam Results"
+                  isActive={pathname === "/academics/parent" || pathname.startsWith("/academics/parent/")}
+                  render={<Link href="/academics/parent" onClick={handleNavClick} />}
+                >
+                  <GraduationCap />
+                  <span>Exam Results</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {schoolItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                    render={<Link href={item.url} onClick={handleNavClick} />}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : showParentNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Parent Portal</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Exam Results & Schedule"
+                  isActive={pathname === "/academics/parent" || pathname.startsWith("/academics/parent/")}
+                  render={<Link href="/academics/parent" onClick={handleNavClick} />}
+                >
+                  <GraduationCap />
+                  <span>Exam Results</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {schoolItems.map((item) => (

@@ -63,6 +63,7 @@ export interface Student {
   contact: string | null
   exam_candidate_number: string | null
   user_id: number | null
+  parent_id?: number | null
   /** Present on student detail / token endpoints only — omitted from list responses. */
   check_in_token?: string
   check_in_token_active?: boolean
@@ -545,11 +546,12 @@ export interface User {
   id: number
   username: string
   email: string
-  role: "pending" | "admin" | "staff" | "teacher" | "student" | "terminal"
+  role: "pending" | "admin" | "staff" | "teacher" | "student" | "parent" | "terminal"
   clerk_id: string
   teacher_profile_id: number | null
   student_profile_id: number | null
   staff_profile_id: number | null
+  children_ids?: number[]
   is_active: boolean
   can_delete?: boolean
   delete_blocked_reason?: string | null
@@ -804,4 +806,393 @@ export interface TimetableSlot {
   course_id?: number | null
   cohort_identifier?: string
   course_label?: string
+}
+
+// --- Academics: Exam Tracking, Class Broadsheet & Parent Portal ---
+
+export type ExamTermType = "midterm" | "final"
+export type ExamPassFailStatus = "PASS" | "FAIL" | "PENDING" | "UNPUBLISHED"
+
+export interface AcademicTerm {
+  id: number
+  academic_year: number
+  academic_year_name?: string
+  number: 1 | 2
+  term_type: ExamTermType
+  name: string
+  is_published: boolean
+  published_at: string | null
+  published_by?: number | null
+}
+
+export interface AcademicYear {
+  id: number
+  name: string
+  start_date: string
+  end_date: string
+  is_active: boolean
+  terms: AcademicTerm[]
+}
+
+export interface AcademicYearPayload {
+  name: string
+  start_date: string
+  end_date: string
+  is_active?: boolean
+}
+
+export interface Exam {
+  id: number
+  term: number
+  term_name: string
+  term_type: ExamTermType
+  academic_year_id: number
+  academic_year_name: string
+  class_obj: number
+  class_label: string
+  subject: number
+  subject_name: string
+  title: string
+  exam_date: string
+  start_time: string
+  end_time: string
+  room: string
+  max_marks: string
+  pass_marks: string
+  results_count: number
+  created_by?: number | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ExamPayload {
+  term: number
+  class_obj: number
+  subject: number
+  title?: string
+  exam_date: string
+  start_time: string
+  end_time: string
+  room?: string
+  max_marks?: string | number
+  pass_marks?: string | number
+}
+
+export interface ExamConflictItem {
+  id: number
+  class_obj: number
+  class_label: string
+  subject_id?: number
+  subject_name: string
+  term_id?: number
+  term_name: string
+  exam_date: string
+  start_time: string
+  end_time: string
+  room: string
+  message: string
+}
+
+export interface ExamConflictResponse {
+  has_conflicts: boolean
+  has_room_warnings: boolean
+  cohort_conflicts: ExamConflictItem[]
+  room_conflicts: ExamConflictItem[]
+}
+
+export interface ExamResult {
+  id: number
+  exam: number
+  exam_title?: string
+  student: number
+  student_name?: string
+  student_code?: string | null
+  marks_obtained: string
+  max_marks?: string
+  pass_marks?: string
+  is_absent: boolean
+  percentage: string
+  grade: string
+  passed: boolean
+  status: "PASS" | "FAIL"
+  remarks: string
+  recorded_by?: number | null
+  updated_at?: string
+}
+
+export interface BulkExamMarkRecord {
+  exam_id?: number
+  student_id: number
+  marks_obtained: string | number
+  is_absent?: boolean
+  remarks?: string
+}
+
+export interface BroadsheetSubjectColumn {
+  id: number
+  subject_id: number
+  subject_name: string
+  title: string
+  exam_date: string
+  start_time: string
+  end_time: string
+  room: string
+  max_marks: string
+  pass_marks: string
+  results_count: number
+}
+
+export interface BroadsheetExamCell {
+  exam_id: number
+  subject_id: number
+  subject_name: string
+  result_id: number | null
+  marks_obtained: string | null
+  max_marks: string
+  pass_marks: string
+  is_absent: boolean
+  percentage: string | null
+  grade: string | null
+  passed: boolean | null
+  status: ExamPassFailStatus
+  remarks: string
+}
+
+export interface BroadsheetStudentRow {
+  student_id: number
+  unique_code: string
+  name: string
+  exam_candidate_number: string | null
+  marks_by_exam: Record<string, BroadsheetExamCell>
+  marks_by_subject: Record<string, BroadsheetExamCell>
+  total_marks_obtained: string | null
+  total_max_marks: string | null
+  exams_taken: number
+  exams_total: number
+  average_percentage: string | null
+  letter_grade: string | null
+  pass_fail_status: ExamPassFailStatus
+  rank: number | null
+}
+
+export interface BroadsheetResponse {
+  term: {
+    id: number
+    academic_year_id: number
+    academic_year_name: string
+    number: 1 | 2
+    term_type: ExamTermType
+    name: string
+    is_published: boolean
+    published_at: string | null
+  }
+  class_obj: {
+    id: number
+    label: string
+    education_level: EducationLevel
+    cohort_identifier: string
+    cohort_sub_category: string | null
+  }
+  exams: BroadsheetSubjectColumn[]
+  students: BroadsheetStudentRow[]
+  summary: {
+    enrolled_count: number
+    exams_scheduled_count: number
+    graded_students_count: number
+    pass_count: number
+    fail_count: number
+    pending_count: number
+    pass_rate: string | null
+    class_average_percentage: string | null
+  }
+}
+
+export interface ParentPortalStudentRef {
+  id: number
+  unique_code: string
+  name: string
+  exam_candidate_number: string | null
+  class_labels: string[]
+}
+
+export interface ParentPortalScheduleItem {
+  id: number
+  term_id: number
+  term_number: 1 | 2
+  term_name: string
+  term_type: ExamTermType
+  is_published: boolean
+  class_id: number
+  cohort_label: string
+  subject_id: number
+  subject_name: string
+  title: string
+  exam_date: string
+  start_time: string
+  end_time: string
+  room: string
+  max_marks: string
+  pass_marks: string
+}
+
+export interface ParentPortalTermCell extends BroadsheetExamCell {
+  term_id: number
+  is_published: boolean
+  exam_date: string
+}
+
+export interface ParentPortalSubjectComparison {
+  class_id: number
+  cohort_label: string
+  subject_id: number
+  subject_name: string
+  midterm: ParentPortalTermCell | null
+  final_term: ParentPortalTermCell | null
+  delta_percentage: string | null
+}
+
+export interface ParentPortalTermSummary {
+  term_id: number
+  name: string
+  term_type: ExamTermType
+  is_published: boolean
+  published_at: string | null
+  exams_count: number
+  graded_count: number
+  total_marks_obtained: string | null
+  total_max_marks: string | null
+  average_percentage: string | null
+  letter_grade: string | null
+  pass_fail_status: ExamPassFailStatus
+  class_rank: number | null
+  cohort_size: number | null
+}
+
+export interface ParentPortalResponse {
+  is_admin_preview: boolean
+  accessible_students: ParentPortalStudentRef[]
+  student: ParentPortalStudentRef | null
+  academic_years: AcademicYear[]
+  selected_academic_year: AcademicYear | null
+  enrolled_subjects: {
+    class_id: number
+    cohort_label: string
+    subject_id: number
+    subject_name: string
+  }[]
+  exam_schedule: ParentPortalScheduleItem[]
+  results_comparison: ParentPortalSubjectComparison[]
+  term_summaries: {
+    midterm: ParentPortalTermSummary | null
+    final_term: ParentPortalTermSummary | null
+  }
+}
+
+// --- Payroll: Teacher Rate Engine ---
+
+export type TeacherRateType = "rate_per_session" | "hourly_rate"
+export type TeacherPayoutStatus = "draft" | "approved" | "paid"
+
+export interface CohortRateOverride {
+  id?: number
+  rate_card?: number
+  class_obj: number
+  class_label?: string
+  rate_per_session: string | null
+  hourly_rate: string | null
+}
+
+export interface TeacherRateCard {
+  id: number
+  teacher: number
+  teacher_name: string
+  teacher_code: string | null
+  employment_type: EmploymentType | null
+  rate_type: TeacherRateType
+  rate_per_session: string
+  hourly_rate: string
+  active_base_rate: string
+  currency: string
+  notes: string
+  cohort_overrides: CohortRateOverride[]
+  updated_at: string
+}
+
+export interface TeacherRateCardPayload {
+  teacher_id: number
+  rate_type: TeacherRateType
+  rate_per_session: string | number
+  hourly_rate: string | number
+  currency?: string
+  notes?: string
+  cohort_overrides?: Array<{
+    class_obj_id: number
+    rate_per_session?: string | number | null
+    hourly_rate?: string | number | null
+  }>
+}
+
+export interface PayoutSessionItem {
+  kind: "session" | "adhoc"
+  session_id: number
+  date: string
+  start_time: string
+  end_time: string
+  duration_hours: string
+  class_id: number | null
+  cohort_label: string
+  subject_name: string
+  status: string
+  is_substitute: boolean
+  rate_type: TeacherRateType
+  rate_applied: string
+  is_cohort_override: boolean
+  amount: string
+}
+
+export interface PayoutCohortSummary {
+  class_id: number | null
+  cohort_label: string
+  sessions_count: number
+  completed_count: number
+  scheduled_count: number
+  total_hours: string
+  rate_type: TeacherRateType
+  rate_applied: string
+  is_cohort_override: boolean
+  subtotal: string
+}
+
+export interface TeacherPayout {
+  id: number
+  teacher: number
+  teacher_name: string
+  teacher_code: string | null
+  employment_type: EmploymentType | null
+  currency: string
+  has_rate_card: boolean
+  cohort_overrides_count: number
+  month: string
+  period_start: string
+  period_end: string
+  rate_type: TeacherRateType
+  base_rate: string
+  sessions_count: number
+  completed_sessions_count: number
+  scheduled_sessions_count: number
+  total_hours: string
+  session_earnings: string
+  bonus: string
+  deduction: string
+  adjustment_note: string
+  net_payout: string
+  status: TeacherPayoutStatus
+  session_breakdown: {
+    sessions: PayoutSessionItem[]
+    cohorts: PayoutCohortSummary[]
+  }
+  approved_at: string | null
+  paid_at: string | null
+  updated_by: number | null
+  updated_at: string
 }

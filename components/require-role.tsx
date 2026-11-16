@@ -12,7 +12,7 @@ import {
 } from "@/lib/roles"
 import { Button } from "@/components/ui/button"
 
-type GateMode = "staff" | "admin" | "checkin" | "any" | "student"
+type GateMode = "staff" | "admin" | "checkin" | "any" | "student" | "parent" | "parent_portal"
 
 function allowed(role: Role | null, mode: GateMode): boolean {
   if (!role) return false
@@ -21,6 +21,10 @@ function allowed(role: Role | null, mode: GateMode): boolean {
   if (mode === "staff") return isStaffOrAbove(role)
   if (mode === "checkin") return canCheckIn(role)
   if (mode === "student") return role === "student"
+  if (mode === "parent") return role === "parent"
+  if (mode === "parent_portal") {
+    return role === "parent" || role === "student" || isStaffOrAbove(role)
+  }
   return false
 }
 
@@ -54,7 +58,13 @@ export function RequireRole({
       router.replace("/pending/")
       return
     }
-    if (role === "student" && mode !== "student" && mode !== "any") {
+    if (role === "student" && mode !== "student" && mode !== "parent_portal" && mode !== "any") {
+      if (pathname !== "/") {
+        router.replace("/")
+      }
+      return
+    }
+    if (role === "parent" && mode !== "parent" && mode !== "parent_portal" && mode !== "any") {
       if (pathname !== "/") {
         router.replace("/")
       }

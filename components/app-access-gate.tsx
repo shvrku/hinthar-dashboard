@@ -47,6 +47,10 @@ function isAnnouncementsPath(pathname: string): boolean {
   return pathname === "/announcements" || pathname.startsWith("/announcements/")
 }
 
+function isParentPortalPath(pathname: string): boolean {
+  return pathname === "/academics/parent"
+}
+
 /**
  * Global access gate after Clerk sign-in:
  * - `/` is the post-login dispatcher (all signed-in roles)
@@ -104,9 +108,20 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     if (role === "student") {
       if (
         !isOwnStudentHubPath(pathname, studentProfileId) &&
+        !isParentPortalPath(pathname) &&
         !isAnnouncementsPath(pathname)
       ) {
         router.replace("/")
+      }
+      return
+    }
+
+    if (role === "parent") {
+      if (
+        !isParentPortalPath(pathname) &&
+        !isAnnouncementsPath(pathname)
+      ) {
+        router.replace("/academics/parent/")
       }
       return
     }
@@ -179,7 +194,18 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   }
 
   if (role === "student") {
-    if (!isOwnStudentHubPath(pathname, studentProfileId) && !isAnnouncementsPath(pathname)) {
+    if (
+      !isOwnStudentHubPath(pathname, studentProfileId) &&
+      !isParentPortalPath(pathname) &&
+      !isAnnouncementsPath(pathname)
+    ) {
+      return null
+    }
+    return <>{children}</>
+  }
+
+  if (role === "parent") {
+    if (!isParentPortalPath(pathname) && !isAnnouncementsPath(pathname)) {
       return null
     }
     return <>{children}</>
