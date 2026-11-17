@@ -961,6 +961,7 @@ export interface BroadsheetExamCell {
 export interface BroadsheetStudentRow {
   student_id: number
   unique_code: string
+  student_code?: string
   name: string
   exam_candidate_number: string | null
   marks_by_exam: Record<string, BroadsheetExamCell>
@@ -1010,6 +1011,7 @@ export interface BroadsheetResponse {
 export interface ParentPortalStudentRef {
   id: number
   unique_code: string
+  student_code?: string
   name: string
   exam_candidate_number: string | null
   class_labels: string[]

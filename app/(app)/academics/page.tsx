@@ -26,7 +26,9 @@ import {
 import { ApiError, createApi } from "@/lib/api"
 import { downloadCsv } from "@/lib/export-utils"
 import { formatCohortIdentifier } from "@/lib/format-class"
+import { formatStudentIdentifier } from "@/lib/format-student-code"
 import { useClassesQuery, useSubjectsQuery } from "@/hooks/use-api-queries"
+import AcademicsLoading from "./loading"
 import type {
   AcademicTerm,
   AcademicYear,
@@ -79,11 +81,16 @@ function statusToTelemetry(status: ExamPassFailStatus): TelemetryStatus {
 function previewGrade(marks: number, maxMarks: number, isAbsent: boolean): string {
   if (isAbsent || maxMarks <= 0) return "F"
   const pct = (marks / maxMarks) * 100
+  if (pct >= 90) return "A*"
   if (pct >= 80) return "A"
   if (pct >= 70) return "B"
   if (pct >= 60) return "C"
   if (pct >= 50) return "D"
   return "F"
+}
+
+function roundTwo(val: number): string {
+  return (Math.round((val + Number.EPSILON) * 100) / 100).toFixed(2)
 }
 
 function AcademicsWorkspaceContent() {
@@ -131,18 +138,19 @@ function AcademicsWorkspaceContent() {
 
   // Broadsheet state
   const [broadsheet, setBroadsheet] = React.useState<BroadsheetResponse | null>(null)
-  const [broadsheetLoading, setBroadsheetLoading] = React.useState(false)
+  const [broadsheetLoading, setBroadsheetLoading] = React.useState(true)
   const [broadsheetSearch, setBroadsheetSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<"ALL" | "PASS" | "FAIL" | "PENDING">("ALL")
 
   // Inline mark entry mode inside broadsheet
   const [inlineEditMode, setInlineEditMode] = React.useState(false)
+  const [editingRowStudentId, setEditingRowStudentId] = React.useState<number | null>(null)
   const [inlineDrafts, setInlineDrafts] = React.useState<Record<string, string>>({})
   const [savingInline, setSavingInline] = React.useState(false)
 
   // Exam schedule list state
   const [exams, setExams] = React.useState<Exam[]>([])
-  const [examsLoading, setExamsLoading] = React.useState(false)
+  const [examsLoading, setExamsLoading] = React.useState(true)
   const [scheduleSearch, setScheduleSearch] = React.useState("")
   const [scheduleTermFilter, setScheduleTermFilter] = React.useState<"ALL" | "midterm" | "final">("ALL")
   const [scheduleClassFilter, setScheduleClassFilter] = React.useState<string>("all")
@@ -252,6 +260,9 @@ function AcademicsWorkspaceContent() {
   const loadBroadsheet = React.useCallback(async () => {
     if (!isSignedIn || !activeTerm || !selectedClassId) {
       setBroadsheet(null)
+      if (!yearsLoading && !classesQuery.isLoading) {
+        setBroadsheetLoading(false)
+      }
       return
     }
     setBroadsheetLoading(true)
@@ -264,6 +275,7 @@ function AcademicsWorkspaceContent() {
       )
       setBroadsheet(res)
       setInlineDrafts({})
+      setEditingRowStudentId(null)
     } catch (err) {
       if (err instanceof ApiError) {
         toast.add({ title: err.userMessage, type: "error" })
@@ -271,11 +283,14 @@ function AcademicsWorkspaceContent() {
     } finally {
       setBroadsheetLoading(false)
     }
-  }, [getToken, isSignedIn, activeTerm, selectedClassId])
+  }, [getToken, isSignedIn, activeTerm, selectedClassId, yearsLoading, classesQuery.isLoading])
 
   const loadExams = React.useCallback(async () => {
     if (!isSignedIn || !selectedYearId) {
       setExams([])
+      if (!yearsLoading) {
+        setExamsLoading(false)
+      }
       return
     }
     setExamsLoading(true)
@@ -293,7 +308,7 @@ function AcademicsWorkspaceContent() {
     } finally {
       setExamsLoading(false)
     }
-  }, [getToken, isSignedIn, selectedYearId])
+  }, [getToken, isSignedIn, selectedYearId, yearsLoading])
 
   React.useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -302,10 +317,10 @@ function AcademicsWorkspaceContent() {
   }, [isLoaded, isSignedIn, loadBroadsheet])
 
   React.useEffect(() => {
-    if (isLoaded && isSignedIn && selectedYearId) {
+    if (isLoaded && isSignedIn && !yearsLoading) {
       void loadExams()
     }
-  }, [isLoaded, isSignedIn, selectedYearId, loadExams])
+  }, [isLoaded, isSignedIn, yearsLoading, loadExams])
 
   // Toggle Term Publish
   const handleToggleTermPublish = async (term: AcademicTerm) => {
@@ -676,7 +691,7 @@ function AcademicsWorkspaceContent() {
         const cell = st.marks_by_exam[String(targetExam!.id)]
         return {
           student_id: st.student_id,
-          unique_code: st.unique_code,
+          unique_code: formatStudentIdentifier(st.student_code ?? st.unique_code, st.student_id),
           name: st.name,
           marks_obtained: cell?.marks_obtained ?? "",
           is_absent: cell?.is_absent ?? false,
@@ -717,12 +732,18 @@ function AcademicsWorkspaceContent() {
       const token = await getToken()
       if (!token) return
       const res = await createApi(token).bulkSaveExamMarks(marksExam.id, records)
+      if (res.broadsheet) {
+        setBroadsheet(res.broadsheet)
+      }
       toast.add({
         title: `Saved ${res.saved_count} mark record(s) for ${marksExam.subject_name}`,
         type: "success",
       })
       setMarksSheetOpen(false)
-      await Promise.all([loadBroadsheet(), loadExams()])
+      void loadExams()
+      if (!res.broadsheet) {
+        await loadBroadsheet()
+      }
     } catch (err) {
       toast.add({
         title: err instanceof ApiError ? err.userMessage : "Failed to save exam marks",
@@ -756,19 +777,30 @@ function AcademicsWorkspaceContent() {
     }
     if (records.length === 0) {
       setInlineDrafts({})
+      setEditingRowStudentId(null)
       return
     }
     setSavingInline(true)
     try {
       const token = await getToken()
       if (!token) return
-      const res = await createApi(token).bulkUpsertExamResults(records)
+      const res = await createApi(token).bulkUpsertExamResults(records, {
+        term_id: activeTerm?.id,
+        class_id: selectedClassId ? Number(selectedClassId) : undefined,
+      })
+      if (res.broadsheet) {
+        setBroadsheet(res.broadsheet)
+      }
       toast.add({
         title: `Saved ${res.saved_count} inline exam score(s)`,
         type: "success",
       })
       setInlineDrafts({})
-      await Promise.all([loadBroadsheet(), loadExams()])
+      setEditingRowStudentId(null)
+      void loadExams()
+      if (!res.broadsheet) {
+        await loadBroadsheet()
+      }
     } catch (err) {
       toast.add({
         title: err instanceof ApiError ? err.userMessage : "Failed to save inline marks",
@@ -779,11 +811,126 @@ function AcademicsWorkspaceContent() {
     }
   }
 
+  // Live Broadsheet Recalculation (Total, Avg %, Grade A*-F, Rank, Status) when typing inline drafts
+  const computedBroadsheetStudents = React.useMemo<BroadsheetStudentRow[]>(() => {
+    const list = broadsheet?.students ?? []
+    const termExams = broadsheet?.exams ?? []
+    const hasDrafts = Object.keys(inlineDrafts).length > 0
+
+    const mapped = list.map((row) => {
+      const normalizedCode = formatStudentIdentifier(
+        row.student_code ?? row.unique_code,
+        row.student_id
+      )
+      if (!hasDrafts || termExams.length === 0) {
+        return { ...row, unique_code: normalizedCode }
+      }
+
+      let totalObtained = 0
+      let totalMax = 0
+      let examsTaken = 0
+      let allPassed = true
+
+      for (const exam of termExams) {
+        const draftKey = `${exam.id}:${row.student_id}`
+        const cell = row.marks_by_exam[String(exam.id)]
+        const rawDraft = draftKey in inlineDrafts ? inlineDrafts[draftKey] : undefined
+        const maxVal = Number(exam.max_marks)
+        const passVal = Number(exam.pass_marks)
+
+        if (rawDraft !== undefined) {
+          const trimmed = rawDraft.trim()
+          if (trimmed !== "") {
+            const num = Number(trimmed)
+            if (!Number.isNaN(num) && num >= 0 && maxVal > 0) {
+              examsTaken += 1
+              totalObtained += num
+              totalMax += maxVal
+              if (num < passVal) {
+                allPassed = false
+              }
+            }
+          }
+          continue
+        }
+
+        if (cell && cell.marks_obtained != null) {
+          examsTaken += 1
+          totalObtained += Number(cell.marks_obtained)
+          totalMax += maxVal
+          if (!cell.passed) {
+            allPassed = false
+          }
+        }
+      }
+
+      if (examsTaken === 0 || totalMax <= 0) {
+        return {
+          ...row,
+          unique_code: normalizedCode,
+          total_marks_obtained: null,
+          total_max_marks: null,
+          exams_taken: 0,
+          average_percentage: null,
+          letter_grade: null,
+          pass_fail_status: "PENDING" as ExamPassFailStatus,
+          rank: null,
+        }
+      }
+
+      const avgPct = (totalObtained / totalMax) * 100
+      const roundedAvg = roundTwo(avgPct)
+      const grade = previewGrade(totalObtained, totalMax, false)
+      const pfStatus: ExamPassFailStatus =
+        allPassed && Number(roundedAvg) >= 50 ? "PASS" : "FAIL"
+
+      return {
+        ...row,
+        unique_code: normalizedCode,
+        total_marks_obtained: roundTwo(totalObtained),
+        total_max_marks: roundTwo(totalMax),
+        exams_taken: examsTaken,
+        average_percentage: roundedAvg,
+        letter_grade: grade,
+        pass_fail_status: pfStatus,
+        rank: null,
+      }
+    })
+
+    if (!hasDrafts) return mapped
+
+    const graded = mapped
+      .filter((r) => r.average_percentage != null)
+      .sort((a, b) => {
+        const avgDiff = Number(b.average_percentage) - Number(a.average_percentage)
+        if (avgDiff !== 0) return avgDiff
+        const totDiff = Number(b.total_marks_obtained ?? 0) - Number(a.total_marks_obtained ?? 0)
+        if (totDiff !== 0) return totDiff
+        return a.name.localeCompare(b.name)
+      })
+
+    let prevScore = ""
+    let prevRank = 0
+    const rankMap = new Map<number, number>()
+    graded.forEach((r, idx) => {
+      const scoreKey = `${r.average_percentage}|${r.total_marks_obtained}`
+      if (scoreKey !== prevScore) {
+        prevRank = idx + 1
+        prevScore = scoreKey
+      }
+      rankMap.set(r.student_id, prevRank)
+    })
+
+    return mapped.map((r) => ({
+      ...r,
+      rank: rankMap.get(r.student_id) ?? null,
+    }))
+  }, [broadsheet?.students, broadsheet?.exams, inlineDrafts])
+
   // Filtered Broadsheet Rows
   const filteredBroadsheetStudents = React.useMemo<BroadsheetStudentRow[]>(() => {
-    const list = broadsheet?.students ?? []
     const q = broadsheetSearch.trim().toLowerCase()
-    return list.filter((row) => {
+    return computedBroadsheetStudents.filter((row) => {
       if (statusFilter !== "ALL" && row.pass_fail_status !== statusFilter) {
         return false
       }
@@ -794,7 +941,7 @@ function AcademicsWorkspaceContent() {
         (row.exam_candidate_number ?? "").toLowerCase().includes(q)
       )
     })
-  }, [broadsheet?.students, broadsheetSearch, statusFilter])
+  }, [computedBroadsheetStudents, broadsheetSearch, statusFilter])
 
   // Filtered Schedule Exams
   const filteredExams = React.useMemo(() => {
@@ -821,7 +968,7 @@ function AcademicsWorkspaceContent() {
     const rows = filteredBroadsheetStudents.map((st) => {
       const record: Record<string, unknown> = {
         Rank: st.rank ?? "—",
-        Identifier: st.unique_code,
+        Identifier: formatStudentIdentifier(st.student_code ?? st.unique_code, st.student_id),
         Student: st.name,
       }
       for (const exam of broadsheet.exams) {
@@ -841,6 +988,15 @@ function AcademicsWorkspaceContent() {
       rows
     )
   }
+
+  const isBroadsheetBootstrapping =
+    !isLoaded ||
+    yearsLoading ||
+    classesQuery.isLoading ||
+    broadsheetLoading ||
+    (years.length > 0 && Boolean(activeTerm) && Boolean(selectedClassId) && broadsheet === null)
+
+  const isExamsBootstrapping = !isLoaded || yearsLoading || examsLoading
 
   const passRateNum =
     broadsheet?.summary.pass_rate != null ? Number(broadsheet.summary.pass_rate) : null
@@ -984,7 +1140,7 @@ function AcademicsWorkspaceContent() {
       {/* ===================================================================== */}
       {/* TAB 1: SCHOOL VIEW (CLASS RESULTS BROADSHEET)                         */}
       {/* ===================================================================== */}
-      {activeTab === "broadsheet" && years.length > 0 && (
+      {activeTab === "broadsheet" && (yearsLoading || years.length > 0) && (
         <DataModule
           searchPlaceholder="Filter broadsheet by student name or SPD26-... code..."
           searchValue={broadsheetSearch}
@@ -1132,7 +1288,10 @@ function AcademicsWorkspaceContent() {
                   <Button
                     variant="ghost"
                     size="xs"
-                    onClick={() => setInlineDrafts({})}
+                    onClick={() => {
+                      setInlineDrafts({})
+                      setEditingRowStudentId(null)
+                    }}
                     className="h-7 rounded-sm px-2 font-mono text-[11px] uppercase"
                   >
                     Discard
@@ -1141,36 +1300,42 @@ function AcademicsWorkspaceContent() {
               )}
 
               <Button
-                variant={inlineEditMode ? "default" : "outline"}
+                variant="default"
+                size="xs"
+                onClick={() => {
+                  if (broadsheet && broadsheet.exams.length > 0) {
+                    void openBulkMarksForExam(broadsheet.exams[0].id)
+                  } else {
+                    openNewExamSheet()
+                  }
+                }}
+                disabled={isBroadsheetBootstrapping || !activeTerm || !selectedClassId}
+                className="h-7 rounded-sm font-mono text-[11px] uppercase shadow-none"
+              >
+                <Pencil className="mr-1 size-3" />
+                Enter Marks
+              </Button>
+
+              <Button
+                variant={inlineEditMode ? "secondary" : "outline"}
                 size="xs"
                 onClick={() => {
                   setInlineEditMode((prev) => !prev)
+                  setEditingRowStudentId(null)
                   setInlineDrafts({})
                 }}
-                disabled={!broadsheet || broadsheet.exams.length === 0}
+                disabled={isBroadsheetBootstrapping || !broadsheet || broadsheet.exams.length === 0}
                 className="h-7 rounded-sm font-mono text-[11px] uppercase"
               >
                 <ClipboardEdit className="mr-1 size-3" />
-                {inlineEditMode ? "Exit Inline Marks" : "Inline Marks"}
+                {inlineEditMode ? "Exit Inline Grid" : "Inline Grid"}
               </Button>
-
-              {broadsheet && broadsheet.exams.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  onClick={() => void openBulkMarksForExam(broadsheet.exams[0].id)}
-                  className="h-7 rounded-sm font-mono text-[11px] uppercase"
-                >
-                  <Pencil className="mr-1 size-3" />
-                  Bulk Entry Drawer
-                </Button>
-              )}
 
               <Button
                 variant="outline"
                 size="xs"
                 onClick={handleExportBroadsheetCsv}
-                disabled={!broadsheet || filteredBroadsheetStudents.length === 0}
+                disabled={isBroadsheetBootstrapping || !broadsheet || filteredBroadsheetStudents.length === 0}
                 className="h-7 rounded-sm font-mono text-[11px] uppercase"
               >
                 <Download className="mr-1 size-3" />
@@ -1181,11 +1346,11 @@ function AcademicsWorkspaceContent() {
                 variant="outline"
                 size="xs"
                 onClick={() => void loadBroadsheet()}
-                disabled={broadsheetLoading}
+                disabled={isBroadsheetBootstrapping}
                 className="h-7 rounded-sm font-mono text-[11px] uppercase"
               >
                 <RotateCcw
-                  className={cn("mr-1 size-3", broadsheetLoading && "animate-spin")}
+                  className={cn("mr-1 size-3", isBroadsheetBootstrapping && "animate-spin")}
                 />
                 Refresh
               </Button>
@@ -1194,6 +1359,30 @@ function AcademicsWorkspaceContent() {
           totalCount={filteredBroadsheetStudents.length}
           countLabel="STUDENTS IN COHORT BROADSHEET"
         >
+          {!isBroadsheetBootstrapping && broadsheet && broadsheet.exams.length === 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/20 px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                <div className="space-y-0.5 font-mono text-xs">
+                  <p className="font-semibold uppercase tracking-wider text-foreground">
+                    No Exams Scheduled for {broadsheet.class_obj.label} — {broadsheet.term.name}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    EXAMS SCHEDULED is currently 0 for this cohort and term. Schedule subject exams to populate dynamic score columns and enable bulk mark entry.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="xs"
+                onClick={openNewExamSheet}
+                className="h-7 rounded-sm font-mono text-[11px] uppercase shadow-none"
+              >
+                <Plus className="mr-1 size-3" />
+                Schedule Exam
+              </Button>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow className="h-10 bg-muted/20 hover:bg-muted/20">
@@ -1206,27 +1395,33 @@ function AcademicsWorkspaceContent() {
                 <TableHead className="min-w-[170px] font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Student Name
                 </TableHead>
-                {(broadsheet?.exams ?? []).map((exam) => (
-                  <TableHead
-                    key={exam.id}
-                    className="min-w-[130px] font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => void openBulkMarksForExam(exam.id)}
-                      title="Click to bulk enter marks for this exam"
-                      className="flex flex-col items-start text-left transition-colors hover:text-foreground"
+                {broadsheet && broadsheet.exams.length > 0 ? (
+                  broadsheet.exams.map((exam) => (
+                    <TableHead
+                      key={exam.id}
+                      className="min-w-[135px] font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
                     >
-                      <span className="flex items-center gap-1 text-foreground">
-                        {exam.subject_name}
-                        <Pencil className="size-2.5 text-muted-foreground" />
-                      </span>
-                      <span className="text-[10px] font-normal text-muted-foreground">
-                        /{exam.max_marks} · {exam.exam_date}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => void openBulkMarksForExam(exam.id)}
+                        title="Click to bulk enter marks for this exam"
+                        className="flex flex-col items-start text-left transition-colors hover:text-foreground"
+                      >
+                        <span className="flex items-center gap-1 text-foreground">
+                          {exam.subject_name}
+                          <Pencil className="size-2.5 text-muted-foreground" />
+                        </span>
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          /{exam.max_marks} · {exam.exam_date}
+                        </span>
+                      </button>
+                    </TableHead>
+                  ))
+                ) : (
+                  <TableHead className="min-w-[180px] font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Subject Exams
                   </TableHead>
-                ))}
+                )}
                 <TableHead className="text-right font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Total
                 </TableHead>
@@ -1236,17 +1431,20 @@ function AcademicsWorkspaceContent() {
                 <TableHead className="text-center font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Grade
                 </TableHead>
-                <TableHead className="text-right pr-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="text-right font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Status
+                </TableHead>
+                <TableHead className="w-16 text-right pr-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Edit
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {broadsheetLoading ? (
+              {isBroadsheetBootstrapping ? (
                 Array.from({ length: 6 }).map((_, idx) => (
                   <TableRow key={idx} className="h-11">
                     <TableCell
-                      colSpan={7 + (broadsheet?.exams.length ?? 0)}
+                      colSpan={8 + Math.max(1, broadsheet?.exams.length ?? 0)}
                       className="px-3.5"
                     >
                       <div className="h-4 w-full rounded-sm skeleton-shimmer" />
@@ -1256,116 +1454,166 @@ function AcademicsWorkspaceContent() {
               ) : filteredBroadsheetStudents.length === 0 ? (
                 <TableRow className="h-24">
                   <TableCell
-                    colSpan={7 + (broadsheet?.exams.length ?? 0)}
+                    colSpan={8 + Math.max(1, broadsheet?.exams.length ?? 0)}
                     className="text-center font-mono text-xs text-muted-foreground"
                   >
-                    {broadsheet && broadsheet.exams.length === 0
-                      ? "No exams scheduled for this cohort and term yet. Click 'Schedule Exam' above to add subjects."
-                      : "No students match the current cohort/status filter."}
+                    No students match the current cohort/status filter.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredBroadsheetStudents.map((row) => (
-                  <TableRow key={row.student_id} className="h-11 hover:bg-muted/30">
-                    <TableCell className="px-3.5 font-mono text-xs font-bold tabular-nums text-foreground">
-                      {row.rank != null ? `#${row.rank}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <CodeChip accent>{row.unique_code}</CodeChip>
-                    </TableCell>
-                    <TableCell className="text-xs font-semibold text-foreground">
-                      {row.name}
-                    </TableCell>
-                    {(broadsheet?.exams ?? []).map((exam) => {
-                      const cell = row.marks_by_exam[String(exam.id)]
-                      const draftKey = `${exam.id}:${row.student_id}`
-                      const hasDraft = draftKey in inlineDrafts
-                      const displayVal = hasDraft
-                        ? inlineDrafts[draftKey]
-                        : (cell?.marks_obtained ?? "")
+                filteredBroadsheetStudents.map((row) => {
+                  const rowEditable = inlineEditMode || editingRowStudentId === row.student_id
+                  const rowExams = broadsheet?.exams ?? []
+                  return (
+                    <TableRow key={row.student_id} className="h-11 hover:bg-muted/30">
+                      <TableCell className="px-3.5 font-mono text-xs font-bold tabular-nums text-foreground">
+                        {row.rank != null ? `#${row.rank}` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <CodeChip accent>
+                          {formatStudentIdentifier(row.student_code ?? row.unique_code, row.student_id)}
+                        </CodeChip>
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-foreground">
+                        {row.name}
+                      </TableCell>
+                      {rowExams.length > 0 ? (
+                        rowExams.map((exam) => {
+                          const cell = row.marks_by_exam[String(exam.id)]
+                          const draftKey = `${exam.id}:${row.student_id}`
+                          const hasDraft = draftKey in inlineDrafts
+                          const displayVal = hasDraft
+                            ? inlineDrafts[draftKey]
+                            : (cell?.marks_obtained ?? "")
 
-                      if (inlineEditMode) {
-                        return (
-                          <TableCell key={exam.id}>
-                            <Input
-                              type="number"
-                              min="0"
-                              max={exam.max_marks}
-                              step="0.5"
-                              value={displayVal}
-                              placeholder="—"
-                              onChange={(e) => {
-                                const val = e.target.value
-                                setInlineDrafts((prev) => ({
-                                  ...prev,
-                                  [draftKey]: val,
-                                }))
-                              }}
-                              className={cn(
-                                "h-7 w-24 rounded-sm bg-background font-mono text-xs tabular-nums",
-                                hasDraft && "border-warning ring-1 ring-warning"
+                          if (rowEditable) {
+                            return (
+                              <TableCell key={exam.id}>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={exam.max_marks}
+                                  step="0.5"
+                                  value={displayVal}
+                                  placeholder="—"
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    setInlineDrafts((prev) => ({
+                                      ...prev,
+                                      [draftKey]: val,
+                                    }))
+                                  }}
+                                  className={cn(
+                                    "h-7 w-24 rounded-sm bg-background font-mono text-xs tabular-nums",
+                                    hasDraft && "border-warning ring-1 ring-warning"
+                                  )}
+                                />
+                              </TableCell>
+                            )
+                          }
+
+                          return (
+                            <TableCell key={exam.id}>
+                              {cell && cell.marks_obtained != null ? (
+                                <button
+                                  type="button"
+                                  title="Click to edit score inline or use subject header for bulk modal"
+                                  onClick={() => setEditingRowStudentId(row.student_id)}
+                                  className="inline-flex items-center gap-1.5 rounded-[2px] px-1.5 py-0.5 font-mono text-xs tabular-nums transition-colors hover:bg-muted"
+                                >
+                                  <span
+                                    className={cn(
+                                      "font-semibold",
+                                      cell.passed ? "text-foreground" : "text-destructive"
+                                    )}
+                                  >
+                                    {cell.is_absent ? "ABS" : cell.marks_obtained}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {cell.grade}
+                                  </span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  title="Click to enter score inline"
+                                  onClick={() => setEditingRowStudentId(row.student_id)}
+                                  className="rounded-[2px] px-1.5 py-0.5 font-mono text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                  —
+                                </button>
                               )}
-                            />
-                          </TableCell>
-                        )
-                      }
-
-                      return (
-                        <TableCell key={exam.id}>
-                          {cell && cell.marks_obtained != null ? (
-                            <button
-                              type="button"
-                              onClick={() => void openBulkMarksForExam(exam.id)}
-                              className="inline-flex items-center gap-1.5 rounded-[2px] px-1 py-0.5 font-mono text-xs tabular-nums transition-colors hover:bg-muted"
-                            >
-                              <span
-                                className={cn(
-                                  "font-semibold",
-                                  cell.passed ? "text-foreground" : "text-destructive"
-                                )}
-                              >
-                                {cell.is_absent ? "ABS" : cell.marks_obtained}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {cell.grade}
-                              </span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => void openBulkMarksForExam(exam.id)}
-                              className="font-mono text-xs text-muted-foreground/60 hover:text-foreground"
-                            >
-                              —
-                            </button>
-                          )}
-                        </TableCell>
-                      )
-                    })}
-                    <TableCell className="text-right font-mono text-xs font-semibold tabular-nums text-foreground">
-                      {row.total_marks_obtained != null
-                        ? `${row.total_marks_obtained} / ${row.total_max_marks}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs font-bold tabular-nums text-foreground">
-                      {row.average_percentage != null
-                        ? `${row.average_percentage}%`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.letter_grade ? (
-                        <CodeChip accent>{row.letter_grade}</CodeChip>
+                            </TableCell>
+                          )
+                        })
                       ) : (
-                        <span className="font-mono text-xs text-muted-foreground">—</span>
+                        <TableCell className="font-mono text-[11px] text-muted-foreground/70">
+                          No exams scheduled
+                        </TableCell>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right pr-3.5">
-                      <TelemetryTag status={statusToTelemetry(row.pass_fail_status)}>
-                        {row.pass_fail_status}
-                      </TelemetryTag>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      <TableCell className="text-right font-mono text-xs font-semibold tabular-nums text-foreground">
+                        {row.total_marks_obtained != null
+                          ? `${row.total_marks_obtained} / ${row.total_max_marks}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold tabular-nums text-foreground">
+                        {row.average_percentage != null
+                          ? `${row.average_percentage}%`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.letter_grade ? (
+                          <CodeChip accent>{row.letter_grade}</CodeChip>
+                        ) : (
+                          <span className="font-mono text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <TelemetryTag status={statusToTelemetry(row.pass_fail_status)}>
+                          {row.pass_fail_status}
+                        </TelemetryTag>
+                      </TableCell>
+                      <TableCell className="text-right pr-3.5">
+                        {rowExams.length > 0 ? (
+                          rowEditable ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              disabled={savingInline}
+                              onClick={() => {
+                                if (inlineDirtyCount > 0) {
+                                  void handleSaveInlineMarks()
+                                } else {
+                                  setEditingRowStudentId(null)
+                                }
+                              }}
+                              title="Save row marks"
+                              className="h-7 rounded-sm px-2 font-mono text-[10px] uppercase"
+                            >
+                              {savingInline ? (
+                                <Loader2 className="size-3 animate-spin" />
+                              ) : (
+                                <Save className="size-3" />
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => setEditingRowStudentId(row.student_id)}
+                              title={`Inline edit marks for ${row.name}`}
+                              className="h-7 rounded-sm px-2 text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="size-3" />
+                            </Button>
+                          )
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
@@ -1596,7 +1844,7 @@ function AcademicsWorkspaceContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {examsLoading ? (
+                {isExamsBootstrapping ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="h-10">
                       <TableCell colSpan={9} className="px-3.5">
@@ -2087,6 +2335,34 @@ function AcademicsWorkspaceContent() {
           </>
         }
       >
+        {broadsheet && broadsheet.exams.length > 1 && (
+          <div className="mb-3 space-y-1.5">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Switch Scheduled Subject Exam
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {broadsheet.exams.map((ex) => {
+                const active = marksExam?.id === ex.id
+                return (
+                  <button
+                    key={ex.id}
+                    type="button"
+                    disabled={loadingMarksSheet || savingMarksSheet}
+                    onClick={() => void openBulkMarksForExam(ex.id)}
+                    className={cn(
+                      "rounded-[2px] border px-2 py-1 font-mono text-[11px] font-semibold transition-colors",
+                      active
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {ex.subject_name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         {loadingMarksSheet ? (
           <div className="space-y-2.5">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -2229,7 +2505,7 @@ function AcademicsWorkspaceContent() {
 
 export default function AcademicsPage() {
   return (
-    <RequireRole mode="staff">
+    <RequireRole mode="staff" skeleton={<AcademicsLoading />}>
       <AcademicsWorkspaceContent />
     </RequireRole>
   )

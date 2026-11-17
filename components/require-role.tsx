@@ -11,6 +11,7 @@ import {
   type Role,
 } from "@/lib/roles"
 import { Button } from "@/components/ui/button"
+import { DashboardOverviewSkeleton } from "@/components/page-skeletons"
 
 type GateMode = "staff" | "admin" | "checkin" | "any" | "student" | "parent" | "parent_portal"
 
@@ -30,9 +31,11 @@ function allowed(role: Role | null, mode: GateMode): boolean {
 
 export function RequireRole({
   mode = "staff",
+  skeleton,
   children,
 }: {
   mode?: GateMode
+  skeleton?: React.ReactNode
   children: React.ReactNode
 }) {
   const { role, user, loading, error } = useCurrentUser()
@@ -78,7 +81,13 @@ export function RequireRole({
   }, [loading, role, waitingForLink, accountLocked, pathname, router, mode])
 
   if (loading) {
-    return null
+    return (
+      skeleton ?? (
+        <div className="flex flex-col gap-5 p-4 sm:p-6">
+          <DashboardOverviewSkeleton />
+        </div>
+      )
+    )
   }
 
   if (error) {

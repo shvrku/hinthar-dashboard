@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 
 import { ApiError, createApi } from "@/lib/api"
+import { formatStudentIdentifier } from "@/lib/format-student-code"
 import { isStaffOrAbove } from "@/lib/roles"
 import type {
   ExamPassFailStatus,
@@ -287,7 +288,7 @@ export function ParentPortalWorkspace({
                 <SelectTrigger className="h-8 min-w-[270px] rounded-sm border-border bg-background font-mono text-xs">
                   <span className="truncate">
                     {student
-                      ? `${student.unique_code} · ${student.name}${
+                      ? `${formatStudentIdentifier(student.student_code ?? student.unique_code, student.id)} · ${student.name}${
                           student.class_labels.length > 0
                             ? ` (${student.class_labels.join(", ")})`
                             : ""
@@ -298,7 +299,7 @@ export function ParentPortalWorkspace({
                 <SelectContent className="max-h-72">
                   {accessibleStudents.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)} className="font-mono text-xs">
-                      {s.unique_code} · {s.name}
+                      {formatStudentIdentifier(s.student_code ?? s.unique_code, s.id)} · {s.name}
                       {s.class_labels.length > 0
                         ? ` (${s.class_labels.join(", ")})`
                         : ""}
@@ -328,7 +329,7 @@ export function ParentPortalWorkspace({
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {child.unique_code} · {child.name}
+                      {formatStudentIdentifier(child.student_code ?? child.unique_code, child.id)} · {child.name}
                     </button>
                   )
                 })}
@@ -336,7 +337,9 @@ export function ParentPortalWorkspace({
             </>
           ) : student ? (
             <div className="flex flex-wrap items-center gap-2">
-              <CodeChip accent>{student.unique_code}</CodeChip>
+              <CodeChip accent>
+                {formatStudentIdentifier(student.student_code ?? student.unique_code, student.id)}
+              </CodeChip>
               <span className="text-xs font-semibold text-foreground">
                 {student.name}
               </span>
@@ -401,7 +404,9 @@ export function ParentPortalWorkspace({
           </span>{" "}
           Displays only{" "}
           <span className="font-semibold text-foreground">
-            {student ? `${student.name} (${student.unique_code})` : "the selected child"}
+            {student
+              ? `${student.name} (${formatStudentIdentifier(student.student_code ?? student.unique_code, student.id)})`
+              : "the selected child"}
           </span>
           &apos;s enrolled subjects and formal Midterm / Final Term assessments. Exam schedules remain
           visible ahead of results release; marks appear once the administration publishes each term.

@@ -1246,6 +1246,7 @@ export function createApi(token: string) {
         exam_id: number
         saved_count: number
         results: import("./types").ExamResult[]
+        broadsheet?: import("./types").BroadsheetResponse
       }>(`/exams/${examId}/bulk_marks/`, token, {
         method: "POST",
         body: JSON.stringify({ records }),
@@ -1254,13 +1255,21 @@ export function createApi(token: string) {
     listExamResults: (params?: Record<string, string | number | undefined | null>) =>
       fetchAllPages<import("./types").ExamResult>(`/exam-results/`, token, params),
 
-    bulkUpsertExamResults: (records: import("./types").BulkExamMarkRecord[]) =>
+    bulkUpsertExamResults: (
+      records: import("./types").BulkExamMarkRecord[],
+      context?: { term_id?: number; class_id?: number }
+    ) =>
       request<{
         saved_count: number
         results: import("./types").ExamResult[]
+        broadsheet?: import("./types").BroadsheetResponse
       }>(`/exam-results/bulk_upsert/`, token, {
         method: "POST",
-        body: JSON.stringify({ records }),
+        body: JSON.stringify({
+          records,
+          ...(context?.term_id != null ? { term_id: context.term_id } : {}),
+          ...(context?.class_id != null ? { class_id: context.class_id } : {}),
+        }),
       }),
 
     getClassBroadsheet: (termId: number, classId: number) =>

@@ -4,6 +4,7 @@ import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { useCurrentUser } from "@/components/current-user-provider"
+import { DashboardOverviewSkeleton } from "@/components/page-skeletons"
 import { canCheckIn, isStaffOrAbove } from "@/lib/roles"
 
 /** Normalize `/pending/` → `/pending` so trailingSlash config doesn't blank the page. */
@@ -153,7 +154,11 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   ])
 
   if (!authLoaded || (isSignedIn && loading)) {
-    return null
+    return (
+      <div className="flex flex-col gap-5 p-4 sm:p-6">
+        <DashboardOverviewSkeleton />
+      </div>
+    )
   }
 
   if (!isSignedIn) {

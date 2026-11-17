@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useCurrentUser } from "@/components/current-user-provider"
 import { isStaffOrAbove } from "@/lib/roles"
+import { DashboardOverviewSkeleton } from "@/components/page-skeletons"
 
 /**
  * Post-login role dispatcher. Not a product page — `/` stays free for a future
@@ -54,5 +55,9 @@ export default function RoleHomeDispatcher() {
     }
   }, [loading, role, studentId, teacherId, user?.is_active, router])
 
-  return null
+  return (
+    <div className="flex flex-col gap-5">
+      <DashboardOverviewSkeleton />
+    </div>
+  )
 }
