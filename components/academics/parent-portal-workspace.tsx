@@ -69,7 +69,7 @@ function renderTermCell(
     )
   }
 
-  if (cell.status === "UNPUBLISHED") {
+  if (cell.status === "UNPUBLISHED" || (!cell.is_published && !isAdminPreview)) {
     return (
       <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
         <Lock className="size-3" />
@@ -166,8 +166,35 @@ export function ParentPortalWorkspace({
     }
   }, [isLoaded, isSignedIn, loadPortal])
 
+  const student = data?.student ?? null
+  const isAdminPreview = Boolean(data?.is_admin_preview) && isStaff && role !== "parent"
+
+  const assignedClassIds = React.useMemo(
+    () => new Set(student?.class_ids ?? []),
+    [student?.class_ids]
+  )
+  const assignedClassLabels = React.useMemo(
+    () => new Set(student?.class_labels ?? []),
+    [student?.class_labels]
+  )
+
+  const matchesStudentCohort = React.useCallback(
+    (classId: number, cohortLabel: string) => {
+      if (assignedClassIds.size > 0) {
+        return assignedClassIds.has(classId)
+      }
+      if (assignedClassLabels.size > 0) {
+        return assignedClassLabels.has(cohortLabel)
+      }
+      return true
+    },
+    [assignedClassIds, assignedClassLabels]
+  )
+
   const filteredComparison = React.useMemo(() => {
-    const rows = data?.results_comparison ?? []
+    const rows = (data?.results_comparison ?? []).filter((r) =>
+      matchesStudentCohort(r.class_id, r.cohort_label)
+    )
     const q = searchQuery.trim().toLowerCase()
     if (!q) return rows
     return rows.filter(
@@ -175,10 +202,12 @@ export function ParentPortalWorkspace({
         r.subject_name.toLowerCase().includes(q) ||
         r.cohort_label.toLowerCase().includes(q)
     )
-  }, [data?.results_comparison, searchQuery])
+  }, [data?.results_comparison, searchQuery, matchesStudentCohort])
 
   const filteredSchedule = React.useMemo(() => {
-    const rows = data?.exam_schedule ?? []
+    const rows = (data?.exam_schedule ?? []).filter((e) =>
+      matchesStudentCohort(e.class_id, e.cohort_label)
+    )
     return rows.filter((e) => {
       if (scheduleTermFilter !== "ALL" && e.term_type !== scheduleTermFilter) {
         return false
@@ -193,11 +222,10 @@ export function ParentPortalWorkspace({
       }
       return true
     })
-  }, [data?.exam_schedule, scheduleTermFilter, searchQuery])
+  }, [data?.exam_schedule, scheduleTermFilter, searchQuery, matchesStudentCohort])
 
   const midtermSummary = data?.term_summaries?.midterm ?? null
   const finalSummary = data?.term_summaries?.final_term ?? null
-  const student = data?.student ?? null
   const accessibleStudents = data?.accessible_students ?? []
 
   if (!isLoaded) {
@@ -220,37 +248,49 @@ export function ParentPortalWorkspace({
           metrics={[
             {
               label: "ENROLLED SUBJECTS",
-              value: data?.enrolled_subjects.length ?? 0,
+              value: filteredComparison.length || (data?.enrolled_subjects.length ?? 0),
             },
             {
               label: "MIDTERM AVG",
               value:
-                midtermSummary?.average_percentage != null
+                midtermSummary &&
+                (midtermSummary.is_published || isAdminPreview) &&
+                midtermSummary.average_percentage != null
                   ? `${midtermSummary.average_percentage}% (${midtermSummary.letter_grade ?? "—"})`
-                  : midtermSummary?.pass_fail_status === "UNPUBLISHED"
+                  : midtermSummary &&
+                      (!midtermSummary.is_published && !isAdminPreview)
                     ? "LOCKED"
                     : "—",
               tone:
-                midtermSummary?.pass_fail_status === "PASS"
-                  ? "success"
-                  : midtermSummary?.pass_fail_status === "FAIL"
-                    ? "destructive"
-                    : "default",
+                midtermSummary &&
+                (midtermSummary.is_published || isAdminPreview)
+                  ? midtermSummary.pass_fail_status === "PASS"
+                    ? "success"
+                    : midtermSummary.pass_fail_status === "FAIL"
+                      ? "destructive"
+                      : "default"
+                  : "default",
             },
             {
               label: "FINAL TERM AVG",
               value:
-                finalSummary?.average_percentage != null
+                finalSummary &&
+                (finalSummary.is_published || isAdminPreview) &&
+                finalSummary.average_percentage != null
                   ? `${finalSummary.average_percentage}% (${finalSummary.letter_grade ?? "—"})`
-                  : finalSummary?.pass_fail_status === "UNPUBLISHED"
+                  : finalSummary &&
+                      (!finalSummary.is_published && !isAdminPreview)
                     ? "LOCKED"
                     : "—",
               tone:
-                finalSummary?.pass_fail_status === "PASS"
-                  ? "success"
-                  : finalSummary?.pass_fail_status === "FAIL"
-                    ? "destructive"
-                    : "default",
+                finalSummary &&
+                (finalSummary.is_published || isAdminPreview)
+                  ? finalSummary.pass_fail_status === "PASS"
+                    ? "success"
+                    : finalSummary.pass_fail_status === "FAIL"
+                      ? "destructive"
+                      : "default"
+                  : "default",
             },
           ]}
           actions={
@@ -433,7 +473,7 @@ export function ParentPortalWorkspace({
             { label: "TERM 02 // FINAL TERM", summary: finalSummary },
           ].map(({ label, summary }) => {
             const unpublished =
-              summary && !summary.is_published && !data?.is_admin_preview
+              summary && !summary.is_published && !isAdminPreview
             return (
               <div
                 key={label}
@@ -451,7 +491,7 @@ export function ParentPortalWorkspace({
                       <TelemetryTag status={summary.is_published ? "present" : "neutral"}>
                         {summary.is_published ? "PUBLISHED" : "UNPUBLISHED"}
                       </TelemetryTag>
-                      {summary.pass_fail_status !== "UNPUBLISHED" && (
+                      {!unpublished && summary.pass_fail_status !== "UNPUBLISHED" && (
                         <TelemetryTag status={statusToTelemetry(summary.pass_fail_status)}>
                           {summary.pass_fail_status}
                         </TelemetryTag>
@@ -584,12 +624,28 @@ export function ParentPortalWorkspace({
                 </TableRow>
               ) : (
                 filteredComparison.map((row) => {
+                  const midVisible = Boolean(row.midterm && (row.midterm.is_published || isAdminPreview))
+                  const finVisible = Boolean(row.final_term && (row.final_term.is_published || isAdminPreview))
+                  const midStatus: ExamPassFailStatus | null = row.midterm
+                    ? midVisible
+                      ? row.midterm.status
+                      : "UNPUBLISHED"
+                    : null
+                  const finStatus: ExamPassFailStatus | null = row.final_term
+                    ? finVisible
+                      ? row.final_term.status
+                      : "UNPUBLISHED"
+                    : null
                   const deltaNum =
+                    midVisible &&
+                    finVisible &&
                     row.delta_percentage != null
                       ? Number(row.delta_percentage)
                       : null
                   const remarkText =
-                    row.final_term?.remarks || row.midterm?.remarks || "—"
+                    (finVisible ? row.final_term?.remarks : "") ||
+                    (midVisible ? row.midterm?.remarks : "") ||
+                    "—"
 
                   return (
                     <TableRow
@@ -603,24 +659,24 @@ export function ParentPortalWorkspace({
                         <CodeChip>{row.cohort_label}</CodeChip>
                       </TableCell>
                       <TableCell>
-                        {renderTermCell(row.midterm, Boolean(data?.is_admin_preview))}
+                        {renderTermCell(row.midterm, isAdminPreview)}
                       </TableCell>
                       <TableCell>
-                        {row.midterm ? (
-                          <TelemetryTag status={statusToTelemetry(row.midterm.status)}>
-                            {row.midterm.status}
+                        {midStatus ? (
+                          <TelemetryTag status={statusToTelemetry(midStatus)}>
+                            {midStatus}
                           </TelemetryTag>
                         ) : (
                           <span className="font-mono text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        {renderTermCell(row.final_term, Boolean(data?.is_admin_preview))}
+                        {renderTermCell(row.final_term, isAdminPreview)}
                       </TableCell>
                       <TableCell>
-                        {row.final_term ? (
-                          <TelemetryTag status={statusToTelemetry(row.final_term.status)}>
-                            {row.final_term.status}
+                        {finStatus ? (
+                          <TelemetryTag status={statusToTelemetry(finStatus)}>
+                            {finStatus}
                           </TelemetryTag>
                         ) : (
                           <span className="font-mono text-xs text-muted-foreground">—</span>

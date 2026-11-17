@@ -1014,6 +1014,7 @@ export interface ParentPortalStudentRef {
   student_code?: string
   name: string
   exam_candidate_number: string | null
+  class_ids?: number[]
   class_labels: string[]
 }
 
