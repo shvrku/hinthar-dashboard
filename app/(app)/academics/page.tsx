@@ -147,12 +147,14 @@ function AcademicsWorkspaceContent() {
   const [scheduleTermFilter, setScheduleTermFilter] = React.useState<"ALL" | "midterm" | "final">("ALL")
   const [scheduleClassFilter, setScheduleClassFilter] = React.useState<string>("all")
 
-  // Create Academic Year InspectorSheet
+  // Create / Delete Academic Year InspectorSheet
   const [yearSheetOpen, setYearSheetOpen] = React.useState(false)
   const [yearName, setYearName] = React.useState("2026-2027")
   const [yearStart, setYearStart] = React.useState("2026-06-01")
   const [yearEnd, setYearEnd] = React.useState("2027-05-31")
   const [savingYear, setSavingYear] = React.useState(false)
+  const [deleteYearTarget, setDeleteYearTarget] = React.useState<AcademicYear | null>(null)
+  const [deletingYear, setDeletingYear] = React.useState(false)
 
   // Create / Edit Exam InspectorSheet
   const [examSheetOpen, setExamSheetOpen] = React.useState(false)
@@ -212,6 +214,8 @@ function AcademicsWorkspaceContent() {
           const activeYr = res.find((y) => y.is_active) ?? res[0]
           return String(activeYr.id)
         })
+      } else {
+        setSelectedYearId("")
       }
     } catch (err) {
       if (err instanceof ApiError) {
@@ -327,9 +331,127 @@ function AcademicsWorkspaceContent() {
     }
   }
 
+  // Academic Year Auto-Sync & Conflict Validation
+  const openCreateYearSheet = React.useCallback(() => {
+    let nextStart = new Date().getFullYear()
+    for (const y of years) {
+      const m = /^(\d{4})-(\d{4})$/.exec(y.name.trim())
+      const endYr = m ? Number(m[2]) : Number(y.end_date.slice(0, 4))
+      if (!Number.isNaN(endYr) && endYr >= nextStart) {
+        nextStart = endYr
+      }
+    }
+    const nextEnd = nextStart + 1
+    setYearName(`${nextStart}-${nextEnd}`)
+    setYearStart(`${nextStart}-06-01`)
+    setYearEnd(`${nextEnd}-05-31`)
+    setYearSheetOpen(true)
+  }, [years])
+
+  const handleYearNameChange = (val: string) => {
+    setYearName(val)
+    const match = /^(\d{4})-(\d{4})$/.exec(val.trim())
+    if (match) {
+      const y1 = Number(match[1])
+      const y2 = Number(match[2])
+      if (y2 === y1 + 1) {
+        const startSuffix = /^\d{4}-\d{2}-\d{2}$/.test(yearStart)
+          ? yearStart.slice(4)
+          : "-06-01"
+        const endSuffix = /^\d{4}-\d{2}-\d{2}$/.test(yearEnd)
+          ? yearEnd.slice(4)
+          : "-05-31"
+        setYearStart(`${y1}${startSuffix}`)
+        setYearEnd(`${y2}${endSuffix}`)
+      }
+    }
+  }
+
+  const handleYearStartChange = (val: string) => {
+    setYearStart(val)
+    const yMatch = /^(\d{4})-\d{2}-\d{2}$/.exec(val)
+    if (yMatch) {
+      const y1 = Number(yMatch[1])
+      const y2 = y1 + 1
+      const endSuffix = /^\d{4}-\d{2}-\d{2}$/.test(yearEnd)
+        ? yearEnd.slice(4)
+        : "-05-31"
+      setYearName(`${y1}-${y2}`)
+      setYearEnd(`${y2}${endSuffix}`)
+    }
+  }
+
+  const yearConflicts = React.useMemo(() => {
+    const issues: string[] = []
+    const trimmed = yearName.trim()
+    const match = /^(\d{4})-(\d{4})$/.exec(trimmed)
+    let startYr: number | null = null
+    let endYr: number | null = null
+
+    if (!match) {
+      issues.push("Label must follow YYYY-YYYY format (e.g. 2026-2027).")
+    } else {
+      startYr = Number(match[1])
+      endYr = Number(match[2])
+      if (endYr <= startYr) {
+        issues.push(
+          `Invalid year order (${trimmed}): end year (${endYr}) must be after start year (${startYr}), e.g. ${startYr}-${startYr + 1}.`
+        )
+      } else if (endYr !== startYr + 1) {
+        issues.push(
+          `Academic year label must span two consecutive years (expected ${startYr}-${startYr + 1}).`
+        )
+      }
+    }
+
+    if (!yearStart || !yearEnd) {
+      issues.push("Start Date and End Date are required.")
+    } else {
+      if (yearEnd <= yearStart) {
+        issues.push("End Date must be after Start Date.")
+      }
+      if (startYr !== null && endYr !== null && endYr === startYr + 1) {
+        const startDateYear = Number(yearStart.slice(0, 4))
+        const endDateYear = Number(yearEnd.slice(0, 4))
+        if (startDateYear !== startYr) {
+          issues.push(
+            `Start Date year (${startDateYear}) does not match label start year (${startYr}).`
+          )
+        }
+        if (endDateYear !== endYr) {
+          issues.push(
+            `End Date year (${endDateYear}) does not match label end year (${endYr}).`
+          )
+        }
+      }
+    }
+
+    if (trimmed && years.some((y) => y.name.toLowerCase() === trimmed.toLowerCase())) {
+      issues.push(`Academic Year "${trimmed}" already exists.`)
+    }
+
+    if (yearStart && yearEnd && yearEnd > yearStart) {
+      for (const y of years) {
+        if (yearStart <= y.end_date && yearEnd >= y.start_date) {
+          issues.push(
+            `Date overlap: ${yearStart} → ${yearEnd} overlaps existing Academic Year ${y.name} (${y.start_date} → ${y.end_date}).`
+          )
+        }
+      }
+    }
+
+    return issues
+  }, [yearName, yearStart, yearEnd, years])
+
+  const examDateOutOfRange = React.useMemo(() => {
+    if (!selectedYear || !examDate) return false
+    return examDate < selectedYear.start_date || examDate > selectedYear.end_date
+  }, [selectedYear, examDate])
+
   // Create Academic Year
   const handleCreateYear = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (yearConflicts.length > 0) return
     if (!yearName.trim() || !yearStart || !yearEnd) return
     setSavingYear(true)
     try {
@@ -358,6 +480,29 @@ function AcademicsWorkspaceContent() {
     }
   }
 
+  const handleDeleteYear = async () => {
+    if (!deleteYearTarget) return
+    setDeletingYear(true)
+    try {
+      const token = await getToken()
+      if (!token) return
+      await createApi(token).deleteAcademicYear(deleteYearTarget.id)
+      toast.add({
+        title: `Deleted Academic Year ${deleteYearTarget.name}`,
+        type: "success",
+      })
+      setDeleteYearTarget(null)
+      await Promise.all([loadYears(), loadExams(), loadBroadsheet()])
+    } catch (err) {
+      toast.add({
+        title: err instanceof ApiError ? err.userMessage : "Failed to delete academic year",
+        type: "error",
+      })
+    } finally {
+      setDeletingYear(false)
+    }
+  }
+
   // Open Schedule / Edit Exam Drawer
   const openNewExamSheet = () => {
     setEditingExam(null)
@@ -365,7 +510,15 @@ function AcademicsWorkspaceContent() {
     setExamClassId(selectedClassId || (classes[0] ? String(classes[0].id) : ""))
     setExamSubjectId(subjects[0] ? String(subjects[0].id) : "")
     setExamTitle("")
-    setExamDate(new Date().toISOString().slice(0, 10))
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const clampedDate = selectedYear
+      ? todayIso < selectedYear.start_date
+        ? selectedYear.start_date
+        : todayIso > selectedYear.end_date
+          ? selectedYear.end_date
+          : todayIso
+      : todayIso
+    setExamDate(clampedDate)
     setExamStartTime("09:00")
     setExamEndTime("11:00")
     setExamRoom("HALL-101")
@@ -413,6 +566,8 @@ function AcademicsWorkspaceContent() {
           end_time: examEndTime,
           room: examRoom,
           exclude_id: editingExam?.id,
+          term_id: examTermId ? Number(examTermId) : undefined,
+          subject_id: examSubjectId ? Number(examSubjectId) : undefined,
         })
         setConflictCheck(res)
       } catch {
@@ -425,6 +580,8 @@ function AcademicsWorkspaceContent() {
   }, [
     examSheetOpen,
     examClassId,
+    examTermId,
+    examSubjectId,
     examDate,
     examStartTime,
     examEndTime,
@@ -815,7 +972,7 @@ function AcademicsWorkspaceContent() {
           </p>
           <Button
             size="sm"
-            onClick={() => setYearSheetOpen(true)}
+            onClick={openCreateYearSheet}
             className="mt-4 rounded-sm font-mono text-xs uppercase"
           >
             <Plus className="mr-1.5 size-3.5" />
@@ -859,12 +1016,24 @@ function AcademicsWorkspaceContent() {
                   type="button"
                   variant="outline"
                   size="xs"
-                  onClick={() => setYearSheetOpen(true)}
+                  onClick={openCreateYearSheet}
                   title="Create Academic Year"
                   className="h-8 rounded-sm px-2 font-mono text-[11px]"
                 >
                   <Plus className="size-3.5" />
                 </Button>
+                {selectedYear && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setDeleteYearTarget(selectedYear)}
+                    title={`Delete Academic Year ${selectedYear.name}`}
+                    className="h-8 rounded-sm px-2 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                )}
               </div>
 
               {/* Fixed Term Switcher (Midterm / Final Term) */}
@@ -1241,15 +1410,29 @@ function AcademicsWorkspaceContent() {
                 )}
               </div>
 
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => setYearSheetOpen(true)}
-                className="h-8 rounded-sm font-mono text-[11px] uppercase"
-              >
-                <Plus className="mr-1 size-3" />
-                New Academic Year
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {selectedYear && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setDeleteYearTarget(selectedYear)}
+                    title={`Delete Academic Year ${selectedYear.name}`}
+                    className="h-8 rounded-sm px-2.5 font-mono text-[11px] uppercase text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="mr-1 size-3" />
+                    Delete Year
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={openCreateYearSheet}
+                  className="h-8 rounded-sm font-mono text-[11px] uppercase"
+                >
+                  <Plus className="mr-1 size-3" />
+                  New Academic Year
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1527,7 +1710,7 @@ function AcademicsWorkspaceContent() {
               size="sm"
               form="create-year-form"
               type="submit"
-              disabled={savingYear}
+              disabled={savingYear || yearConflicts.length > 0}
               className="rounded-sm font-mono text-xs uppercase"
             >
               {savingYear && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
@@ -1544,8 +1727,8 @@ function AcademicsWorkspaceContent() {
             <Input
               required
               value={yearName}
-              onChange={(e) => setYearName(e.target.value)}
-              placeholder="e.g. 2026-2027"
+              onChange={(e) => handleYearNameChange(e.target.value)}
+              placeholder="e.g. 2027-2028"
               className="h-9 rounded-sm font-mono text-xs"
             />
           </div>
@@ -1558,7 +1741,7 @@ function AcademicsWorkspaceContent() {
                 type="date"
                 required
                 value={yearStart}
-                onChange={(e) => setYearStart(e.target.value)}
+                onChange={(e) => handleYearStartChange(e.target.value)}
                 className="h-9 rounded-sm font-mono text-xs"
               />
             </div>
@@ -1575,6 +1758,26 @@ function AcademicsWorkspaceContent() {
               />
             </div>
           </div>
+
+          {yearConflicts.length > 0 ? (
+            <div className="space-y-1.5 rounded-sm border border-destructive/40 bg-destructive/10 p-3 font-mono text-xs text-destructive">
+              <div className="flex items-center gap-1.5 font-bold uppercase">
+                <AlertTriangle className="size-3.5" />
+                Academic Year Conflict
+              </div>
+              {yearConflicts.map((msg) => (
+                <p key={msg} className="leading-snug">
+                  {msg}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-sm border border-success/30 bg-success/10 p-2.5 font-mono text-xs text-success">
+              <CheckCircle2 className="size-3.5 shrink-0" />
+              Valid consecutive Academic Year window without date overlaps.
+            </div>
+          )}
+
           <div className="rounded-sm border border-border bg-muted/25 p-3 font-mono text-[11px] text-muted-foreground">
             Creating this record automatically initializes{" "}
             <strong className="text-foreground">Term 1: Midterm</strong> and{" "}
@@ -1607,7 +1810,11 @@ function AcademicsWorkspaceContent() {
               size="sm"
               form="exam-schedule-form"
               type="submit"
-              disabled={savingExam || Boolean(conflictCheck?.has_conflicts)}
+              disabled={
+                savingExam ||
+                examDateOutOfRange ||
+                Boolean(conflictCheck?.has_conflicts)
+              }
               className="rounded-sm font-mono text-xs uppercase"
             >
               {savingExam && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
@@ -1693,6 +1900,8 @@ function AcademicsWorkspaceContent() {
               <Input
                 type="date"
                 required
+                min={selectedYear?.start_date}
+                max={selectedYear?.end_date}
                 value={examDate}
                 onChange={(e) => setExamDate(e.target.value)}
                 className="h-9 rounded-sm font-mono text-xs"
@@ -1779,7 +1988,19 @@ function AcademicsWorkspaceContent() {
           </div>
 
           {/* Conflict Detection Callout */}
-          {checkingConflict ? (
+          {examDateOutOfRange && selectedYear ? (
+            <div className="space-y-1.5 rounded-sm border border-destructive/40 bg-destructive/10 p-3 font-mono text-xs text-destructive">
+              <div className="flex items-center gap-1.5 font-bold uppercase">
+                <AlertTriangle className="size-3.5" />
+                Exam Date Out of Bounds
+              </div>
+              <p className="leading-snug">
+                Exam date ({examDate}) must fall within Academic Year{" "}
+                {selectedYear.name} ({selectedYear.start_date} →{" "}
+                {selectedYear.end_date}).
+              </p>
+            </div>
+          ) : checkingConflict ? (
             <div className="flex items-center gap-2 rounded-sm border border-border bg-muted/25 p-2.5 font-mono text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />
               Checking cohort exam conflicts...
@@ -1987,6 +2208,20 @@ function AcademicsWorkspaceContent() {
         onConfirm={handleDeleteExam}
         onCancel={() => setDeleteExamTarget(null)}
         loading={deletingExam}
+      />
+
+      {/* Delete Academic Year Confirmation */}
+      <ConfirmDialog
+        open={deleteYearTarget !== null}
+        title="Delete Academic Year"
+        description={
+          deleteYearTarget
+            ? `Delete Academic Year "${deleteYearTarget.name}" (${deleteYearTarget.start_date} → ${deleteYearTarget.end_date})? Its Midterm/Final Term containers and any scheduled exams will be permanently removed.`
+            : ""
+        }
+        onConfirm={handleDeleteYear}
+        onCancel={() => setDeleteYearTarget(null)}
+        loading={deletingYear}
       />
     </div>
   )

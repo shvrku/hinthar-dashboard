@@ -1230,6 +1230,8 @@ export function createApi(token: string) {
       end_time: string
       room?: string
       exclude_id?: number
+      term_id?: number
+      subject_id?: number
     }) =>
       request<import("./types").ExamConflictResponse>(
         `/exams/conflicts/${buildQueryString(params)}`,
