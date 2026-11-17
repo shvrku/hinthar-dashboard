@@ -1064,7 +1064,7 @@ function AcademicsWorkspaceContent() {
                 size="sm"
                 disabled={togglingTermId === activeTerm.id}
                 onClick={() => void handleToggleTermPublish(activeTerm)}
-                className="rounded-sm font-mono text-xs uppercase"
+                className="shrink-0 rounded-sm font-mono text-xs uppercase"
               >
                 {togglingTermId === activeTerm.id ? (
                   <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -1080,7 +1080,7 @@ function AcademicsWorkspaceContent() {
               size="sm"
               onClick={openNewExamSheet}
               disabled={!selectedYear}
-              className="rounded-sm font-mono text-xs uppercase shadow-none"
+              className="shrink-0 rounded-sm font-mono text-xs uppercase shadow-none"
             >
               <Plus className="mr-1.5 size-3.5" />
               Schedule Exam
@@ -1089,7 +1089,7 @@ function AcademicsWorkspaceContent() {
               href="/classes"
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "rounded-sm font-mono text-xs uppercase"
+                "shrink-0 rounded-sm font-mono text-xs uppercase"
               )}
             >
               <Layers className="mr-1.5 size-3.5" />
@@ -1148,14 +1148,14 @@ function AcademicsWorkspaceContent() {
           filters={
             <>
               {/* Academic Year Picker + Create Year Button */}
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <Select
                   value={selectedYearId}
                   onValueChange={(val) => {
                     if (val) setSelectedYearId(val)
                   }}
                 >
-                  <SelectTrigger className="h-8 w-36 rounded-sm border-border bg-background font-mono text-xs">
+                  <SelectTrigger className="h-8 w-36 shrink-0 rounded-sm border-border bg-background font-mono text-xs">
                     <span className="truncate">
                       {selectedYear?.name ?? "Academic Year"}
                     </span>
@@ -1174,7 +1174,7 @@ function AcademicsWorkspaceContent() {
                   size="xs"
                   onClick={openCreateYearSheet}
                   title="Create Academic Year"
-                  className="h-8 rounded-sm px-2 font-mono text-[11px]"
+                  className="h-8 shrink-0 rounded-sm px-2 font-mono text-[11px]"
                 >
                   <Plus className="size-3.5" />
                 </Button>
@@ -1185,7 +1185,7 @@ function AcademicsWorkspaceContent() {
                     size="xs"
                     onClick={() => setDeleteYearTarget(selectedYear)}
                     title={`Delete Academic Year ${selectedYear.name}`}
-                    className="h-8 rounded-sm px-2 text-destructive hover:bg-destructive/10"
+                    className="h-8 shrink-0 rounded-sm px-2 text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
@@ -1193,7 +1193,7 @@ function AcademicsWorkspaceContent() {
               </div>
 
               {/* Fixed Term Switcher (Midterm / Final Term) */}
-              <div className="inline-flex items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
+              <div className="inline-flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
                 {(
                   [
                     { id: "midterm", label: "MIDTERM" },
@@ -1205,7 +1205,7 @@ function AcademicsWorkspaceContent() {
                     type="button"
                     onClick={() => setSelectedTermType(t.id)}
                     className={cn(
-                      "rounded-[2px] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
+                      "shrink-0 whitespace-nowrap rounded-[2px] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
                       selectedTermType === t.id
                         ? "bg-foreground text-background"
                         : "text-muted-foreground hover:text-foreground"
@@ -1218,7 +1218,10 @@ function AcademicsWorkspaceContent() {
 
               {/* Term Publish Indicator */}
               {activeTerm && (
-                <TelemetryTag status={activeTerm.is_published ? "present" : "neutral"}>
+                <TelemetryTag
+                  status={activeTerm.is_published ? "present" : "neutral"}
+                  className="shrink-0"
+                >
                   {activeTerm.is_published ? "PUBLISHED" : "UNPUBLISHED"}
                 </TelemetryTag>
               )}
@@ -1230,7 +1233,7 @@ function AcademicsWorkspaceContent() {
                   if (val) setSelectedClassId(val)
                 }}
               >
-                <SelectTrigger className="h-8 min-w-[180px] rounded-sm border-border bg-background font-mono text-xs">
+                <SelectTrigger className="h-8 min-w-[180px] shrink-0 rounded-sm border-border bg-background font-mono text-xs">
                   <span className="truncate">
                     {classes.find((c) => String(c.id) === selectedClassId)
                       ? formatCohortIdentifier(
@@ -1249,14 +1252,14 @@ function AcademicsWorkspaceContent() {
               </Select>
 
               {/* Pass/Fail Segment Filter */}
-              <div className="inline-flex items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
+              <div className="inline-flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
                 {(["ALL", "PASS", "FAIL", "PENDING"] as const).map((st) => (
                   <button
                     key={st}
                     type="button"
                     onClick={() => setStatusFilter(st)}
                     className={cn(
-                      "rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
+                      "shrink-0 whitespace-nowrap rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
                       statusFilter === st
                         ? "bg-foreground text-background"
                         : "text-muted-foreground hover:text-foreground"
@@ -1269,14 +1272,14 @@ function AcademicsWorkspaceContent() {
             </>
           }
           toolbarRight={
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
               {inlineDirtyCount > 0 && (
                 <>
                   <Button
                     size="xs"
                     onClick={() => void handleSaveInlineMarks()}
                     disabled={savingInline}
-                    className="h-7 rounded-sm px-2.5 font-mono text-[11px] uppercase"
+                    className="h-7 shrink-0 rounded-sm px-2.5 font-mono text-[11px] uppercase"
                   >
                     {savingInline ? (
                       <Loader2 className="mr-1 size-3 animate-spin" />
@@ -1292,7 +1295,7 @@ function AcademicsWorkspaceContent() {
                       setInlineDrafts({})
                       setEditingRowStudentId(null)
                     }}
-                    className="h-7 rounded-sm px-2 font-mono text-[11px] uppercase"
+                    className="h-7 shrink-0 rounded-sm px-2 font-mono text-[11px] uppercase"
                   >
                     Discard
                   </Button>
@@ -1310,7 +1313,7 @@ function AcademicsWorkspaceContent() {
                   }
                 }}
                 disabled={isBroadsheetBootstrapping || !activeTerm || !selectedClassId}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase shadow-none"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase shadow-none"
               >
                 <Pencil className="mr-1 size-3" />
                 Enter Marks
@@ -1325,7 +1328,7 @@ function AcademicsWorkspaceContent() {
                   setInlineDrafts({})
                 }}
                 disabled={isBroadsheetBootstrapping || !broadsheet || broadsheet.exams.length === 0}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
               >
                 <ClipboardEdit className="mr-1 size-3" />
                 {inlineEditMode ? "Exit Inline Grid" : "Inline Grid"}
@@ -1336,7 +1339,7 @@ function AcademicsWorkspaceContent() {
                 size="xs"
                 onClick={handleExportBroadsheetCsv}
                 disabled={isBroadsheetBootstrapping || !broadsheet || filteredBroadsheetStudents.length === 0}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
               >
                 <Download className="mr-1 size-3" />
                 CSV
@@ -1347,7 +1350,7 @@ function AcademicsWorkspaceContent() {
                 size="xs"
                 onClick={() => void loadBroadsheet()}
                 disabled={isBroadsheetBootstrapping}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
               >
                 <RotateCcw
                   className={cn("mr-1 size-3", isBroadsheetBootstrapping && "animate-spin")}
@@ -1375,7 +1378,7 @@ function AcademicsWorkspaceContent() {
               <Button
                 size="xs"
                 onClick={openNewExamSheet}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase shadow-none"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase shadow-none"
               >
                 <Plus className="mr-1 size-3" />
                 Schedule Exam
@@ -1383,18 +1386,19 @@ function AcademicsWorkspaceContent() {
             </div>
           )}
 
-          <Table>
-            <TableHeader>
-              <TableRow className="h-10 bg-muted/20 hover:bg-muted/20">
-                <TableHead className="w-16 px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Rank
-                </TableHead>
-                <TableHead className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Identifier
-                </TableHead>
-                <TableHead className="min-w-[170px] font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Student Name
-                </TableHead>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[920px]">
+              <TableHeader>
+                <TableRow className="h-10 bg-muted/20 hover:bg-muted/20">
+                  <TableHead className="w-[120px] min-w-[120px] sticky left-0 z-20 bg-muted px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Identifier
+                  </TableHead>
+                  <TableHead className="min-w-[180px] sticky left-[120px] z-20 bg-muted border-r border-border/60 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Student Name
+                  </TableHead>
+                  <TableHead className="w-16 px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Rank
+                  </TableHead>
                 {broadsheet && broadsheet.exams.length > 0 ? (
                   broadsheet.exams.map((exam) => (
                     <TableHead
@@ -1466,16 +1470,16 @@ function AcademicsWorkspaceContent() {
                   const rowExams = broadsheet?.exams ?? []
                   return (
                     <TableRow key={row.student_id} className="h-11 hover:bg-muted/30">
-                      <TableCell className="px-3.5 font-mono text-xs font-bold tabular-nums text-foreground">
-                        {row.rank != null ? `#${row.rank}` : "—"}
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="w-[120px] min-w-[120px] sticky left-0 z-10 bg-card px-3.5 font-mono">
                         <CodeChip accent>
                           {formatStudentIdentifier(row.student_code ?? row.unique_code, row.student_id)}
                         </CodeChip>
                       </TableCell>
-                      <TableCell className="text-xs font-semibold text-foreground">
+                      <TableCell className="min-w-[180px] sticky left-[120px] z-10 bg-card border-r border-border/60 text-xs font-semibold text-foreground">
                         {row.name}
+                      </TableCell>
+                      <TableCell className="px-3.5 font-mono text-xs font-bold tabular-nums text-foreground">
+                        {row.rank != null ? `#${row.rank}` : "—"}
                       </TableCell>
                       {rowExams.length > 0 ? (
                         rowExams.map((exam) => {
@@ -1616,7 +1620,8 @@ function AcademicsWorkspaceContent() {
                 })
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </DataModule>
       )}
 
@@ -1629,7 +1634,7 @@ function AcademicsWorkspaceContent() {
           <div className="rounded-sm border border-border bg-card p-3.5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="shrink-0 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   ACADEMIC YEAR //
                 </span>
                 <Select
@@ -1638,7 +1643,7 @@ function AcademicsWorkspaceContent() {
                     if (val) setSelectedYearId(val)
                   }}
                 >
-                  <SelectTrigger className="h-8 w-44 rounded-sm border-border bg-background font-mono text-xs">
+                  <SelectTrigger className="h-8 w-44 shrink-0 rounded-sm border-border bg-background font-mono text-xs">
                     <span className="truncate">
                       {selectedYear?.name ?? "Select Academic Year"}
                     </span>
@@ -1652,20 +1657,20 @@ function AcademicsWorkspaceContent() {
                   </SelectContent>
                 </Select>
                 {selectedYear && (
-                  <span className="font-mono text-[11px] text-muted-foreground">
+                  <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
                     {selectedYear.start_date} → {selectedYear.end_date}
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
                 {selectedYear && (
                   <Button
                     variant="ghost"
                     size="xs"
                     onClick={() => setDeleteYearTarget(selectedYear)}
                     title={`Delete Academic Year ${selectedYear.name}`}
-                    className="h-8 rounded-sm px-2.5 font-mono text-[11px] uppercase text-destructive hover:bg-destructive/10"
+                    className="h-8 shrink-0 rounded-sm px-2.5 font-mono text-[11px] uppercase text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="mr-1 size-3" />
                     Delete Year
@@ -1675,7 +1680,7 @@ function AcademicsWorkspaceContent() {
                   variant="outline"
                   size="xs"
                   onClick={openCreateYearSheet}
-                  className="h-8 rounded-sm font-mono text-[11px] uppercase"
+                  className="h-8 shrink-0 rounded-sm font-mono text-[11px] uppercase"
                 >
                   <Plus className="mr-1 size-3" />
                   New Academic Year
@@ -1683,17 +1688,17 @@ function AcademicsWorkspaceContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {[midtermTerm, finalTerm].map((term, idx) => {
                 if (!term) return null
                 const termExamCount = exams.filter((e) => e.term === term.id).length
                 return (
                   <div
                     key={term.id}
-                    className="flex items-center justify-between gap-3 rounded-sm border border-border bg-muted/20 px-3.5 py-2.5"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-border bg-muted/20 px-4 py-3"
                   >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
                           TERM 0{idx + 1} // {term.name}
                         </span>
@@ -1709,8 +1714,8 @@ function AcademicsWorkspaceContent() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="whitespace-nowrap font-mono text-[10px] uppercase text-muted-foreground">
                         Parent Visible
                       </span>
                       <Switch
@@ -1733,7 +1738,7 @@ function AcademicsWorkspaceContent() {
             onSearchChange={setScheduleSearch}
             filters={
               <>
-                <div className="inline-flex items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
+                <div className="inline-flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
                   {(
                     [
                       { id: "ALL", label: "ALL TERMS" },
@@ -1746,7 +1751,7 @@ function AcademicsWorkspaceContent() {
                       type="button"
                       onClick={() => setScheduleTermFilter(opt.id)}
                       className={cn(
-                        "rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
+                        "shrink-0 whitespace-nowrap rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
                         scheduleTermFilter === opt.id
                           ? "bg-foreground text-background"
                           : "text-muted-foreground hover:text-foreground"
@@ -1761,7 +1766,7 @@ function AcademicsWorkspaceContent() {
                   value={scheduleClassFilter}
                   onValueChange={(val) => setScheduleClassFilter(val ?? "all")}
                 >
-                  <SelectTrigger className="h-8 w-44 rounded-sm border-border bg-background font-mono text-xs">
+                  <SelectTrigger className="h-8 w-44 shrink-0 rounded-sm border-border bg-background font-mono text-xs">
                     <span className="truncate">
                       {scheduleClassFilter === "all"
                         ? "All Cohorts"
@@ -1784,12 +1789,12 @@ function AcademicsWorkspaceContent() {
               </>
             }
             toolbarRight={
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="xs"
                   onClick={openNewExamSheet}
                   disabled={!selectedYear}
-                  className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                  className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
                 >
                   <Plus className="mr-1 size-3" />
                   Schedule Exam
@@ -1799,7 +1804,7 @@ function AcademicsWorkspaceContent() {
                   size="xs"
                   onClick={() => void loadExams()}
                   disabled={examsLoading}
-                  className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                  className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
                 >
                   <RotateCcw
                     className={cn("mr-1 size-3", examsLoading && "animate-spin")}
@@ -1811,7 +1816,8 @@ function AcademicsWorkspaceContent() {
             totalCount={filteredExams.length}
             countLabel="SCHEDULED EXAMS"
           >
-            <Table>
+            <div className="w-full overflow-x-auto">
+              <Table className="min-w-[850px]">
               <TableHeader>
                 <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                   <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1926,6 +1932,7 @@ function AcademicsWorkspaceContent() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </DataModule>
         </div>
       )}
@@ -2399,14 +2406,16 @@ function AcademicsWorkspaceContent() {
                       </span>
                     </div>
                     {hasScore || row.is_absent ? (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex shrink-0 items-center gap-1.5">
                         <CodeChip>{grade}</CodeChip>
                         <TelemetryTag status={passed ? "present" : "absent"}>
                           {row.is_absent ? "ABSENT" : passed ? "PASS" : "FAIL"}
                         </TelemetryTag>
                       </div>
                     ) : (
-                      <TelemetryTag status="neutral">PENDING</TelemetryTag>
+                      <TelemetryTag status="neutral" className="shrink-0">
+                        PENDING
+                      </TelemetryTag>
                     )}
                   </div>
 

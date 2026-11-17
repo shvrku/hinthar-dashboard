@@ -299,7 +299,7 @@ export function ParentPortalWorkspace({
               size="sm"
               onClick={() => void loadPortal()}
               disabled={loading}
-              className="rounded-sm font-mono text-xs uppercase"
+              className="shrink-0 rounded-sm font-mono text-xs uppercase"
             >
               <RotateCcw
                 className={cn("mr-1.5 size-3.5", loading && "animate-spin")}
@@ -312,10 +312,10 @@ export function ParentPortalWorkspace({
 
       {/* Student & Academic Year Selector Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-border bg-card px-3.5 py-2.5">
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {isStaff ? (
             <>
-              <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <Eye className="size-3.5 text-foreground" />
                 ADMIN PREVIEW // STUDENT:
               </span>
@@ -325,7 +325,7 @@ export function ParentPortalWorkspace({
                   if (val) setSelectedStudentId(val)
                 }}
               >
-                <SelectTrigger className="h-8 min-w-[270px] rounded-sm border-border bg-background font-mono text-xs">
+                <SelectTrigger className="h-8 w-full min-w-[240px] shrink-0 rounded-sm border-border bg-background font-mono text-xs sm:w-[270px]">
                   <span className="truncate">
                     {student
                       ? `${formatStudentIdentifier(student.student_code ?? student.unique_code, student.id)} · ${student.name}${
@@ -350,7 +350,7 @@ export function ParentPortalWorkspace({
             </>
           ) : accessibleStudents.length > 1 ? (
             <>
-              <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <UserCheck className="size-3.5 text-foreground" />
                 LINKED CHILDREN:
               </span>
@@ -363,7 +363,7 @@ export function ParentPortalWorkspace({
                       type="button"
                       onClick={() => setSelectedStudentId(String(child.id))}
                       className={cn(
-                        "rounded-[2px] px-2.5 py-1 font-mono text-[11px] font-semibold transition-colors",
+                        "shrink-0 whitespace-nowrap rounded-[2px] px-2.5 py-1 font-mono text-[11px] font-semibold transition-colors",
                         active
                           ? "bg-foreground text-background"
                           : "text-muted-foreground hover:text-foreground"
@@ -395,7 +395,7 @@ export function ParentPortalWorkspace({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="shrink-0 whitespace-nowrap font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             ACADEMIC YEAR:
           </span>
           <Select
@@ -404,7 +404,7 @@ export function ParentPortalWorkspace({
               if (val) setSelectedYearId(val)
             }}
           >
-            <SelectTrigger className="h-8 w-44 rounded-sm border-border bg-background font-mono text-xs">
+            <SelectTrigger className="h-8 w-44 shrink-0 rounded-sm border-border bg-background font-mono text-xs">
               <span className="truncate">
                 {data?.selected_academic_year?.name ?? "Select Academic Year"}
               </span>
@@ -424,7 +424,7 @@ export function ParentPortalWorkspace({
               size="xs"
               onClick={() => void loadPortal()}
               disabled={loading}
-              className="h-8 rounded-sm font-mono text-[11px] uppercase"
+              className="h-8 shrink-0 rounded-sm font-mono text-[11px] uppercase"
             >
               <RotateCcw
                 className={cn("mr-1 size-3", loading && "animate-spin")}
@@ -467,7 +467,7 @@ export function ParentPortalWorkspace({
 
       {/* Term Summary Comparison Cards */}
       {student && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {[
             { label: "TERM 01 // MIDTERM", summary: midtermSummary },
             { label: "TERM 02 // FINAL TERM", summary: finalSummary },
@@ -479,15 +479,15 @@ export function ParentPortalWorkspace({
                 key={label}
                 className="rounded-sm border border-border bg-card p-3.5 space-y-2.5"
               >
-                <div className="flex items-center justify-between gap-2 border-b border-border/70 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="size-1.5 rounded-[1px] bg-primary" />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="size-1.5 shrink-0 rounded-[1px] bg-primary" />
                     <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
                       {label}
                     </span>
                   </div>
                   {summary ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                       <TelemetryTag status={summary.is_published ? "present" : "neutral"}>
                         {summary.is_published ? "PUBLISHED" : "UNPUBLISHED"}
                       </TelemetryTag>
@@ -498,7 +498,9 @@ export function ParentPortalWorkspace({
                       )}
                     </div>
                   ) : (
-                    <TelemetryTag status="neutral">NOT CONFIGURED</TelemetryTag>
+                    <TelemetryTag status="neutral" className="shrink-0">
+                      NOT CONFIGURED
+                    </TelemetryTag>
                   )}
                 </div>
 
@@ -510,9 +512,9 @@ export function ParentPortalWorkspace({
                     </span>
                   </div>
                 ) : summary ? (
-                  <div className="grid grid-cols-4 gap-2 pt-0.5">
-                    <div>
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <div className="grid grid-cols-2 gap-3 pt-0.5 sm:grid-cols-4">
+                    <div className="min-w-0">
+                      <div className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                         TOTAL MARKS
                       </div>
                       <div className="mt-0.5 font-mono text-sm font-bold tabular-nums text-foreground">
@@ -520,8 +522,8 @@ export function ParentPortalWorkspace({
                         {summary.total_max_marks ? ` / ${summary.total_max_marks}` : ""}
                       </div>
                     </div>
-                    <div>
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="min-w-0">
+                      <div className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                         AVERAGE %
                       </div>
                       <div className="mt-0.5 font-mono text-sm font-bold tabular-nums text-foreground">
@@ -530,16 +532,16 @@ export function ParentPortalWorkspace({
                           : "—"}
                       </div>
                     </div>
-                    <div>
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="min-w-0">
+                      <div className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                         GRADE
                       </div>
                       <div className="mt-0.5">
                         <CodeChip accent>{summary.letter_grade ?? "—"}</CodeChip>
                       </div>
                     </div>
-                    <div>
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="min-w-0">
+                      <div className="whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                         CLASS RANK
                       </div>
                       <div className="mt-0.5 font-mono text-sm font-bold tabular-nums text-foreground">
@@ -567,15 +569,16 @@ export function ParentPortalWorkspace({
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           toolbarRight={
-            <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-              <GraduationCap className="size-3.5 text-foreground" />
-              <span>MIDTERM VS. FINAL TERM COMPARISON</span>
+            <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <GraduationCap className="size-3.5 shrink-0 text-foreground" />
+              <span className="whitespace-nowrap">MIDTERM VS. FINAL TERM COMPARISON</span>
             </div>
           }
           totalCount={filteredComparison.length}
           countLabel="ENROLLED SUBJECTS"
         >
-          <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[850px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -708,6 +711,7 @@ export function ParentPortalWorkspace({
               )}
             </TableBody>
           </Table>
+          </div>
         </DataModule>
       )}
 
@@ -715,7 +719,7 @@ export function ParentPortalWorkspace({
       {student && (
         <DataModule
           filters={
-            <div className="inline-flex items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
+            <div className="inline-flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
               {(
                 [
                   { id: "ALL", label: "ALL EXAMS" },
@@ -728,7 +732,7 @@ export function ParentPortalWorkspace({
                   type="button"
                   onClick={() => setScheduleTermFilter(opt.id)}
                   className={cn(
-                    "rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
+                    "shrink-0 whitespace-nowrap rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
                     scheduleTermFilter === opt.id
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"
@@ -740,15 +744,16 @@ export function ParentPortalWorkspace({
             </div>
           }
           toolbarRight={
-            <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-              <Calendar className="size-3.5 text-foreground" />
-              <span>PERSONAL EXAM TIMETABLE</span>
+            <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <Calendar className="size-3.5 shrink-0 text-foreground" />
+              <span className="whitespace-nowrap">PERSONAL EXAM TIMETABLE</span>
             </div>
           }
           totalCount={filteredSchedule.length}
           countLabel="SCHEDULED EXAMS"
         >
-          <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[850px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -825,6 +830,7 @@ export function ParentPortalWorkspace({
               )}
             </TableBody>
           </Table>
+          </div>
         </DataModule>
       )}
     </div>

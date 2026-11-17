@@ -513,7 +513,7 @@ function PayrollWorkspaceContent() {
               variant="outline"
               size="sm"
               onClick={() => handleTabChange("rates")}
-              className="rounded-sm font-mono text-xs uppercase"
+              className="shrink-0 rounded-sm font-mono text-xs uppercase"
             >
               <SlidersHorizontal className="mr-1.5 size-3.5" />
               Rate Cards
@@ -522,7 +522,7 @@ function PayrollWorkspaceContent() {
               size="sm"
               onClick={() => void handleRecalculateMonth()}
               disabled={calculating}
-              className="rounded-sm font-mono text-xs uppercase shadow-none"
+              className="shrink-0 rounded-sm font-mono text-xs uppercase shadow-none"
             >
               {calculating ? (
                 <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -569,17 +569,17 @@ function PayrollWorkspaceContent() {
                 onChange={(e) => {
                   if (e.target.value) setSelectedMonth(e.target.value)
                 }}
-                className="h-8 w-40 rounded-sm border-border bg-background font-mono text-xs"
+                className="h-8 w-40 shrink-0 rounded-sm border-border bg-background font-mono text-xs"
               />
 
-              <div className="inline-flex items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
+              <div className="inline-flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border bg-muted/40 p-0.5">
                 {(["ALL", "draft", "approved", "paid"] as const).map((st) => (
                   <button
                     key={st}
                     type="button"
                     onClick={() => setStatusFilter(st)}
                     className={cn(
-                      "rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
+                      "shrink-0 whitespace-nowrap rounded-[2px] px-2 py-0.5 font-mono text-[11px] font-semibold uppercase transition-colors",
                       statusFilter === st
                         ? "bg-foreground text-background"
                         : "text-muted-foreground hover:text-foreground"
@@ -592,13 +592,13 @@ function PayrollWorkspaceContent() {
             </>
           }
           toolbarRight={
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="xs"
                 onClick={handleExportPayrollCsv}
                 disabled={filteredPayouts.length === 0}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
               >
                 <Download className="mr-1 size-3" />
                 CSV
@@ -608,7 +608,7 @@ function PayrollWorkspaceContent() {
                 size="xs"
                 onClick={() => void loadPayouts()}
                 disabled={payoutsLoading}
-                className="h-7 rounded-sm font-mono text-[11px] uppercase"
+                className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
               >
                 <RotateCcw
                   className={cn("mr-1 size-3", payoutsLoading && "animate-spin")}
@@ -620,7 +620,8 @@ function PayrollWorkspaceContent() {
           totalCount={filteredPayouts.length}
           countLabel={`FACULTY PAYOUTS (${selectedMonth})`}
         >
-          <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[850px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -739,12 +740,12 @@ function PayrollWorkspaceContent() {
                         </TelemetryTag>
                       </TableCell>
                       <TableCell className="text-right pr-3.5">
-                        <div className="inline-flex items-center gap-1.5">
+                        <div className="inline-flex shrink-0 items-center gap-1.5">
                           <Button
                             variant="outline"
                             size="xs"
                             onClick={() => openPayoutDrawer(p)}
-                            className="h-7 rounded-sm px-2 font-mono text-[11px] uppercase"
+                            className="h-7 shrink-0 rounded-sm px-2 font-mono text-[11px] uppercase"
                           >
                             Drill-Down
                           </Button>
@@ -755,7 +756,7 @@ function PayrollWorkspaceContent() {
                               onClick={() =>
                                 void handleTransitionStatus(p, nextAction.target)
                               }
-                              className="h-7 rounded-sm px-2 font-mono text-[11px] uppercase"
+                              className="h-7 shrink-0 rounded-sm px-2 font-mono text-[11px] uppercase"
                             >
                               {transitioningId === p.id && (
                                 <Loader2 className="mr-1 size-3 animate-spin" />
@@ -770,7 +771,8 @@ function PayrollWorkspaceContent() {
                 })
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </DataModule>
       )}
 
@@ -788,7 +790,7 @@ function PayrollWorkspaceContent() {
               size="xs"
               onClick={() => void loadRatesAndTeachers()}
               disabled={ratesLoading}
-              className="h-7 rounded-sm font-mono text-[11px] uppercase"
+              className="h-7 shrink-0 rounded-sm font-mono text-[11px] uppercase"
             >
               <RotateCcw
                 className={cn("mr-1 size-3", ratesLoading && "animate-spin")}
@@ -799,7 +801,8 @@ function PayrollWorkspaceContent() {
           totalCount={filteredTeachersForRates.length}
           countLabel="TEACHER RATE CONFIGURATIONS"
         >
-          <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[850px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -902,7 +905,7 @@ function PayrollWorkspaceContent() {
                           variant={card ? "outline" : "default"}
                           size="xs"
                           onClick={() => openRateCardDrawer(teacher)}
-                          className="h-7 rounded-sm px-2.5 font-mono text-[11px] uppercase"
+                          className="h-7 shrink-0 rounded-sm px-2.5 font-mono text-[11px] uppercase"
                         >
                           <SlidersHorizontal className="mr-1 size-3" />
                           {card ? "Edit Rate" : "Configure"}
@@ -913,7 +916,8 @@ function PayrollWorkspaceContent() {
                 })
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </DataModule>
       )}
 
@@ -1023,15 +1027,15 @@ function PayrollWorkspaceContent() {
               onSubmit={handleSaveAdjustments}
               className="space-y-3 rounded-sm border border-border bg-muted/20 p-3"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   MANUAL ADJUSTMENTS
                 </span>
-                <span className="font-mono text-xs font-bold tabular-nums text-foreground">
+                <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-foreground">
                   Preview Net: {formatMoney(liveAdjustedNetPreview, inspectedPayout.currency)}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div className="space-y-1">
                   <label className="font-mono text-[10px] uppercase text-muted-foreground">
                     Bonus ({inspectedPayout.currency})
@@ -1102,11 +1106,15 @@ function PayrollWorkspaceContent() {
                       key={`${coh.cohort_label}-${i}`}
                       className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
                     >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <CodeChip accent>{coh.cohort_label}</CodeChip>
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <CodeChip accent className="shrink-0">
+                            {coh.cohort_label}
+                          </CodeChip>
                           {coh.is_cohort_override && (
-                            <TelemetryTag status="info">OVERRIDE</TelemetryTag>
+                            <TelemetryTag status="info" className="shrink-0">
+                              OVERRIDE
+                            </TelemetryTag>
                           )}
                         </div>
                         <div className="font-mono text-[10px] text-muted-foreground">
@@ -1115,7 +1123,7 @@ function PayrollWorkspaceContent() {
                           {coh.rate_type === "hourly_rate" ? "/hr" : "/sess"}
                         </div>
                       </div>
-                      <div className="font-mono text-xs font-bold tabular-nums text-foreground">
+                      <div className="shrink-0 font-mono text-xs font-bold tabular-nums text-foreground">
                         {formatMoney(coh.subtotal, inspectedPayout.currency)}
                       </div>
                     </div>
@@ -1192,7 +1200,7 @@ function PayrollWorkspaceContent() {
               variant="outline"
               size="sm"
               onClick={() => setRateSheetTeacher(null)}
-              className="rounded-sm font-mono text-xs uppercase"
+              className="shrink-0 rounded-sm font-mono text-xs uppercase"
             >
               Cancel
             </Button>
@@ -1201,7 +1209,7 @@ function PayrollWorkspaceContent() {
               form="rate-card-form"
               type="submit"
               disabled={savingRateCard}
-              className="rounded-sm font-mono text-xs uppercase"
+              className="shrink-0 rounded-sm font-mono text-xs uppercase"
             >
               {savingRateCard && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
               <Banknote className="mr-1.5 size-3.5" />
@@ -1227,7 +1235,7 @@ function PayrollWorkspaceContent() {
                   type="button"
                   onClick={() => setRateType(opt.id)}
                   className={cn(
-                    "rounded-[2px] px-2.5 py-1.5 font-mono text-[11px] font-semibold uppercase transition-colors",
+                    "shrink-0 whitespace-nowrap rounded-[2px] px-2.5 py-1.5 font-mono text-[11px] font-semibold uppercase transition-colors",
                     rateType === opt.id
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"
@@ -1239,7 +1247,7 @@ function PayrollWorkspaceContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             <div className="space-y-1.5">
               <label className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Rate / Session
@@ -1302,10 +1310,12 @@ function PayrollWorkspaceContent() {
                 {overrideRows.map((ov) => (
                   <div
                     key={ov.class_obj_id}
-                    className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
                   >
-                    <div className="flex items-center gap-2">
-                      <CodeChip accent>{ov.class_label}</CodeChip>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <CodeChip accent className="shrink-0">
+                        {ov.class_label}
+                      </CodeChip>
                       <span className="font-mono text-[11px] text-muted-foreground">
                         {ov.rate_per_session ? `${ov.rate_per_session}/sess` : ""}{" "}
                         {ov.hourly_rate ? `${ov.hourly_rate}/hr` : ""}
@@ -1320,7 +1330,7 @@ function PayrollWorkspaceContent() {
                           prev.filter((r) => r.class_obj_id !== ov.class_obj_id)
                         )
                       }
-                      className="h-6 px-1.5 text-destructive hover:bg-destructive/10"
+                      className="h-6 shrink-0 px-1.5 text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="size-3" />
                     </Button>
@@ -1349,7 +1359,7 @@ function PayrollWorkspaceContent() {
                 </SelectContent>
               </Select>
 
-              <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
                 <Input
                   type="number"
                   min="0"
@@ -1371,7 +1381,7 @@ function PayrollWorkspaceContent() {
                   variant="outline"
                   size="xs"
                   onClick={handleAddOverrideRow}
-                  className="h-8 rounded-sm px-2.5 font-mono text-[11px] uppercase"
+                  className="h-8 shrink-0 rounded-sm px-2.5 font-mono text-[11px] uppercase"
                 >
                   <Plus className="mr-1 size-3" />
                   Add
