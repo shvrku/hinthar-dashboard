@@ -467,7 +467,7 @@ function PayrollWorkspaceContent() {
   }, [inspectedPayout, bonusInput, deductionInput])
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <div className="min-w-0 max-w-full space-y-4 p-4 sm:p-6">
       {/* 1. Tactical Industrial SystemHeader */}
       <SystemHeader
         domain="FINANCE // PAYROLL"
@@ -620,8 +620,8 @@ function PayrollWorkspaceContent() {
           totalCount={filteredPayouts.length}
           countLabel={`FACULTY PAYOUTS (${selectedMonth})`}
         >
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[850px]">
+          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+            <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -801,8 +801,8 @@ function PayrollWorkspaceContent() {
           totalCount={filteredTeachersForRates.length}
           countLabel="TEACHER RATE CONFIGURATIONS"
         >
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[850px]">
+          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+            <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1090,7 +1090,7 @@ function PayrollWorkspaceContent() {
             </form>
 
             {/* 3. Cohort Rate Breakdown */}
-            <div className="space-y-2">
+            <div className="min-w-0 max-w-full space-y-2">
               <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <Layers className="size-3 text-foreground" />
                 COHORT SUMMARY ({inspectedPayout.session_breakdown?.cohorts?.length ?? 0})
@@ -1100,40 +1100,42 @@ function PayrollWorkspaceContent() {
                   No scheduled or completed sessions recorded in this month.
                 </div>
               ) : (
-                <div className="divide-y divide-border rounded-sm border border-border">
-                  {inspectedPayout.session_breakdown.cohorts.map((coh, i) => (
-                    <div
-                      key={`${coh.cohort_label}-${i}`}
-                      className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
-                    >
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <CodeChip accent className="shrink-0">
-                            {coh.cohort_label}
-                          </CodeChip>
-                          {coh.is_cohort_override && (
-                            <TelemetryTag status="info" className="shrink-0">
-                              OVERRIDE
-                            </TelemetryTag>
-                          )}
+                <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+                  <div className="min-w-[460px] divide-y divide-border rounded-sm border border-border">
+                    {inspectedPayout.session_breakdown.cohorts.map((coh, i) => (
+                      <div
+                        key={`${coh.cohort_label}-${i}`}
+                        className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                      >
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <CodeChip accent className="shrink-0">
+                              {coh.cohort_label}
+                            </CodeChip>
+                            {coh.is_cohort_override && (
+                              <TelemetryTag status="info" className="shrink-0">
+                                OVERRIDE
+                              </TelemetryTag>
+                            )}
+                          </div>
+                          <div className="font-mono text-[10px] text-muted-foreground">
+                            {coh.sessions_count} sess · {coh.total_hours}h @{" "}
+                            {formatMoney(coh.rate_applied, inspectedPayout.currency)}
+                            {coh.rate_type === "hourly_rate" ? "/hr" : "/sess"}
+                          </div>
                         </div>
-                        <div className="font-mono text-[10px] text-muted-foreground">
-                          {coh.sessions_count} sess · {coh.total_hours}h @{" "}
-                          {formatMoney(coh.rate_applied, inspectedPayout.currency)}
-                          {coh.rate_type === "hourly_rate" ? "/hr" : "/sess"}
+                        <div className="shrink-0 font-mono text-xs font-bold tabular-nums text-foreground">
+                          {formatMoney(coh.subtotal, inspectedPayout.currency)}
                         </div>
                       </div>
-                      <div className="shrink-0 font-mono text-xs font-bold tabular-nums text-foreground">
-                        {formatMoney(coh.subtotal, inspectedPayout.currency)}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* 4. Exact Sessions Taught Ledger */}
-            <div className="space-y-2">
+            <div className="min-w-0 max-w-full space-y-2">
               <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <Clock className="size-3 text-foreground" />
                 EXACT SESSIONS TAUGHT ({inspectedPayout.session_breakdown?.sessions?.length ?? 0})
@@ -1143,35 +1145,37 @@ function PayrollWorkspaceContent() {
                   0 sessions in period.
                 </div>
               ) : (
-                <div className="max-h-64 divide-y divide-border overflow-y-auto rounded-sm border border-border">
-                  {inspectedPayout.session_breakdown.sessions.map((s) => (
-                    <div
-                      key={`${s.kind}-${s.session_id}`}
-                      className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
-                    >
-                      <div className="min-w-0 space-y-0.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono text-[11px] font-semibold tabular-nums text-foreground">
-                            {s.date}
-                          </span>
-                          <span className="font-mono text-[10px] text-muted-foreground">
-                            {s.start_time}–{s.end_time}
-                          </span>
-                          <CodeChip>{s.cohort_label}</CodeChip>
-                          {s.is_substitute && (
-                            <TelemetryTag status="late">SUB COVER</TelemetryTag>
-                          )}
+                <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+                  <div className="min-w-[460px] max-h-64 divide-y divide-border overflow-y-auto rounded-sm border border-border custom-scrollbar">
+                    {inspectedPayout.session_breakdown.sessions.map((s) => (
+                      <div
+                        key={`${s.kind}-${s.session_id}`}
+                        className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-mono text-[11px] font-semibold tabular-nums text-foreground">
+                              {s.date}
+                            </span>
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              {s.start_time}–{s.end_time}
+                            </span>
+                            <CodeChip>{s.cohort_label}</CodeChip>
+                            {s.is_substitute && (
+                              <TelemetryTag status="late">SUB COVER</TelemetryTag>
+                            )}
+                          </div>
+                          <div className="truncate text-[11px] text-muted-foreground">
+                            {s.subject_name} ·{" "}
+                            <span className="uppercase">{s.status}</span> · {s.duration_hours}h
+                          </div>
                         </div>
-                        <div className="truncate text-[11px] text-muted-foreground">
-                          {s.subject_name} ·{" "}
-                          <span className="uppercase">{s.status}</span> · {s.duration_hours}h
+                        <div className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
+                          {formatMoney(s.amount, inspectedPayout.currency)}
                         </div>
                       </div>
-                      <div className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
-                        {formatMoney(s.amount, inspectedPayout.currency)}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -29,9 +29,9 @@ export default async function AppLayout({
 
       <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
         <AppSidebar />
-        <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <SidebarInset className="flex flex-col flex-1 min-h-0 min-w-0 max-w-full overflow-hidden">
           <SiteHeader />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto overflow-x-hidden">
             <AppMain>
               <AppAccessGate>{children}</AppAccessGate>
             </AppMain>

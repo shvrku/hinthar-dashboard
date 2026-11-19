@@ -16,7 +16,7 @@ function Table({
   return (
     <div
       data-slot="table-container"
-      className={cn("relative w-full overflow-x-auto overflow-y-hidden", containerClassName)}
+      className={cn("relative w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar", containerClassName)}
     >
       <table
         data-slot="table"

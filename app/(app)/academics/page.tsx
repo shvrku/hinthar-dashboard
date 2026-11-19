@@ -1002,7 +1002,7 @@ function AcademicsWorkspaceContent() {
     broadsheet?.summary.pass_rate != null ? Number(broadsheet.summary.pass_rate) : null
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <div className="min-w-0 max-w-full space-y-4 p-4 sm:p-6">
       {/* 1. Tactical Industrial SystemHeader */}
       <SystemHeader
         domain="ACADEMICS"
@@ -1386,14 +1386,19 @@ function AcademicsWorkspaceContent() {
             </div>
           )}
 
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[920px]">
+          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+            <Table
+              className="min-w-[900px]"
+              style={{
+                minWidth: `${Math.max(900, 380 + Math.max(1, broadsheet?.exams.length ?? 0) * 140 + 340)}px`,
+              }}
+            >
               <TableHeader>
                 <TableRow className="h-10 bg-muted/20 hover:bg-muted/20">
-                  <TableHead className="w-[120px] min-w-[120px] sticky left-0 z-20 bg-muted px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <TableHead className="w-[120px] min-w-[120px] px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Identifier
                   </TableHead>
-                  <TableHead className="min-w-[180px] sticky left-[120px] z-20 bg-muted border-r border-border/60 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <TableHead className="min-w-[180px] md:sticky md:left-0 z-20 bg-zinc-950 border-r border-border/60 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Student Name
                   </TableHead>
                   <TableHead className="w-16 px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1470,12 +1475,12 @@ function AcademicsWorkspaceContent() {
                   const rowExams = broadsheet?.exams ?? []
                   return (
                     <TableRow key={row.student_id} className="h-11 hover:bg-muted/30">
-                      <TableCell className="w-[120px] min-w-[120px] sticky left-0 z-10 bg-card px-3.5 font-mono">
+                      <TableCell className="w-[120px] min-w-[120px] px-3.5 font-mono">
                         <CodeChip accent>
                           {formatStudentIdentifier(row.student_code ?? row.unique_code, row.student_id)}
                         </CodeChip>
                       </TableCell>
-                      <TableCell className="min-w-[180px] sticky left-[120px] z-10 bg-card border-r border-border/60 text-xs font-semibold text-foreground">
+                      <TableCell className="min-w-[180px] md:sticky md:left-0 z-10 bg-zinc-950 border-r border-border/60 text-xs font-semibold text-foreground">
                         {row.name}
                       </TableCell>
                       <TableCell className="px-3.5 font-mono text-xs font-bold tabular-nums text-foreground">
@@ -1629,7 +1634,7 @@ function AcademicsWorkspaceContent() {
       {/* TAB 2: EXAM SCHEDULE & FIXED TERMS MANAGEMENT                         */}
       {/* ===================================================================== */}
       {activeTab === "schedule" && (
-        <div className="space-y-4">
+        <div className="min-w-0 max-w-full space-y-4">
           {/* Academic Year & Fixed Term Publication Controls */}
           <div className="rounded-sm border border-border bg-card p-3.5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2.5">
@@ -1816,8 +1821,8 @@ function AcademicsWorkspaceContent() {
             totalCount={filteredExams.length}
             countLabel="SCHEDULED EXAMS"
           >
-            <div className="w-full overflow-x-auto">
-              <Table className="min-w-[850px]">
+            <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+              <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                   <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">

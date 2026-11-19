@@ -238,7 +238,7 @@ export function ParentPortalWorkspace({
   }
 
   return (
-    <div className={cn("space-y-4", !embedded && "p-4 sm:p-6")}>
+    <div className={cn("min-w-0 max-w-full space-y-4", !embedded && "p-4 sm:p-6")}>
       {!embedded && (
         <SystemHeader
           domain={isStaff ? "ACADEMICS // PREVIEW" : "PARENT PORTAL"}
@@ -577,8 +577,8 @@ export function ParentPortalWorkspace({
           totalCount={filteredComparison.length}
           countLabel="ENROLLED SUBJECTS"
         >
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[850px]">
+          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+            <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -752,8 +752,8 @@ export function ParentPortalWorkspace({
           totalCount={filteredSchedule.length}
           countLabel="SCHEDULED EXAMS"
         >
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[850px]">
+          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+            <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">

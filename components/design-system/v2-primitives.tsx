@@ -196,7 +196,7 @@ export function SystemHeader({
   return (
     <div
       className={cn(
-        "w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
+        "w-full max-w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
         className
       )}
     >
@@ -391,7 +391,7 @@ export function DataModule({
   return (
     <div
       className={cn(
-        "w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
+        "w-full max-w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
         className
       )}
     >
@@ -456,7 +456,7 @@ export function DataModule({
       </div>
 
       {/* Body (flush 0px margin) */}
-      <div className="w-full overflow-x-auto">{children}</div>
+      <div className="w-full max-w-full min-w-0 overflow-x-auto custom-scrollbar">{children}</div>
 
       {/* Docked Footer Bar */}
       {(totalCount !== undefined || totalPages > 1 || onPageChange) && (
