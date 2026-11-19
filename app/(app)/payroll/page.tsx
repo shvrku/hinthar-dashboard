@@ -54,6 +54,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  useSyncedHorizontalScroll,
 } from "@/components/ui/table"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
@@ -466,6 +467,9 @@ function PayrollWorkspaceContent() {
     return Math.max(0, base + bonus - ded)
   }, [inspectedPayout, bonusInput, deductionInput])
 
+  const payoutsScroll = useSyncedHorizontalScroll(900)
+  const ratesScroll = useSyncedHorizontalScroll(900)
+
   return (
     <div className="min-w-0 max-w-full space-y-4 p-4 sm:p-6">
       {/* 1. Tactical Industrial SystemHeader */}
@@ -620,10 +624,22 @@ function PayrollWorkspaceContent() {
           totalCount={filteredPayouts.length}
           countLabel={`FACULTY PAYOUTS (${selectedMonth})`}
         >
-          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
-            <Table className="min-w-[900px]">
-            <TableHeader>
-              <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
+          <div
+            ref={payoutsScroll.topBarRef}
+            onScroll={payoutsScroll.onTopScroll}
+            className="w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar h-3 border-b border-zinc-800/80 bg-zinc-950/80"
+          >
+            <div style={{ width: `${payoutsScroll.trackWidth}px`, height: "1px" }} />
+          </div>
+
+          <div
+            ref={payoutsScroll.containerRef}
+            onScroll={payoutsScroll.onMainScroll}
+            className="w-full max-w-full max-h-[62vh] overflow-auto custom-scrollbar relative"
+          >
+            <Table noWrapper className="min-w-[900px]">
+            <TableHeader className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800">
+              <TableRow className="h-9 bg-zinc-950 hover:bg-zinc-950">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Identifier
                 </TableHead>
@@ -801,10 +817,22 @@ function PayrollWorkspaceContent() {
           totalCount={filteredTeachersForRates.length}
           countLabel="TEACHER RATE CONFIGURATIONS"
         >
-          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
-            <Table className="min-w-[900px]">
-            <TableHeader>
-              <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
+          <div
+            ref={ratesScroll.topBarRef}
+            onScroll={ratesScroll.onTopScroll}
+            className="w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar h-3 border-b border-zinc-800/80 bg-zinc-950/80"
+          >
+            <div style={{ width: `${ratesScroll.trackWidth}px`, height: "1px" }} />
+          </div>
+
+          <div
+            ref={ratesScroll.containerRef}
+            onScroll={ratesScroll.onMainScroll}
+            className="w-full max-w-full max-h-[62vh] overflow-auto custom-scrollbar relative"
+          >
+            <Table noWrapper className="min-w-[900px]">
+            <TableHeader className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800">
+              <TableRow className="h-9 bg-zinc-950 hover:bg-zinc-950">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Identifier
                 </TableHead>

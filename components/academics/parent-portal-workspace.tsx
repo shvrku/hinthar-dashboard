@@ -46,6 +46,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  useSyncedHorizontalScroll,
 } from "@/components/ui/table"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
@@ -227,6 +228,9 @@ export function ParentPortalWorkspace({
   const midtermSummary = data?.term_summaries?.midterm ?? null
   const finalSummary = data?.term_summaries?.final_term ?? null
   const accessibleStudents = data?.accessible_students ?? []
+
+  const comparisonScroll = useSyncedHorizontalScroll(900)
+  const timetableScroll = useSyncedHorizontalScroll(900)
 
   if (!isLoaded) {
     return (
@@ -577,10 +581,22 @@ export function ParentPortalWorkspace({
           totalCount={filteredComparison.length}
           countLabel="ENROLLED SUBJECTS"
         >
-          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
-            <Table className="min-w-[900px]">
-            <TableHeader>
-              <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
+          <div
+            ref={comparisonScroll.topBarRef}
+            onScroll={comparisonScroll.onTopScroll}
+            className="w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar h-3 border-b border-zinc-800/80 bg-zinc-950/80"
+          >
+            <div style={{ width: `${comparisonScroll.trackWidth}px`, height: "1px" }} />
+          </div>
+
+          <div
+            ref={comparisonScroll.containerRef}
+            onScroll={comparisonScroll.onMainScroll}
+            className="w-full max-w-full max-h-[62vh] overflow-auto custom-scrollbar relative"
+          >
+            <Table noWrapper className="min-w-[900px]">
+            <TableHeader className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800">
+              <TableRow className="h-9 bg-zinc-950 hover:bg-zinc-950">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Subject
                 </TableHead>
@@ -752,10 +768,22 @@ export function ParentPortalWorkspace({
           totalCount={filteredSchedule.length}
           countLabel="SCHEDULED EXAMS"
         >
-          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
-            <Table className="min-w-[900px]">
-            <TableHeader>
-              <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
+          <div
+            ref={timetableScroll.topBarRef}
+            onScroll={timetableScroll.onTopScroll}
+            className="w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar h-3 border-b border-zinc-800/80 bg-zinc-950/80"
+          >
+            <div style={{ width: `${timetableScroll.trackWidth}px`, height: "1px" }} />
+          </div>
+
+          <div
+            ref={timetableScroll.containerRef}
+            onScroll={timetableScroll.onMainScroll}
+            className="w-full max-w-full max-h-[62vh] overflow-auto custom-scrollbar relative"
+          >
+            <Table noWrapper className="min-w-[900px]">
+            <TableHeader className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800">
+              <TableRow className="h-9 bg-zinc-950 hover:bg-zinc-950">
                 <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Exam Date
                 </TableHead>

@@ -6,23 +6,118 @@ import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { SortOrder } from "@/lib/use-sortable-data"
 
+function useSyncedHorizontalScroll(defaultTrackWidth = 900) {
+  const topBarRef = React.useRef<HTMLDivElement | null>(null)
+  const containerElRef = React.useRef<HTMLDivElement | null>(null)
+  const [containerNode, setContainerNode] = React.useState<HTMLDivElement | null>(null)
+  const syncingSource = React.useRef<"top" | "main" | null>(null)
+  const [trackWidth, setTrackWidth] = React.useState(defaultTrackWidth)
+
+  const containerRef = React.useCallback((node: HTMLDivElement | null) => {
+    containerElRef.current = node
+    setContainerNode((prev) => (prev === node ? prev : node))
+  }, [])
+
+  React.useEffect(() => {
+    if (!containerNode) {
+      setTrackWidth(defaultTrackWidth)
+      return
+    }
+
+    const updateWidth = () => {
+      const next = Math.max(
+        defaultTrackWidth,
+        containerNode.scrollWidth,
+        containerNode.clientWidth
+      )
+      setTrackWidth((prev) => (prev === next ? prev : next))
+    }
+
+    updateWidth()
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(containerNode)
+    if (containerNode.firstElementChild) {
+      observer.observe(containerNode.firstElementChild)
+    }
+
+    return () => observer.disconnect()
+  }, [containerNode, defaultTrackWidth])
+
+  const onTopScroll = React.useCallback(() => {
+    if (syncingSource.current === "main") {
+      syncingSource.current = null
+      return
+    }
+    const top = topBarRef.current
+    const main = containerElRef.current
+    if (!top || !main) return
+    if (Math.abs(main.scrollLeft - top.scrollLeft) <= 1) return
+    syncingSource.current = "top"
+    main.scrollLeft = top.scrollLeft
+    requestAnimationFrame(() => {
+      if (syncingSource.current === "top") syncingSource.current = null
+    })
+  }, [])
+
+  const onMainScroll = React.useCallback(() => {
+    if (syncingSource.current === "top") {
+      syncingSource.current = null
+      return
+    }
+    const top = topBarRef.current
+    const main = containerElRef.current
+    if (!top || !main) return
+    if (Math.abs(top.scrollLeft - main.scrollLeft) <= 1) return
+    syncingSource.current = "main"
+    top.scrollLeft = main.scrollLeft
+    requestAnimationFrame(() => {
+      if (syncingSource.current === "main") syncingSource.current = null
+    })
+  }, [])
+
+  const scrollByAmount = React.useCallback((delta: number) => {
+    const main = containerElRef.current
+    if (!main) return
+    main.scrollBy({ left: delta, behavior: "smooth" })
+  }, [])
+
+  return {
+    topBarRef,
+    containerRef,
+    trackWidth,
+    onTopScroll,
+    onMainScroll,
+    scrollByAmount,
+  }
+}
+
 function Table({
   className,
   containerClassName,
+  noWrapper = false,
   ...props
 }: React.ComponentProps<"table"> & {
   containerClassName?: string
+  noWrapper?: boolean
 }) {
+  const tableElement = (
+    <table
+      data-slot="table"
+      className={cn("w-full caption-bottom border-collapse text-sm", className)}
+      {...props}
+    />
+  )
+
+  if (noWrapper) {
+    return tableElement
+  }
+
   return (
     <div
       data-slot="table-container"
       className={cn("relative w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar", containerClassName)}
     >
-      <table
-        data-slot="table"
-        className={cn("w-full caption-bottom border-collapse text-sm", className)}
-        {...props}
-      />
+      {tableElement}
     </div>
   )
 }
@@ -32,7 +127,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "bg-muted/50 border-b border-border/80 [&_tr]:border-b-0",
+        "sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800 [&_tr]:border-b-0",
         className
       )}
       {...props}
@@ -178,4 +273,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  useSyncedHorizontalScroll,
 }

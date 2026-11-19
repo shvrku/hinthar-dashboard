@@ -67,6 +67,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  useSyncedHorizontalScroll,
 } from "@/components/ui/table"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
@@ -989,6 +990,13 @@ function AcademicsWorkspaceContent() {
     )
   }
 
+  const broadsheetMinWidth = Math.max(
+    900,
+    380 + Math.max(1, broadsheet?.exams.length ?? 0) * 140 + 340
+  )
+  const broadsheetScroll = useSyncedHorizontalScroll(broadsheetMinWidth)
+  const scheduleScroll = useSyncedHorizontalScroll(900)
+
   const isBroadsheetBootstrapping =
     !isLoaded ||
     yearsLoading ||
@@ -1357,6 +1365,31 @@ function AcademicsWorkspaceContent() {
                 />
                 Refresh
               </Button>
+
+              <div className="inline-flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => broadsheetScroll.scrollByAmount(-280)}
+                  title="Scroll broadsheet columns left"
+                  aria-label="Scroll broadsheet columns left"
+                  className="h-7 w-7 shrink-0 rounded-sm p-0 font-mono text-xs"
+                >
+                  ←
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => broadsheetScroll.scrollByAmount(280)}
+                  title="Scroll broadsheet columns right"
+                  aria-label="Scroll broadsheet columns right"
+                  className="h-7 w-7 shrink-0 rounded-sm p-0 font-mono text-xs"
+                >
+                  →
+                </Button>
+              </div>
             </div>
           }
           totalCount={filteredBroadsheetStudents.length}
@@ -1386,19 +1419,32 @@ function AcademicsWorkspaceContent() {
             </div>
           )}
 
-          <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
+          <div
+            ref={broadsheetScroll.topBarRef}
+            onScroll={broadsheetScroll.onTopScroll}
+            className="w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar h-3 border-b border-zinc-800/80 bg-zinc-950/80"
+          >
+            <div style={{ width: `${broadsheetScroll.trackWidth}px`, height: "1px" }} />
+          </div>
+
+          <div
+            ref={broadsheetScroll.containerRef}
+            onScroll={broadsheetScroll.onMainScroll}
+            className="w-full max-w-full max-h-[62vh] overflow-auto custom-scrollbar relative"
+          >
             <Table
+              noWrapper
               className="min-w-[900px]"
               style={{
-                minWidth: `${Math.max(900, 380 + Math.max(1, broadsheet?.exams.length ?? 0) * 140 + 340)}px`,
+                minWidth: `${broadsheetMinWidth}px`,
               }}
             >
-              <TableHeader>
-                <TableRow className="h-10 bg-muted/20 hover:bg-muted/20">
+              <TableHeader className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800">
+                <TableRow className="h-10 bg-zinc-950 hover:bg-zinc-950">
                   <TableHead className="w-[120px] min-w-[120px] px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Identifier
                   </TableHead>
-                  <TableHead className="min-w-[180px] md:sticky md:left-0 z-20 bg-zinc-950 border-r border-border/60 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <TableHead className="min-w-[180px] sticky top-0 md:sticky md:left-0 z-30 bg-zinc-950 border-r border-border/60 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Student Name
                   </TableHead>
                   <TableHead className="w-16 px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1821,10 +1867,22 @@ function AcademicsWorkspaceContent() {
             totalCount={filteredExams.length}
             countLabel="SCHEDULED EXAMS"
           >
-            <div className="w-full max-w-full overflow-x-auto pb-2 custom-scrollbar">
-              <Table className="min-w-[900px]">
-              <TableHeader>
-                <TableRow className="h-9 bg-muted/20 hover:bg-muted/20">
+            <div
+              ref={scheduleScroll.topBarRef}
+              onScroll={scheduleScroll.onTopScroll}
+              className="w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar h-3 border-b border-zinc-800/80 bg-zinc-950/80"
+            >
+              <div style={{ width: `${scheduleScroll.trackWidth}px`, height: "1px" }} />
+            </div>
+
+            <div
+              ref={scheduleScroll.containerRef}
+              onScroll={scheduleScroll.onMainScroll}
+              className="w-full max-w-full max-h-[62vh] overflow-auto custom-scrollbar relative"
+            >
+              <Table noWrapper className="min-w-[900px]">
+              <TableHeader className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800">
+                <TableRow className="h-9 bg-zinc-950 hover:bg-zinc-950">
                   <TableHead className="px-3.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Exam Date
                   </TableHead>
