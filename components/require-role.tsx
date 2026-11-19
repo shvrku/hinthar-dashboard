@@ -68,8 +68,8 @@ export function RequireRole({
       return
     }
     if (role === "parent" && mode !== "parent" && mode !== "parent_portal" && mode !== "any") {
-      if (pathname !== "/") {
-        router.replace("/")
+      if (pathname !== "/academics" && pathname !== "/academics/parent") {
+        router.replace("/academics/")
       }
       return
     }
@@ -110,6 +110,15 @@ export function RequireRole({
   }
 
   if (!allowed(role, mode)) {
+    if (role === "parent" || role === "student" || role === "teacher" || role === "terminal") {
+      return (
+        skeleton ?? (
+          <div className="flex flex-col gap-5 p-4 sm:p-6">
+            <DashboardOverviewSkeleton />
+          </div>
+        )
+      )
+    }
     return (
       <div className="mx-auto max-w-md space-y-4 py-16 text-center">
         <h1 className="text-xl font-semibold">Access denied</h1>

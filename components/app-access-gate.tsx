@@ -49,7 +49,7 @@ function isAnnouncementsPath(pathname: string): boolean {
 }
 
 function isParentPortalPath(pathname: string): boolean {
-  return pathname === "/academics/parent"
+  return pathname === "/academics" || pathname === "/academics/parent"
 }
 
 /**
@@ -122,7 +122,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
         !isParentPortalPath(pathname) &&
         !isAnnouncementsPath(pathname)
       ) {
-        router.replace("/academics/parent/")
+        router.replace("/academics/")
       }
       return
     }
@@ -211,7 +211,11 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
 
   if (role === "parent") {
     if (!isParentPortalPath(pathname) && !isAnnouncementsPath(pathname)) {
-      return null
+      return (
+        <div className="flex flex-col gap-5 p-4 sm:p-6">
+          <DashboardOverviewSkeleton />
+        </div>
+      )
     }
     return <>{children}</>
   }

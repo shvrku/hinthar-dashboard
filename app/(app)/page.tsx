@@ -47,7 +47,7 @@ export default function RoleHomeDispatcher() {
       return
     }
     if (role === "parent") {
-      router.replace("/academics/parent/")
+      router.replace("/academics/")
       return
     }
     if (isStaffOrAbove(role)) {

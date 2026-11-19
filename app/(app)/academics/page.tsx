@@ -40,6 +40,8 @@ import type {
   ExamPassFailStatus,
 } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
+import { useCurrentUser } from "@/components/current-user-provider"
+import { isStaffOrAbove } from "@/lib/roles"
 import { ParentPortalWorkspace } from "@/components/academics/parent-portal-workspace"
 import {
   CodeChip,
@@ -2575,10 +2577,21 @@ function AcademicsWorkspaceContent() {
   )
 }
 
+function AcademicsRoleSwitch() {
+  const { role } = useCurrentUser()
+  if (role === "parent" || role === "student") {
+    return <ParentPortalWorkspace />
+  }
+  if (!isStaffOrAbove(role)) {
+    return <AcademicsLoading />
+  }
+  return <AcademicsWorkspaceContent />
+}
+
 export default function AcademicsPage() {
   return (
-    <RequireRole mode="staff" skeleton={<AcademicsLoading />}>
-      <AcademicsWorkspaceContent />
+    <RequireRole mode="parent_portal" skeleton={<AcademicsLoading />}>
+      <AcademicsRoleSwitch />
     </RequireRole>
   )
 }

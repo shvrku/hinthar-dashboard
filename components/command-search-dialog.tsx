@@ -94,6 +94,14 @@ const navigationItems: NavigationItem[] = [
     keywords: ["link", "teacher", "account", "matching", "portal"],
   },
   {
+    title: "Match parents",
+    href: "/users/matching/parents",
+    group: "Users",
+    icon: Link2,
+    adminOnly: true,
+    keywords: ["link", "parent", "student", "account", "matching", "portal"],
+  },
+  {
     title: "Design System",
     href: "/design-system",
     group: "Administration",
@@ -119,7 +127,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     title: "Child Exam Results & Schedule",
-    href: "/academics/parent",
+    href: "/academics",
     group: "Parent Portal",
     icon: GraduationCap,
     parentOnly: true,

@@ -130,36 +130,53 @@ export function ParentPortalWorkspace({
     "ALL" | "midterm" | "final"
   >("ALL")
 
-  const loadPortal = React.useCallback(async () => {
-    if (!isSignedIn) return
-    setLoading(true)
-    try {
-      const token = await getToken()
-      if (!token) return
-      const api = createApi(token)
-      const res = await api.getParentPortal({
-        student_id: selectedStudentId ? Number(selectedStudentId) : undefined,
-        academic_year_id: selectedYearId ? Number(selectedYearId) : undefined,
-      })
-      setData(res)
-      if (!selectedStudentId && res.student) {
-        setSelectedStudentId(String(res.student.id))
+  const lastRequestedKeyRef = React.useRef<string | null>(null)
+
+  const loadPortal = React.useCallback(
+    async (opts?: { force?: boolean }) => {
+      if (!isSignedIn) return
+      const reqKey = `${selectedStudentId}:${selectedYearId}`
+      if (!opts?.force && lastRequestedKeyRef.current === reqKey) {
+        return
       }
-      if (!selectedYearId && res.selected_academic_year) {
-        setSelectedYearId(String(res.selected_academic_year.id))
+      lastRequestedKeyRef.current = reqKey
+      setLoading(true)
+      try {
+        const token = await getToken()
+        if (!token) return
+        const api = createApi(token)
+        const res = await api.getParentPortal({
+          student_id: selectedStudentId ? Number(selectedStudentId) : undefined,
+          academic_year_id: selectedYearId ? Number(selectedYearId) : undefined,
+        })
+        const resolvedStudentId = !selectedStudentId && res.student ? String(res.student.id) : selectedStudentId
+        const resolvedYearId =
+          !selectedYearId && res.selected_academic_year
+            ? String(res.selected_academic_year.id)
+            : selectedYearId
+        lastRequestedKeyRef.current = `${resolvedStudentId}:${resolvedYearId}`
+        setData(res)
+        if (!selectedStudentId && res.student) {
+          setSelectedStudentId(String(res.student.id))
+        }
+        if (!selectedYearId && res.selected_academic_year) {
+          setSelectedYearId(String(res.selected_academic_year.id))
+        }
+      } catch (err) {
+        lastRequestedKeyRef.current = null
+        toast.add({
+          title:
+            err instanceof ApiError
+              ? err.userMessage
+              : "Failed to load parent results portal",
+          type: "error",
+        })
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      toast.add({
-        title:
-          err instanceof ApiError
-            ? err.userMessage
-            : "Failed to load parent results portal",
-        type: "error",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [getToken, isSignedIn, selectedStudentId, selectedYearId])
+    },
+    [getToken, isSignedIn, selectedStudentId, selectedYearId]
+  )
 
   React.useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -301,7 +318,7 @@ export function ParentPortalWorkspace({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void loadPortal()}
+              onClick={() => void loadPortal({ force: true })}
               disabled={loading}
               className="shrink-0 rounded-sm font-mono text-xs uppercase"
             >
@@ -426,7 +443,7 @@ export function ParentPortalWorkspace({
             <Button
               variant="outline"
               size="xs"
-              onClick={() => void loadPortal()}
+              onClick={() => void loadPortal({ force: true })}
               disabled={loading}
               className="h-8 shrink-0 rounded-sm font-mono text-[11px] uppercase"
             >
@@ -457,14 +474,24 @@ export function ParentPortalWorkspace({
         </div>
       </div>
 
+      {loading && !data && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <div className="h-32 w-full rounded-sm border border-border skeleton-shimmer" />
+            <div className="h-32 w-full rounded-sm border border-border skeleton-shimmer" />
+          </div>
+          <div className="h-64 w-full rounded-sm border border-border skeleton-shimmer" />
+        </div>
+      )}
+
       {!loading && !student && (
         <div className="flex flex-col items-center justify-center rounded-sm border border-dashed border-border bg-card px-6 py-12 text-center">
           <AlertTriangle className="mb-2 size-6 text-warning" />
           <p className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">
             No Student Linked To This Account
           </p>
-          <p className="mt-1 max-w-md text-xs text-muted-foreground">
-            Ask a school administrator to link your account to your child&apos;s student profile to view exam schedules and term results.
+          <p className="mt-1.5 max-w-md text-xs text-muted-foreground">
+            No students linked to this parent account yet. Ask an administrator to link your account under Users → Match parents.
           </p>
         </div>
       )}

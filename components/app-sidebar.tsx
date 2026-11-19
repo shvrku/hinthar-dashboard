@@ -163,6 +163,7 @@ const userSubItems = [
   { title: "Management", url: "/users/management", icon: UserCog },
   { title: "Match students", url: "/users/matching/students", icon: Link2 },
   { title: "Match teachers", url: "/users/matching/teachers", icon: Link2 },
+  { title: "Match parents", url: "/users/matching/parents", icon: Link2 },
 ]
 
 function isUsersSectionPath(pathname: string) {
@@ -190,6 +191,12 @@ function isUsersSubItemActive(pathname: string, url: string) {
     return (
       pathname.startsWith("/users/matching/teachers") ||
       pathname.startsWith("/users/matching-teachers")
+    )
+  }
+  if (url === "/users/matching/parents") {
+    return (
+      pathname.startsWith("/users/matching/parents") ||
+      pathname.startsWith("/users/matching-parents")
     )
   }
   return pathname === url || pathname === `${url}/` || pathname.startsWith(`${url}/`)
@@ -224,7 +231,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const studentHomeHref = account?.student_profile_id
     ? `/students/${account.student_profile_id}`
     : "/pending"
-  const homeHref = accountLocked ? "/account-locked" : "/"
+  const homeHref = accountLocked
+    ? "/account-locked"
+    : role === "parent"
+      ? "/academics"
+      : "/"
 
   const closeMobileSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile(false)
@@ -404,30 +415,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         ) : showParentNav ? (
           <SidebarGroup>
-            <SidebarGroupLabel>Parent Portal</SidebarGroupLabel>
+            <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              Parent Portal
+            </SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Exam Results & Schedule"
-                  isActive={pathname === "/academics/parent" || pathname.startsWith("/academics/parent/")}
-                  render={<Link href="/academics/parent" onClick={handleNavClick} />}
+                  isActive={pathname === "/academics" || pathname.startsWith("/academics/")}
+                  render={<Link href="/academics" onClick={handleNavClick} />}
+                  className={cn(
+                    "rounded-sm transition-colors",
+                    (pathname === "/academics" || pathname.startsWith("/academics/")) &&
+                      "font-semibold bg-sidebar-accent text-sidebar-accent-foreground"
+                  )}
                 >
-                  <GraduationCap />
-                  <span>Exam Results</span>
+                  <GraduationCap className="size-4" />
+                  <span>Parent Portal</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {schoolItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-                    render={<Link href={item.url} onClick={handleNavClick} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
             </SidebarMenu>
           </SidebarGroup>
         ) : showTeacherNav ? (
