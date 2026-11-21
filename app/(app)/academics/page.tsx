@@ -22,7 +22,7 @@ import {
   Trash2,
 } from "lucide-react"
 
-import { ApiError, createApi } from "@/lib/api"
+import { ApiError, createApi, getTokenWithTimeout } from "@/lib/api"
 import { downloadCsv } from "@/lib/export-utils"
 import { formatCohortIdentifier } from "@/lib/format-class"
 import { formatStudentIdentifier } from "@/lib/format-student-code"
@@ -114,7 +114,7 @@ function AcademicsWorkspaceContent() {
 
   React.useEffect(() => {
     if (paramTab === "schedule" || paramTab === "parent" || paramTab === "broadsheet") {
-      setActiveTab(paramTab)
+      setActiveTab((prev) => (prev === paramTab ? prev : paramTab))
     }
   }, [paramTab])
 
@@ -133,8 +133,8 @@ function AcademicsWorkspaceContent() {
   // Reference metadata — strictly gated to staff/admin so parents never trigger admin fetches.
   const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn && isStaff)
   const subjectsQuery = useSubjectsQuery(!!isLoaded && !!isSignedIn && isStaff)
-  const classes = classesQuery.data ?? []
-  const subjects = subjectsQuery.data ?? []
+  const classes = React.useMemo(() => classesQuery.data ?? [], [classesQuery.data])
+  const subjects = React.useMemo(() => subjectsQuery.data ?? [], [subjectsQuery.data])
 
   // Academic Years & Fixed Terms
   const [years, setYears] = React.useState<AcademicYear[]>([])
@@ -220,8 +220,14 @@ function AcademicsWorkspaceContent() {
     if (!isSignedIn || !isStaff) return
     setYearsLoading(true)
     try {
-      const token = await getTokenRef.current()
-      if (!token) return
+      const token = await getTokenWithTimeout(() => getTokenRef.current())
+      if (!token) {
+        toast.add({
+          title: "Authentication token timed out or unavailable. Please retry or sign in again.",
+          type: "error",
+        })
+        return
+      }
       const res = await createApi(token).listAcademicYears()
       setYears(res)
       if (res.length > 0) {
@@ -264,21 +270,26 @@ function AcademicsWorkspaceContent() {
 
   const activeTerm: AcademicTerm | null =
     selectedTermType === "midterm" ? midtermTerm : finalTerm
+  const activeTermId = activeTerm?.id ?? null
 
   const loadBroadsheet = React.useCallback(async () => {
-    if (!isSignedIn || !isStaff || !activeTerm || !selectedClassId) {
+    if (!isSignedIn || !isStaff || !activeTermId || !selectedClassId) {
       setBroadsheet(null)
-      if (!yearsLoading && !classesQuery.isLoading) {
-        setBroadsheetLoading(false)
-      }
+      setBroadsheetLoading(false)
       return
     }
     setBroadsheetLoading(true)
     try {
-      const token = await getTokenRef.current()
-      if (!token) return
+      const token = await getTokenWithTimeout(() => getTokenRef.current())
+      if (!token) {
+        toast.add({
+          title: "Authentication token timed out or unavailable. Please retry or sign in again.",
+          type: "error",
+        })
+        return
+      }
       const res = await createApi(token).getClassBroadsheet(
-        activeTerm.id,
+        activeTermId,
         Number(selectedClassId)
       )
       setBroadsheet(res)
@@ -291,20 +302,24 @@ function AcademicsWorkspaceContent() {
     } finally {
       setBroadsheetLoading(false)
     }
-  }, [isSignedIn, isStaff, activeTerm, selectedClassId, yearsLoading, classesQuery.isLoading])
+  }, [isSignedIn, isStaff, activeTermId, selectedClassId])
 
   const loadExams = React.useCallback(async () => {
     if (!isSignedIn || !isStaff || !selectedYearId) {
       setExams([])
-      if (!yearsLoading) {
-        setExamsLoading(false)
-      }
+      setExamsLoading(false)
       return
     }
     setExamsLoading(true)
     try {
-      const token = await getTokenRef.current()
-      if (!token) return
+      const token = await getTokenWithTimeout(() => getTokenRef.current())
+      if (!token) {
+        toast.add({
+          title: "Authentication token timed out or unavailable. Please retry or sign in again.",
+          type: "error",
+        })
+        return
+      }
       const res = await createApi(token).listExams({
         academic_year_id: selectedYearId,
       })
@@ -316,13 +331,13 @@ function AcademicsWorkspaceContent() {
     } finally {
       setExamsLoading(false)
     }
-  }, [isSignedIn, isStaff, selectedYearId, yearsLoading])
+  }, [isSignedIn, isStaff, selectedYearId])
 
   React.useEffect(() => {
-    if (isLoaded && isSignedIn && isStaff) {
+    if (isLoaded && isSignedIn && isStaff && !yearsLoading && !classesQuery.isLoading) {
       void loadBroadsheet()
     }
-  }, [isLoaded, isSignedIn, isStaff, loadBroadsheet])
+  }, [isLoaded, isSignedIn, isStaff, yearsLoading, classesQuery.isLoading, loadBroadsheet])
 
   React.useEffect(() => {
     if (isLoaded && isSignedIn && isStaff && !yearsLoading) {
@@ -570,17 +585,17 @@ function AcademicsWorkspaceContent() {
   // Live exam conflict pre-check
   React.useEffect(() => {
     if (!examSheetOpen || !examClassId || !examDate || !examStartTime || !examEndTime) {
-      setConflictCheck(null)
+      setConflictCheck((prev) => (prev === null ? prev : null))
       return
     }
     if (examEndTime <= examStartTime) {
-      setConflictCheck(null)
+      setConflictCheck((prev) => (prev === null ? prev : null))
       return
     }
     const timer = window.setTimeout(async () => {
       setCheckingConflict(true)
       try {
-        const token = await getTokenRef.current()
+        const token = await getTokenWithTimeout(() => getTokenRef.current())
         if (!token) return
         const res = await createApi(token).checkExamConflicts({
           class_id: Number(examClassId),

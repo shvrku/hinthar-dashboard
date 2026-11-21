@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth, useClerk } from "@clerk/nextjs"
-import { AlertTriangle, RotateCcw, LogOut } from "lucide-react"
+import { AlertTriangle, RotateCcw, LogIn, LogOut } from "lucide-react"
 import { useCurrentUser } from "@/components/current-user-provider"
 import { AuthPortalLoadingState } from "@/components/page-skeletons"
 import { Button } from "@/components/ui/button"
@@ -83,6 +84,15 @@ export function AuthProfileErrorState({
           >
             <RotateCcw className="mr-1.5 size-3.5" />
             Retry
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link href="/sign-in/" />}
+            className="rounded-sm font-mono text-xs uppercase text-muted-foreground hover:text-foreground"
+          >
+            <LogIn className="mr-1.5 size-3.5" />
+            Sign in
           </Button>
           <Button
             type="button"

@@ -1,5 +1,32 @@
 import { sysLog } from "@/lib/sys-log"
 
+export const DEFAULT_TOKEN_TIMEOUT_MS = 4000
+
+/**
+ * Race Clerk's `getToken()` against a timeout so a hung token request resolves
+ * to `null` after 4 seconds instead of suspending rendering indefinitely.
+ */
+export async function getTokenWithTimeout(
+  getTokenFn: () => Promise<string | null>,
+  timeoutMs = DEFAULT_TOKEN_TIMEOUT_MS
+): Promise<string | null> {
+  let timerId: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      Promise.resolve()
+        .then(() => getTokenFn())
+        .catch(() => null),
+      new Promise<null>((resolve) => {
+        timerId = setTimeout(() => resolve(null), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timerId !== undefined) {
+      clearTimeout(timerId)
+    }
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,

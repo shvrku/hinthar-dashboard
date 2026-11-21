@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import {
   AlertTriangle,
@@ -10,13 +11,14 @@ import {
   Eye,
   GraduationCap,
   Lock,
+  LogIn,
   Minus,
   RotateCcw,
   ShieldCheck,
   UserCheck,
 } from "lucide-react"
 
-import { ApiError, createApi } from "@/lib/api"
+import { ApiError, createApi, getTokenWithTimeout } from "@/lib/api"
 import { formatStudentIdentifier } from "@/lib/format-student-code"
 import { isStaffOrAbove } from "@/lib/roles"
 import type {
@@ -153,11 +155,11 @@ export function ParentPortalWorkspace({
       setErrorMessage(null)
       setLoading(true)
       try {
-        const token = await getTokenRef.current()
+        const token = await getTokenWithTimeout(() => getTokenRef.current())
         if (!token) {
           lastRequestedKeyRef.current = null
           setErrorMessage(
-            "Authentication session token is unavailable. Please retry or sign in again."
+            "Authentication token timed out or unavailable. Please retry or sign in again."
           )
           return
         }
@@ -507,16 +509,27 @@ export function ParentPortalWorkspace({
           <p className="mt-1.5 max-w-md text-xs text-muted-foreground break-words">
             {errorMessage}
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void loadPortal({ force: true })}
-            className="mt-4 rounded-sm font-mono text-xs uppercase"
-          >
-            <RotateCcw className="mr-1.5 size-3.5" />
-            Retry
-          </Button>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void loadPortal({ force: true })}
+              className="rounded-sm font-mono text-xs uppercase"
+            >
+              <RotateCcw className="mr-1.5 size-3.5" />
+              Retry
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              render={<Link href="/sign-in/" />}
+              className="rounded-sm font-mono text-xs uppercase text-muted-foreground hover:text-foreground"
+            >
+              <LogIn className="mr-1.5 size-3.5" />
+              Sign in
+            </Button>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 import { NextResponse, type NextRequest } from "next/server"
+import { getTokenWithTimeout } from "@/lib/api"
 
 // Fallback proxy when NEXT_PUBLIC_API_ORIGIN is unset.
 // Prefer browser → Django (direct) in production to cut Vercel function usage.
@@ -61,7 +62,7 @@ async function handleRequest(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const token = await getToken()
+  const token = await getTokenWithTimeout(() => getToken())
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
