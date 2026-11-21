@@ -56,10 +56,12 @@ function isParentPortalPath(pathname: string): boolean {
 }
 
 export function AuthProfileErrorState({
+  title = "Session unavailable — Sign In / Retry",
   error,
   onRetry,
   onSignOut,
 }: {
+  title?: string
   error: string
   onRetry: () => void
   onSignOut: () => void
@@ -70,7 +72,7 @@ export function AuthProfileErrorState({
         <AlertTriangle className="mx-auto size-6 text-warning" />
         <div className="space-y-1.5">
           <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">
-            Account Profile Error
+            {title}
           </h2>
           <p className="text-xs text-muted-foreground break-words">{error}</p>
         </div>
@@ -138,15 +140,11 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   const accountLocked = user?.is_active === false
 
   React.useEffect(() => {
-    if (!authLoaded) return
+    if (!authLoaded || !isSignedIn || loading || !role) return
 
     let target: string | null = null
 
-    if (!isSignedIn) {
-      target = "/sign-in/"
-    } else if (loading || !role) {
-      return
-    } else if (
+    if (
       isSettingsPath(pathname) ||
       pathname === "/" ||
       isLegacyStudentPortalPath(pathname)
@@ -225,10 +223,11 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
 
   if (authLoaded && !isSignedIn) {
     return (
-      <AuthPortalLoadingState
-        label="Redirecting to sign in..."
-        subtitle="No active session found. Opening sign-in screen..."
-        compact
+      <AuthProfileErrorState
+        title="Session unavailable — Sign In / Retry"
+        error="Your client session could not be verified. Click Retry to reload your session or Sign In to authenticate."
+        onRetry={() => window.location.reload()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
       />
     )
   }

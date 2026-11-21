@@ -504,7 +504,7 @@ export function ParentPortalWorkspace({
         <div className="flex flex-col items-center justify-center rounded-sm border border-destructive/40 bg-zinc-950 px-6 py-10 text-center">
           <AlertTriangle className="mb-2 size-6 text-destructive" />
           <p className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">
-            Unable To Load Parent Portal
+            Session unavailable — Sign In / Retry
           </p>
           <p className="mt-1.5 max-w-md text-xs text-muted-foreground break-words">
             {errorMessage}

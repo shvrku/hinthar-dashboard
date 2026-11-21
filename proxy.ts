@@ -1,46 +1,22 @@
-import { clerkMiddleware } from "@clerk/nextjs/server"
-import { NextResponse, type NextRequest } from "next/server"
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 
-const ENTRY_PATHS = new Set(["/", "/sign-in", "/sign-in/", "/sign-up", "/sign-up/"])
-
-function resolveSafeRedirectPath(req: NextRequest, rawRedirect: string | null): string {
-  if (!rawRedirect) return "/academics/"
-  const trimmed = rawRedirect.trim()
-  try {
-    const reqUrl = new URL(req.url)
-    const parsed = new URL(trimmed, reqUrl)
-    if (parsed.origin === reqUrl.origin && !ENTRY_PATHS.has(parsed.pathname)) {
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`
-    }
-  } catch {
-    // fall through to default route
-  }
-  return "/academics/"
-}
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/events(.*)",
+  "/api(.*)",
+])
 
 /**
- * Session plumbing + direct post-login routing to `/academics/` on entry routes
- * so already-authenticated users visiting `/academics` or `/payroll` never bounce.
- * Resource auth gates live on:
- * - app/(app)/layout.tsx → await auth.protect()
- * - app/api/[...slug]/route.ts → await auth.protect()
+ * Server-side route protection via Clerk `auth.protect()`.
+ * Public auth routes (`/sign-in`, `/sign-up`), public `/events`, and `/api/*`
+ * (which returns JSON 401 inside app/api/[...slug]/route.ts) are never auto-redirected,
+ * preventing any ping-pong loop between `/academics/` and `/sign-in/`.
  */
 export default clerkMiddleware(async (auth, req) => {
-  const { pathname } = req.nextUrl
-  if (!ENTRY_PATHS.has(pathname)) {
-    return
+  if (!isPublicRoute(req)) {
+    await auth.protect({ unauthenticatedUrl: "/sign-in/" })
   }
-
-  const { userId } = await auth()
-  if (!userId) {
-    return
-  }
-
-  const targetPath = resolveSafeRedirectPath(
-    req,
-    req.nextUrl.searchParams.get("redirect_url")
-  )
-  return NextResponse.redirect(new URL(targetPath, req.url))
 })
 
 export const config = {

@@ -23,14 +23,10 @@ export default function RoleHomeDispatcher() {
   const teacherId = user?.teacher_profile_id ?? null
 
   React.useEffect(() => {
-    if (!isLoaded) return
+    if (!isLoaded || !isSignedIn || loading || !role) return
 
     let target: string | null = null
-    if (!isSignedIn) {
-      target = "/sign-in/"
-    } else if (loading || !role) {
-      return
-    } else if (user?.is_active === false) {
+    if (user?.is_active === false) {
       target = "/account-locked/"
     } else if (role === "pending") {
       target = "/pending/"
@@ -64,10 +60,11 @@ export default function RoleHomeDispatcher() {
 
   if (isLoaded && !isSignedIn) {
     return (
-      <AuthPortalLoadingState
-        label="Redirecting to sign in..."
-        subtitle="Opening authentication page..."
-        compact
+      <AuthProfileErrorState
+        title="Session unavailable — Sign In / Retry"
+        error="Your client session could not be verified. Click Retry to reload your session or Sign In to authenticate."
+        onRetry={() => window.location.reload()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
       />
     )
   }
