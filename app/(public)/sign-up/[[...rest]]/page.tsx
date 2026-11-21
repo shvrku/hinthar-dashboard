@@ -1,13 +1,24 @@
 "use client"
 
-import Link from "next/link"
+import * as React from "react"
 import { SignUp, useAuth, useClerk } from "@clerk/nextjs"
 import { ArrowRight, Loader2, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { getTokenWithTimeout } from "@/lib/api"
 
 export default function SignUpPage() {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn, getToken } = useAuth()
   const { signOut } = useClerk()
+  const [continuing, setContinuing] = React.useState(false)
+
+  const handleContinue = async () => {
+    setContinuing(true)
+    try {
+      await getTokenWithTimeout(() => getToken())
+    } finally {
+      window.location.assign("/academics/")
+    }
+  }
 
   if (!isLoaded) {
     return (
@@ -31,15 +42,21 @@ export default function SignUpPage() {
         </div>
         <div className="flex flex-col gap-2 pt-1">
           <Button
-            render={<Link href="/academics/" />}
+            type="button"
+            disabled={continuing}
+            onClick={() => void handleContinue()}
             className="w-full rounded-sm font-mono text-xs uppercase"
           >
+            {continuing ? (
+              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+            ) : null}
             <span>Continue to Dashboard</span>
             <ArrowRight className="ml-1.5 size-3.5" />
           </Button>
           <Button
             type="button"
             variant="outline"
+            disabled={continuing}
             onClick={() => void signOut({ redirectUrl: "/sign-up/" })}
             className="w-full rounded-sm font-mono text-xs uppercase"
           >
