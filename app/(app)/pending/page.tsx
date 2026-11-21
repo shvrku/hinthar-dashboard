@@ -2,6 +2,7 @@
 
 import { useClerk } from "@clerk/nextjs"
 import { useCurrentUser } from "@/components/current-user-provider"
+import { AuthPortalLoadingState } from "@/components/page-skeletons"
 import { Button } from "@/components/ui/button"
 import { StandardPageHeader } from "@/components/standard-page-header"
 
@@ -10,7 +11,7 @@ export default function PendingApprovalPage() {
   const { signOut } = useClerk()
 
   if (loading) {
-    return null
+    return <AuthPortalLoadingState label="Loading account status..." compact />
   }
 
   const role = user?.role

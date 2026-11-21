@@ -25,6 +25,7 @@ export function useMeQuery(enabled = true, clerkUserId?: string | null) {
     queryKey: apiQueryKeys.me(clerkUserId),
     enabled: enabled && isLoaded && isSignedIn && !!clerkUserId,
     staleTime: 5 * 60_000,
+    retry: 1,
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error("No session token")

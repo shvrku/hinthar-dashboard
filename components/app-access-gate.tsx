@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { useAuth } from "@clerk/nextjs"
+import { useAuth, useClerk } from "@clerk/nextjs"
+import { AlertTriangle, RotateCcw, LogOut } from "lucide-react"
 import { useCurrentUser } from "@/components/current-user-provider"
-import { DashboardOverviewSkeleton } from "@/components/page-skeletons"
+import { AuthPortalLoadingState } from "@/components/page-skeletons"
+import { Button } from "@/components/ui/button"
 import { canCheckIn, isStaffOrAbove } from "@/lib/roles"
 
 /** Normalize `/pending/` → `/pending` so trailingSlash config doesn't blank the page. */
@@ -49,7 +51,53 @@ function isAnnouncementsPath(pathname: string): boolean {
 }
 
 function isParentPortalPath(pathname: string): boolean {
-  return pathname === "/academics" || pathname === "/academics/parent"
+  return pathname === "/academics" || pathname.startsWith("/academics/")
+}
+
+export function AuthProfileErrorState({
+  error,
+  onRetry,
+  onSignOut,
+}: {
+  error: string
+  onRetry: () => void
+  onSignOut: () => void
+}) {
+  return (
+    <div className="mx-auto flex min-h-[45vh] max-w-md flex-col items-center justify-center p-6 text-center">
+      <div className="w-full space-y-4 rounded-sm border border-zinc-800 bg-zinc-950 p-6">
+        <AlertTriangle className="mx-auto size-6 text-warning" />
+        <div className="space-y-1.5">
+          <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">
+            Account Profile Error
+          </h2>
+          <p className="text-xs text-muted-foreground break-words">{error}</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="rounded-sm font-mono text-xs uppercase"
+          >
+            <RotateCcw className="mr-1.5 size-3.5" />
+            Retry
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onSignOut}
+            className="rounded-sm font-mono text-xs uppercase text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="mr-1.5 size-3.5" />
+            Sign out
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -61,14 +109,17 @@ function isParentPortalPath(pathname: string): boolean {
  * - pending / unmatched student or teacher → `/pending`
  * - teacher → `/`, `/settings`, own `/teachers/{id}`
  * - terminal → `/`, `/settings`, `/check-in/terminal*`
- * - student → `/`, `/settings`, own `/students/{id}`
+ * - student → `/`, `/settings`, own `/students/{id}`, `/academics*`
+ * - parent → `/`, `/settings`, `/academics*`
  * - staff/admin → full app
  */
 export function AppAccessGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded: authLoaded } = useAuth()
-  const { role, user, loading } = useCurrentUser()
+  const { signOut } = useClerk()
+  const { role, user, loading, error, refresh } = useCurrentUser()
   const pathname = normalizePath(usePathname())
   const router = useRouter()
+  const lastRedirectRef = React.useRef<string | null>(null)
   const studentProfileId = user?.student_profile_id ?? null
   const teacherProfileId = user?.teacher_profile_id ?? null
   const unmatchedStudent = role === "student" && studentProfileId == null
@@ -77,68 +128,62 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   const accountLocked = user?.is_active === false
 
   React.useEffect(() => {
-    if (!authLoaded || loading || !isSignedIn || !role) return
-    if (isSettingsPath(pathname) || pathname === "/" || isLegacyStudentPortalPath(pathname)) {
-      return
-    }
+    if (!authLoaded) return
 
-    if (accountLocked) {
-      if (!isAccountLockedPath(pathname)) router.replace("/account-locked/")
-      return
-    }
+    let target: string | null = null
 
-    if (isAccountLockedPath(pathname)) {
-      router.replace("/")
+    if (!isSignedIn) {
+      target = "/sign-in/"
+    } else if (loading || !role) {
       return
-    }
-
-    if (waitingForLink) {
+    } else if (
+      isSettingsPath(pathname) ||
+      pathname === "/" ||
+      isLegacyStudentPortalPath(pathname)
+    ) {
+      target = null
+    } else if (accountLocked) {
+      if (!isAccountLockedPath(pathname)) target = "/account-locked/"
+    } else if (isAccountLockedPath(pathname)) {
+      target = "/"
+    } else if (waitingForLink) {
       if (!isPendingPath(pathname) && !isAnnouncementsPath(pathname)) {
-        router.replace("/pending/")
+        target = "/pending/"
       }
-      return
-    }
-
-    if (role === "terminal") {
+    } else if (role === "terminal") {
       if (!pathname.startsWith("/check-in/terminal")) {
-        router.replace("/check-in/terminal/")
+        target = "/check-in/terminal/"
       }
-      return
-    }
-
-    if (role === "student") {
+    } else if (role === "student") {
       if (
         !isOwnStudentHubPath(pathname, studentProfileId) &&
         !isParentPortalPath(pathname) &&
         !isAnnouncementsPath(pathname)
       ) {
-        router.replace("/")
+        target = "/"
       }
-      return
-    }
-
-    if (role === "parent") {
-      if (
-        !isParentPortalPath(pathname) &&
-        !isAnnouncementsPath(pathname)
-      ) {
-        router.replace("/academics/")
+    } else if (role === "parent") {
+      if (!isParentPortalPath(pathname) && !isAnnouncementsPath(pathname)) {
+        target = "/academics/"
       }
-      return
-    }
-
-    if (role === "teacher") {
+    } else if (role === "teacher") {
       if (
         !isOwnTeacherHubPath(pathname, teacherProfileId) &&
         !isAnnouncementsPath(pathname)
       ) {
-        router.replace("/")
+        target = "/"
       }
-      return
+    } else if (isStaffOrAbove(role) && isPendingPath(pathname)) {
+      target = "/overview/"
     }
 
-    if (isStaffOrAbove(role) && isPendingPath(pathname)) {
-      router.replace("/overview/")
+    if (target) {
+      if (lastRedirectRef.current !== target) {
+        lastRedirectRef.current = target
+        router.replace(target)
+      }
+    } else {
+      lastRedirectRef.current = null
     }
   }, [
     authLoaded,
@@ -153,23 +198,42 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     router,
   ])
 
-  if (!authLoaded || (isSignedIn && loading)) {
+  const defaultLoadingLabel =
+    isParentPortalPath(pathname) || role === "parent"
+      ? "Loading Hinthar Portal..."
+      : "Loading Hinthar Portal..."
+
+  if (error) {
     return (
-      <div className="flex flex-col gap-5 p-4 sm:p-6">
-        <DashboardOverviewSkeleton />
-      </div>
+      <AuthProfileErrorState
+        error={error}
+        onRetry={() => void refresh()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
+      />
     )
   }
 
-  if (!isSignedIn) {
-    return <>{children}</>
+  if (authLoaded && !isSignedIn) {
+    return (
+      <AuthPortalLoadingState
+        label="Redirecting to sign in..."
+        subtitle="No active session found. Opening sign-in screen..."
+        compact
+      />
+    )
+  }
+
+  if (!authLoaded || (isSignedIn && loading)) {
+    return <AuthPortalLoadingState label={defaultLoadingLabel} />
   }
 
   if (!role) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-        Unable to load your account profile.
-      </div>
+      <AuthProfileErrorState
+        error="Unable to load your account profile from /api/v1/me/."
+        onRetry={() => void refresh()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
+      />
     )
   }
 
@@ -178,22 +242,26 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
   }
 
   if (accountLocked) {
-    if (!isAccountLockedPath(pathname)) return null
+    if (!isAccountLockedPath(pathname)) {
+      return <AuthPortalLoadingState label="Loading account status..." compact />
+    }
     return <>{children}</>
   }
 
   if (isAccountLockedPath(pathname)) {
-    return null
+    return <AuthPortalLoadingState label="Loading workspace..." compact />
   }
 
   if (waitingForLink) {
-    if (!isPendingPath(pathname) && !isAnnouncementsPath(pathname)) return null
+    if (!isPendingPath(pathname) && !isAnnouncementsPath(pathname)) {
+      return <AuthPortalLoadingState label="Loading account status..." compact />
+    }
     return <>{children}</>
   }
 
   if (role === "teacher") {
     if (!isOwnTeacherHubPath(pathname, teacherProfileId) && !isAnnouncementsPath(pathname)) {
-      return null
+      return <AuthPortalLoadingState label="Loading teacher portal..." compact />
     }
     return <>{children}</>
   }
@@ -204,29 +272,33 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
       !isParentPortalPath(pathname) &&
       !isAnnouncementsPath(pathname)
     ) {
-      return null
+      return <AuthPortalLoadingState label="Loading student portal..." compact />
     }
     return <>{children}</>
   }
 
   if (role === "parent") {
     if (!isParentPortalPath(pathname) && !isAnnouncementsPath(pathname)) {
-      return (
-        <div className="flex flex-col gap-5 p-4 sm:p-6">
-          <DashboardOverviewSkeleton />
-        </div>
-      )
+      return <AuthPortalLoadingState label="Loading Parent Portal..." />
     }
     return <>{children}</>
   }
 
   if (role === "terminal") {
-    if (!pathname.startsWith("/check-in/terminal")) return null
+    if (!pathname.startsWith("/check-in/terminal")) {
+      return <AuthPortalLoadingState label="Loading check-in terminal..." compact />
+    }
     return <>{children}</>
   }
 
   if (!isStaffOrAbove(role) && !canCheckIn(role)) {
-    return null
+    return (
+      <AuthProfileErrorState
+        error={`Your account role ("${role}") does not have permission to access this workspace.`}
+        onRetry={() => void refresh()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
+      />
+    )
   }
 
   return <>{children}</>

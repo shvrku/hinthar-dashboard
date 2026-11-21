@@ -25,6 +25,7 @@ import type {
   ParentPortalTermCell,
 } from "@/lib/types"
 import { useCurrentUser } from "@/components/current-user-provider"
+import { AuthPortalLoadingState } from "@/components/page-skeletons"
 import {
   CodeChip,
   DataModule,
@@ -125,25 +126,41 @@ export function ParentPortalWorkspace({
   const [selectedYearId, setSelectedYearId] = React.useState<string>("")
   const [data, setData] = React.useState<ParentPortalResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [scheduleTermFilter, setScheduleTermFilter] = React.useState<
     "ALL" | "midterm" | "final"
   >("ALL")
 
+  const getTokenRef = React.useRef(getToken)
+  React.useEffect(() => {
+    getTokenRef.current = getToken
+  }, [getToken])
+
   const lastRequestedKeyRef = React.useRef<string | null>(null)
 
   const loadPortal = React.useCallback(
     async (opts?: { force?: boolean }) => {
-      if (!isSignedIn) return
+      if (!isSignedIn) {
+        setLoading(false)
+        return
+      }
       const reqKey = `${selectedStudentId}:${selectedYearId}`
       if (!opts?.force && lastRequestedKeyRef.current === reqKey) {
         return
       }
       lastRequestedKeyRef.current = reqKey
+      setErrorMessage(null)
       setLoading(true)
       try {
-        const token = await getToken()
-        if (!token) return
+        const token = await getTokenRef.current()
+        if (!token) {
+          lastRequestedKeyRef.current = null
+          setErrorMessage(
+            "Authentication session token is unavailable. Please retry or sign in again."
+          )
+          return
+        }
         const api = createApi(token)
         const res = await api.getParentPortal({
           student_id: selectedStudentId ? Number(selectedStudentId) : undefined,
@@ -164,18 +181,22 @@ export function ParentPortalWorkspace({
         }
       } catch (err) {
         lastRequestedKeyRef.current = null
+        const msg =
+          err instanceof ApiError
+            ? err.userMessage
+            : err instanceof Error
+              ? err.message
+              : "Failed to load parent results portal"
+        setErrorMessage(msg)
         toast.add({
-          title:
-            err instanceof ApiError
-              ? err.userMessage
-              : "Failed to load parent results portal",
+          title: msg,
           type: "error",
         })
       } finally {
         setLoading(false)
       }
     },
-    [getToken, isSignedIn, selectedStudentId, selectedYearId]
+    [isSignedIn, selectedStudentId, selectedYearId]
   )
 
   React.useEffect(() => {
@@ -250,12 +271,7 @@ export function ParentPortalWorkspace({
   const timetableScroll = useSyncedHorizontalScroll(900)
 
   if (!isLoaded) {
-    return (
-      <div className="space-y-4">
-        <div className="h-28 w-full rounded-sm border border-border skeleton-shimmer" />
-        <div className="h-80 w-full rounded-sm border border-border skeleton-shimmer" />
-      </div>
-    )
+    return <AuthPortalLoadingState label="Loading Parent Portal..." compact />
   }
 
   return (
@@ -475,16 +491,36 @@ export function ParentPortalWorkspace({
       </div>
 
       {loading && !data && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <div className="h-32 w-full rounded-sm border border-border skeleton-shimmer" />
-            <div className="h-32 w-full rounded-sm border border-border skeleton-shimmer" />
-          </div>
-          <div className="h-64 w-full rounded-sm border border-border skeleton-shimmer" />
+        <AuthPortalLoadingState
+          label="Loading Parent Portal..."
+          subtitle="Fetching enrolled subjects, schedules, and term summaries..."
+          compact
+        />
+      )}
+
+      {!loading && errorMessage && !student && (
+        <div className="flex flex-col items-center justify-center rounded-sm border border-destructive/40 bg-zinc-950 px-6 py-10 text-center">
+          <AlertTriangle className="mb-2 size-6 text-destructive" />
+          <p className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">
+            Unable To Load Parent Portal
+          </p>
+          <p className="mt-1.5 max-w-md text-xs text-muted-foreground break-words">
+            {errorMessage}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadPortal({ force: true })}
+            className="mt-4 rounded-sm font-mono text-xs uppercase"
+          >
+            <RotateCcw className="mr-1.5 size-3.5" />
+            Retry
+          </Button>
         </div>
       )}
 
-      {!loading && !student && (
+      {!loading && !errorMessage && !student && (
         <div className="flex flex-col items-center justify-center rounded-sm border border-dashed border-border bg-card px-6 py-12 text-center">
           <AlertTriangle className="mb-2 size-6 text-warning" />
           <p className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">

@@ -7,48 +7,68 @@ import { cn } from "@/lib/utils"
 import type { SortOrder } from "@/lib/use-sortable-data"
 
 function useSyncedHorizontalScroll(defaultTrackWidth = 900) {
-  const topBarRef = React.useRef<HTMLDivElement | null>(null)
+  const topBarElRef = React.useRef<HTMLDivElement | null>(null)
   const containerElRef = React.useRef<HTMLDivElement | null>(null)
-  const [containerNode, setContainerNode] = React.useState<HTMLDivElement | null>(null)
+  const observerRef = React.useRef<ResizeObserver | null>(null)
   const syncingSource = React.useRef<"top" | "main" | null>(null)
-  const [trackWidth, setTrackWidth] = React.useState(defaultTrackWidth)
 
-  const containerRef = React.useCallback((node: HTMLDivElement | null) => {
-    containerElRef.current = node
-    setContainerNode((prev) => (prev === node ? prev : node))
-  }, [])
+  const syncSpacerWidth = React.useCallback(() => {
+    const main = containerElRef.current
+    const top = topBarElRef.current
+    if (!top) return
+    const spacer = top.firstElementChild as HTMLElement | null
+    if (!spacer) return
+    const next = main
+      ? Math.max(defaultTrackWidth, main.scrollWidth, main.clientWidth)
+      : defaultTrackWidth
+    spacer.style.width = `${next}px`
+  }, [defaultTrackWidth])
+
+  const topBarRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      topBarElRef.current = node
+      syncSpacerWidth()
+    },
+    [syncSpacerWidth]
+  )
+
+  const containerRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+        observerRef.current = null
+      }
+      containerElRef.current = node
+      syncSpacerWidth()
+      if (!node || typeof ResizeObserver === "undefined") return
+
+      const observer = new ResizeObserver(() => {
+        syncSpacerWidth()
+      })
+      observer.observe(node)
+      if (node.firstElementChild) {
+        observer.observe(node.firstElementChild)
+      }
+      observerRef.current = observer
+    },
+    [syncSpacerWidth]
+  )
 
   React.useEffect(() => {
-    if (!containerNode) {
-      setTrackWidth(defaultTrackWidth)
-      return
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+        observerRef.current = null
+      }
     }
-
-    const updateWidth = () => {
-      const next = Math.max(
-        defaultTrackWidth,
-        containerNode.scrollWidth,
-        containerNode.clientWidth
-      )
-      setTrackWidth((prev) => (prev === next ? prev : next))
-    }
-
-    updateWidth()
-    const observer = new ResizeObserver(updateWidth)
-    observer.observe(containerNode)
-    if (containerNode.firstElementChild) {
-      observer.observe(containerNode.firstElementChild)
-    }
-
-    return () => observer.disconnect()
-  }, [containerNode, defaultTrackWidth])
+  }, [])
 
   const onTopScroll = React.useCallback(() => {
     if (syncingSource.current === "main") {
       syncingSource.current = null
       return
     }
-    const top = topBarRef.current
+    const top = topBarElRef.current
     const main = containerElRef.current
     if (!top || !main) return
     if (Math.abs(main.scrollLeft - top.scrollLeft) <= 1) return
@@ -60,11 +80,12 @@ function useSyncedHorizontalScroll(defaultTrackWidth = 900) {
   }, [])
 
   const onMainScroll = React.useCallback(() => {
+    syncSpacerWidth()
     if (syncingSource.current === "top") {
       syncingSource.current = null
       return
     }
-    const top = topBarRef.current
+    const top = topBarElRef.current
     const main = containerElRef.current
     if (!top || !main) return
     if (Math.abs(top.scrollLeft - main.scrollLeft) <= 1) return
@@ -73,7 +94,7 @@ function useSyncedHorizontalScroll(defaultTrackWidth = 900) {
     requestAnimationFrame(() => {
       if (syncingSource.current === "main") syncingSource.current = null
     })
-  }, [])
+  }, [syncSpacerWidth])
 
   const scrollByAmount = React.useCallback((delta: number) => {
     const main = containerElRef.current
@@ -84,7 +105,7 @@ function useSyncedHorizontalScroll(defaultTrackWidth = 900) {
   return {
     topBarRef,
     containerRef,
-    trackWidth,
+    trackWidth: defaultTrackWidth,
     onTopScroll,
     onMainScroll,
     scrollByAmount,

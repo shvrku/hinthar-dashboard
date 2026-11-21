@@ -3,7 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useClerk } from "@clerk/nextjs"
 import { useCurrentUser } from "@/components/current-user-provider"
+import { AuthProfileErrorState } from "@/components/app-access-gate"
 import {
   canCheckIn,
   isAdmin,
@@ -11,7 +13,7 @@ import {
   type Role,
 } from "@/lib/roles"
 import { Button } from "@/components/ui/button"
-import { DashboardOverviewSkeleton } from "@/components/page-skeletons"
+import { AuthPortalLoadingState } from "@/components/page-skeletons"
 
 type GateMode = "staff" | "admin" | "checkin" | "any" | "student" | "parent" | "parent_portal"
 
@@ -38,8 +40,10 @@ export function RequireRole({
   skeleton?: React.ReactNode
   children: React.ReactNode
 }) {
-  const { role, user, loading, error } = useCurrentUser()
+  const { role, user, loading, error, refresh } = useCurrentUser()
+  const { signOut } = useClerk()
   const router = useRouter()
+  const lastRedirectRef = React.useRef<string | null>(null)
   const pathnameRaw = usePathname()
   const pathname =
     pathnameRaw.length > 1 && pathnameRaw.endsWith("/")
@@ -52,72 +56,77 @@ export function RequireRole({
   const accountLocked = user?.is_active === false
 
   React.useEffect(() => {
-    if (loading) return
+    if (loading || !role) return
+
+    let target: string | null = null
+
     if (accountLocked && pathname !== "/account-locked") {
-      router.replace("/account-locked/")
-      return
-    }
-    if (waitingForLink && pathname !== "/pending") {
-      router.replace("/pending/")
-      return
-    }
-    if (role === "student" && mode !== "student" && mode !== "parent_portal" && mode !== "any") {
+      target = "/account-locked/"
+    } else if (waitingForLink && pathname !== "/pending") {
+      target = "/pending/"
+    } else if (role === "student" && mode !== "student" && mode !== "parent_portal" && mode !== "any") {
       if (pathname !== "/") {
-        router.replace("/")
+        target = "/"
       }
-      return
-    }
-    if (role === "parent" && mode !== "parent" && mode !== "parent_portal" && mode !== "any") {
-      if (pathname !== "/academics" && pathname !== "/academics/parent") {
-        router.replace("/academics/")
+    } else if (role === "parent" && mode !== "parent" && mode !== "parent_portal" && mode !== "any") {
+      if (pathname !== "/academics" && !pathname.startsWith("/academics/")) {
+        target = "/academics/"
       }
-      return
-    }
-    if (role === "terminal" && mode !== "checkin" && mode !== "any") {
+    } else if (role === "terminal" && mode !== "checkin" && mode !== "any") {
       if (!pathname.startsWith("/check-in/terminal")) {
-        router.replace("/check-in/terminal/")
+        target = "/check-in/terminal/"
       }
+    }
+
+    if (target) {
+      if (lastRedirectRef.current !== target) {
+        lastRedirectRef.current = target
+        router.replace(target)
+      }
+    } else {
+      lastRedirectRef.current = null
     }
   }, [loading, role, waitingForLink, accountLocked, pathname, router, mode])
 
-  if (loading) {
-    return (
-      skeleton ?? (
-        <div className="flex flex-col gap-5 p-4 sm:p-6">
-          <DashboardOverviewSkeleton />
-        </div>
-      )
-    )
-  }
+  const defaultLabel =
+    mode === "parent" || mode === "parent_portal" || role === "parent"
+      ? "Loading Hinthar Portal..."
+      : "Loading Hinthar Portal..."
 
   if (error) {
     return (
-      <div className="mx-auto max-w-md space-y-3 py-16 text-center">
-        <p className="text-sm text-destructive">{error}</p>
-        <Button variant="outline" onClick={() => window.location.reload()}>
-          Retry
-        </Button>
-      </div>
+      <AuthProfileErrorState
+        error={error}
+        onRetry={() => void refresh()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
+      />
     )
   }
 
-  if (accountLocked) {
-    return null
+  if (loading) {
+    return skeleton ?? <AuthPortalLoadingState label={defaultLabel} />
   }
 
-  if (waitingForLink) {
-    return null
+  if (!role) {
+    return (
+      <AuthProfileErrorState
+        error="Unable to load your account profile from /api/v1/me/."
+        onRetry={() => void refresh()}
+        onSignOut={() => void signOut({ redirectUrl: "/sign-in/" })}
+      />
+    )
+  }
+
+  if (accountLocked || waitingForLink) {
+    return <AuthPortalLoadingState label="Loading account status..." compact />
   }
 
   if (!allowed(role, mode)) {
-    if (role === "parent" || role === "student" || role === "teacher" || role === "terminal") {
-      return (
-        skeleton ?? (
-          <div className="flex flex-col gap-5 p-4 sm:p-6">
-            <DashboardOverviewSkeleton />
-          </div>
-        )
-      )
+    if (role === "parent") {
+      return skeleton ?? <AuthPortalLoadingState label="Loading Parent Portal..." />
+    }
+    if (role === "student" || role === "teacher" || role === "terminal") {
+      return skeleton ?? <AuthPortalLoadingState label="Loading workspace..." />
     }
     return (
       <div className="mx-auto max-w-md space-y-4 py-16 text-center">

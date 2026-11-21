@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { TableCell, TableRow } from "@/components/ui/table"
@@ -227,6 +228,38 @@ export function WeekGridSkeleton({ rows = 6 }: { rows?: number }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+export function AuthPortalLoadingState({
+  label = "Loading Hinthar Portal...",
+  subtitle = "Verifying session and account permissions...",
+  compact = false,
+}: {
+  label?: string
+  subtitle?: string
+  compact?: boolean
+}) {
+  return (
+    <div className="flex min-h-[50vh] flex-col gap-5 rounded-sm bg-zinc-950 p-4 text-zinc-400 sm:p-6">
+      <div className="flex items-center gap-3 rounded-sm border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-400">
+        <Loader2 className="size-4 shrink-0 animate-spin text-zinc-100" />
+        <div className="min-w-0">
+          <p className="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-100">
+            {label}
+          </p>
+          <p className="font-mono text-[11px] text-zinc-400">{subtitle}</p>
+        </div>
+      </div>
+      {compact ? (
+        <div className="space-y-3">
+          <div className="h-28 w-full rounded-sm border border-zinc-800 bg-zinc-950/80 skeleton-shimmer" />
+          <div className="h-44 w-full rounded-sm border border-zinc-800 bg-zinc-950/80 skeleton-shimmer" />
+        </div>
+      ) : (
+        <DashboardOverviewSkeleton />
+      )}
     </div>
   )
 }

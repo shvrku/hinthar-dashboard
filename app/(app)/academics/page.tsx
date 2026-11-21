@@ -6,7 +6,6 @@ import { useAuth } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   AlertTriangle,
-  Calendar,
   CheckCircle2,
   ClipboardEdit,
   Download,
@@ -28,7 +27,6 @@ import { downloadCsv } from "@/lib/export-utils"
 import { formatCohortIdentifier } from "@/lib/format-class"
 import { formatStudentIdentifier } from "@/lib/format-student-code"
 import { useClassesQuery, useSubjectsQuery } from "@/hooks/use-api-queries"
-import AcademicsLoading from "./loading"
 import type {
   AcademicTerm,
   AcademicYear,
@@ -41,6 +39,7 @@ import type {
 } from "@/lib/types"
 import { RequireRole } from "@/components/require-role"
 import { useCurrentUser } from "@/components/current-user-provider"
+import { AuthPortalLoadingState } from "@/components/page-skeletons"
 import { isStaffOrAbove } from "@/lib/roles"
 import { ParentPortalWorkspace } from "@/components/academics/parent-portal-workspace"
 import {
@@ -100,6 +99,12 @@ function AcademicsWorkspaceContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { getToken, isLoaded, isSignedIn } = useAuth()
+  const { role } = useCurrentUser()
+  const isStaff = isStaffOrAbove(role)
+  const getTokenRef = React.useRef(getToken)
+  React.useEffect(() => {
+    getTokenRef.current = getToken
+  }, [getToken])
 
   const paramTab = searchParams.get("tab")
   const [activeTab, setActiveTab] = React.useState<string>(() => {
@@ -125,9 +130,9 @@ function AcademicsWorkspaceContent() {
     router.replace(qs ? `/academics?${qs}` : "/academics", { scroll: false })
   }
 
-  // Reference metadata
-  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn)
-  const subjectsQuery = useSubjectsQuery(!!isLoaded && !!isSignedIn)
+  // Reference metadata — strictly gated to staff/admin so parents never trigger admin fetches.
+  const classesQuery = useClassesQuery(!!isLoaded && !!isSignedIn && isStaff)
+  const subjectsQuery = useSubjectsQuery(!!isLoaded && !!isSignedIn && isStaff)
   const classes = classesQuery.data ?? []
   const subjects = subjectsQuery.data ?? []
 
@@ -212,10 +217,10 @@ function AcademicsWorkspaceContent() {
   }, [classes, selectedClassId])
 
   const loadYears = React.useCallback(async () => {
-    if (!isSignedIn) return
+    if (!isSignedIn || !isStaff) return
     setYearsLoading(true)
     try {
-      const token = await getToken()
+      const token = await getTokenRef.current()
       if (!token) return
       const res = await createApi(token).listAcademicYears()
       setYears(res)
@@ -235,13 +240,13 @@ function AcademicsWorkspaceContent() {
     } finally {
       setYearsLoading(false)
     }
-  }, [getToken, isSignedIn])
+  }, [isSignedIn, isStaff])
 
   React.useEffect(() => {
-    if (isLoaded && isSignedIn) {
+    if (isLoaded && isSignedIn && isStaff) {
       void loadYears()
     }
-  }, [isLoaded, isSignedIn, loadYears])
+  }, [isLoaded, isSignedIn, isStaff, loadYears])
 
   const selectedYear = React.useMemo(
     () => years.find((y) => String(y.id) === selectedYearId) ?? null,
@@ -261,7 +266,7 @@ function AcademicsWorkspaceContent() {
     selectedTermType === "midterm" ? midtermTerm : finalTerm
 
   const loadBroadsheet = React.useCallback(async () => {
-    if (!isSignedIn || !activeTerm || !selectedClassId) {
+    if (!isSignedIn || !isStaff || !activeTerm || !selectedClassId) {
       setBroadsheet(null)
       if (!yearsLoading && !classesQuery.isLoading) {
         setBroadsheetLoading(false)
@@ -270,7 +275,7 @@ function AcademicsWorkspaceContent() {
     }
     setBroadsheetLoading(true)
     try {
-      const token = await getToken()
+      const token = await getTokenRef.current()
       if (!token) return
       const res = await createApi(token).getClassBroadsheet(
         activeTerm.id,
@@ -286,10 +291,10 @@ function AcademicsWorkspaceContent() {
     } finally {
       setBroadsheetLoading(false)
     }
-  }, [getToken, isSignedIn, activeTerm, selectedClassId, yearsLoading, classesQuery.isLoading])
+  }, [isSignedIn, isStaff, activeTerm, selectedClassId, yearsLoading, classesQuery.isLoading])
 
   const loadExams = React.useCallback(async () => {
-    if (!isSignedIn || !selectedYearId) {
+    if (!isSignedIn || !isStaff || !selectedYearId) {
       setExams([])
       if (!yearsLoading) {
         setExamsLoading(false)
@@ -298,7 +303,7 @@ function AcademicsWorkspaceContent() {
     }
     setExamsLoading(true)
     try {
-      const token = await getToken()
+      const token = await getTokenRef.current()
       if (!token) return
       const res = await createApi(token).listExams({
         academic_year_id: selectedYearId,
@@ -311,19 +316,19 @@ function AcademicsWorkspaceContent() {
     } finally {
       setExamsLoading(false)
     }
-  }, [getToken, isSignedIn, selectedYearId, yearsLoading])
+  }, [isSignedIn, isStaff, selectedYearId, yearsLoading])
 
   React.useEffect(() => {
-    if (isLoaded && isSignedIn) {
+    if (isLoaded && isSignedIn && isStaff) {
       void loadBroadsheet()
     }
-  }, [isLoaded, isSignedIn, loadBroadsheet])
+  }, [isLoaded, isSignedIn, isStaff, loadBroadsheet])
 
   React.useEffect(() => {
-    if (isLoaded && isSignedIn && !yearsLoading) {
+    if (isLoaded && isSignedIn && isStaff && !yearsLoading) {
       void loadExams()
     }
-  }, [isLoaded, isSignedIn, yearsLoading, loadExams])
+  }, [isLoaded, isSignedIn, isStaff, yearsLoading, loadExams])
 
   // Toggle Term Publish
   const handleToggleTermPublish = async (term: AcademicTerm) => {
@@ -575,7 +580,7 @@ function AcademicsWorkspaceContent() {
     const timer = window.setTimeout(async () => {
       setCheckingConflict(true)
       try {
-        const token = await getToken()
+        const token = await getTokenRef.current()
         if (!token) return
         const res = await createApi(token).checkExamConflicts({
           class_id: Number(examClassId),
@@ -605,7 +610,6 @@ function AcademicsWorkspaceContent() {
     examEndTime,
     examRoom,
     editingExam?.id,
-    getToken,
   ])
 
   const handleSaveExam = async (e: React.FormEvent) => {
@@ -2578,19 +2582,25 @@ function AcademicsWorkspaceContent() {
 }
 
 function AcademicsRoleSwitch() {
-  const { role } = useCurrentUser()
+  const { role, loading } = useCurrentUser()
+  if (loading || !role) {
+    return <AuthPortalLoadingState label="Loading Parent Portal..." />
+  }
   if (role === "parent" || role === "student") {
     return <ParentPortalWorkspace />
   }
   if (!isStaffOrAbove(role)) {
-    return <AcademicsLoading />
+    return <AuthPortalLoadingState label="Loading workspace..." />
   }
   return <AcademicsWorkspaceContent />
 }
 
 export default function AcademicsPage() {
   return (
-    <RequireRole mode="parent_portal" skeleton={<AcademicsLoading />}>
+    <RequireRole
+      mode="parent_portal"
+      skeleton={<AuthPortalLoadingState label="Loading Parent Portal..." />}
+    >
       <AcademicsRoleSwitch />
     </RequireRole>
   )

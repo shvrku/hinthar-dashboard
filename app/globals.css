@@ -304,7 +304,7 @@
 }
 
 [data-gsap-enter]:not([data-gsap-entered]) {
-  opacity: 0;
+  opacity: 1;
 }
 
 /* App toggle (`data-reduced-motion`) wins over OS when set.
