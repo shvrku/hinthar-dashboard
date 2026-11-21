@@ -1,5 +1,32 @@
 import { sysLog } from "@/lib/sys-log"
 
+export const DEFAULT_TOKEN_TIMEOUT_MS = 4000
+
+/**
+ * Race Clerk's `getToken()` against a timeout so a hung token request resolves
+ * to `null` after 4 seconds instead of suspending rendering indefinitely.
+ */
+export async function getTokenWithTimeout(
+  getTokenFn: () => Promise<string | null>,
+  timeoutMs = DEFAULT_TOKEN_TIMEOUT_MS
+): Promise<string | null> {
+  let timerId: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      Promise.resolve()
+        .then(() => getTokenFn())
+        .catch(() => null),
+      new Promise<null>((resolve) => {
+        timerId = setTimeout(() => resolve(null), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timerId !== undefined) {
+      clearTimeout(timerId)
+    }
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -485,6 +512,17 @@ export function createApi(token: string) {
 
     unlinkStudentUser: (studentId: number) =>
       request<import("./types").Student>(`/students/${studentId}/unlink_user/`, token, {
+        method: "POST",
+      }),
+
+    linkStudentParent: (studentId: number, userId: number) =>
+      request<import("./types").Student>(`/students/${studentId}/link_parent/`, token, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
+
+    unlinkStudentParent: (studentId: number) =>
+      request<import("./types").Student>(`/students/${studentId}/unlink_parent/`, token, {
         method: "POST",
       }),
 
@@ -1162,6 +1200,183 @@ export function createApi(token: string) {
         token,
         { method: "POST", body: JSON.stringify(data) }
       ),
+
+    // --- Academics: Exam Tracking, Broadsheet & Parent Portal ---
+    listAcademicYears: () =>
+      request<import("./types").AcademicYear[]>(`/academic-years/`, token),
+
+    createAcademicYear: (data: import("./types").AcademicYearPayload) =>
+      request<import("./types").AcademicYear>(`/academic-years/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    deleteAcademicYear: (id: number) =>
+      request<void>(`/academic-years/${id}/`, token, { method: "DELETE" }),
+
+    listTerms: (params?: { academic_year_id?: number; term_type?: string }) =>
+      request<import("./types").AcademicTerm[]>(
+        `/terms/${buildQueryString(params)}`,
+        token
+      ),
+
+    updateTerm: (id: number, data: { is_published: boolean }) =>
+      request<import("./types").AcademicTerm>(`/terms/${id}/`, token, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    toggleTermPublish: (id: number) =>
+      request<import("./types").AcademicTerm>(`/terms/${id}/toggle_publish/`, token, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+
+    listExams: (params?: Record<string, string | number | undefined | null>) =>
+      fetchAllPages<import("./types").Exam>(`/exams/`, token, params),
+
+    createExam: (data: import("./types").ExamPayload) =>
+      request<import("./types").Exam>(`/exams/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateExam: (id: number, data: Partial<import("./types").ExamPayload>) =>
+      request<import("./types").Exam>(`/exams/${id}/`, token, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    deleteExam: (id: number) =>
+      request<void>(`/exams/${id}/`, token, { method: "DELETE" }),
+
+    checkExamConflicts: (params: {
+      class_id: number
+      exam_date: string
+      start_time: string
+      end_time: string
+      room?: string
+      exclude_id?: number
+      term_id?: number
+      subject_id?: number
+    }) =>
+      request<import("./types").ExamConflictResponse>(
+        `/exams/conflicts/${buildQueryString(params)}`,
+        token
+      ),
+
+    bulkSaveExamMarks: (
+      examId: number,
+      records: import("./types").BulkExamMarkRecord[]
+    ) =>
+      request<{
+        exam_id: number
+        saved_count: number
+        results: import("./types").ExamResult[]
+        broadsheet?: import("./types").BroadsheetResponse
+      }>(`/exams/${examId}/bulk_marks/`, token, {
+        method: "POST",
+        body: JSON.stringify({ records }),
+      }),
+
+    listExamResults: (params?: Record<string, string | number | undefined | null>) =>
+      fetchAllPages<import("./types").ExamResult>(`/exam-results/`, token, params),
+
+    bulkUpsertExamResults: (
+      records: import("./types").BulkExamMarkRecord[],
+      context?: { term_id?: number; class_id?: number }
+    ) =>
+      request<{
+        saved_count: number
+        results: import("./types").ExamResult[]
+        broadsheet?: import("./types").BroadsheetResponse
+      }>(`/exam-results/bulk_upsert/`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          records,
+          ...(context?.term_id != null ? { term_id: context.term_id } : {}),
+          ...(context?.class_id != null ? { class_id: context.class_id } : {}),
+        }),
+      }),
+
+    getClassBroadsheet: (termId: number, classId: number) =>
+      request<import("./types").BroadsheetResponse>(
+        `/academics/broadsheet/${buildQueryString({ term_id: termId, class_id: classId })}`,
+        token
+      ),
+
+    getParentPortal: (params?: { student_id?: number; academic_year_id?: number }) =>
+      request<import("./types").ParentPortalResponse>(
+        `/academics/parent-portal/${buildQueryString(params)}`,
+        token
+      ),
+
+    // --- Payroll: Teacher Rate Engine ---
+    listTeacherRateCards: (params?: { teacher_id?: number }) =>
+      request<import("./types").TeacherRateCard[]>(
+        `/teacher-rate-cards/${buildQueryString(params)}`,
+        token
+      ),
+
+    upsertTeacherRateCard: (data: import("./types").TeacherRateCardPayload) =>
+      request<import("./types").TeacherRateCard>(`/teacher-rate-cards/upsert/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    createCohortRateOverride: (data: {
+      rate_card: number
+      class_obj: number
+      rate_per_session?: string | number | null
+      hourly_rate?: string | number | null
+    }) =>
+      request<import("./types").CohortRateOverride>(`/cohort-rate-overrides/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    deleteCohortRateOverride: (id: number) =>
+      request<void>(`/cohort-rate-overrides/${id}/`, token, { method: "DELETE" }),
+
+    listTeacherPayouts: (params?: Record<string, string | number | undefined | null>) =>
+      fetchAllPages<import("./types").TeacherPayout>(`/teacher-payouts/`, token, params),
+
+    calculateTeacherPayouts: (data: {
+      month: string
+      force?: boolean
+      teacher_id?: number
+    }) =>
+      request<{
+        month: string
+        calculated_count: number
+        payouts: import("./types").TeacherPayout[]
+      }>(`/teacher-payouts/calculate/`, token, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    updateTeacherPayout: (
+      id: number,
+      data: Partial<{
+        bonus: string | number
+        deduction: string | number
+        adjustment_note: string
+        status: import("./types").TeacherPayoutStatus
+      }>
+    ) =>
+      request<import("./types").TeacherPayout>(`/teacher-payouts/${id}/`, token, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    transitionTeacherPayoutStatus: (
+      id: number,
+      status: import("./types").TeacherPayoutStatus
+    ) =>
+      request<import("./types").TeacherPayout>(`/teacher-payouts/${id}/transition/`, token, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      }),
   }
 }
 

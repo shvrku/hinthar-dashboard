@@ -6,6 +6,7 @@ export type Role = User["role"]
 export const ROLE_RANK: Record<Role, number> = {
   pending: 0,
   student: 1,
+  parent: 1,
   teacher: 2,
   terminal: 3,
   staff: 4,
@@ -37,9 +38,14 @@ export function canCheckIn(role: Role | null | undefined): boolean {
   return role === "admin" || role === "staff" || role === "terminal"
 }
 
+export function isParent(role: Role | null | undefined): boolean {
+  return role === "parent"
+}
+
 export const ASSIGNABLE_ROLES: Role[] = [
   "pending",
   "student",
+  "parent",
   "teacher",
   "terminal",
   "staff",

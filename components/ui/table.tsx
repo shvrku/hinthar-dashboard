@@ -6,23 +6,139 @@ import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { SortOrder } from "@/lib/use-sortable-data"
 
+function useSyncedHorizontalScroll(defaultTrackWidth = 900) {
+  const topBarElRef = React.useRef<HTMLDivElement | null>(null)
+  const containerElRef = React.useRef<HTMLDivElement | null>(null)
+  const observerRef = React.useRef<ResizeObserver | null>(null)
+  const syncingSource = React.useRef<"top" | "main" | null>(null)
+
+  const syncSpacerWidth = React.useCallback(() => {
+    const main = containerElRef.current
+    const top = topBarElRef.current
+    if (!top) return
+    const spacer = top.firstElementChild as HTMLElement | null
+    if (!spacer) return
+    const next = main
+      ? Math.max(defaultTrackWidth, main.scrollWidth, main.clientWidth)
+      : defaultTrackWidth
+    spacer.style.width = `${next}px`
+  }, [defaultTrackWidth])
+
+  const topBarRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      topBarElRef.current = node
+      syncSpacerWidth()
+    },
+    [syncSpacerWidth]
+  )
+
+  const containerRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+        observerRef.current = null
+      }
+      containerElRef.current = node
+      syncSpacerWidth()
+      if (!node || typeof ResizeObserver === "undefined") return
+
+      const observer = new ResizeObserver(() => {
+        syncSpacerWidth()
+      })
+      observer.observe(node)
+      if (node.firstElementChild) {
+        observer.observe(node.firstElementChild)
+      }
+      observerRef.current = observer
+    },
+    [syncSpacerWidth]
+  )
+
+  React.useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+        observerRef.current = null
+      }
+    }
+  }, [])
+
+  const onTopScroll = React.useCallback(() => {
+    if (syncingSource.current === "main") {
+      syncingSource.current = null
+      return
+    }
+    const top = topBarElRef.current
+    const main = containerElRef.current
+    if (!top || !main) return
+    if (Math.abs(main.scrollLeft - top.scrollLeft) <= 1) return
+    syncingSource.current = "top"
+    main.scrollLeft = top.scrollLeft
+    requestAnimationFrame(() => {
+      if (syncingSource.current === "top") syncingSource.current = null
+    })
+  }, [])
+
+  const onMainScroll = React.useCallback(() => {
+    syncSpacerWidth()
+    if (syncingSource.current === "top") {
+      syncingSource.current = null
+      return
+    }
+    const top = topBarElRef.current
+    const main = containerElRef.current
+    if (!top || !main) return
+    if (Math.abs(top.scrollLeft - main.scrollLeft) <= 1) return
+    syncingSource.current = "main"
+    top.scrollLeft = main.scrollLeft
+    requestAnimationFrame(() => {
+      if (syncingSource.current === "main") syncingSource.current = null
+    })
+  }, [syncSpacerWidth])
+
+  const scrollByAmount = React.useCallback((delta: number) => {
+    const main = containerElRef.current
+    if (!main) return
+    main.scrollBy({ left: delta, behavior: "smooth" })
+  }, [])
+
+  return {
+    topBarRef,
+    containerRef,
+    trackWidth: defaultTrackWidth,
+    onTopScroll,
+    onMainScroll,
+    scrollByAmount,
+  }
+}
+
 function Table({
   className,
   containerClassName,
+  noWrapper = false,
   ...props
 }: React.ComponentProps<"table"> & {
   containerClassName?: string
+  noWrapper?: boolean
 }) {
+  const tableElement = (
+    <table
+      data-slot="table"
+      className={cn("w-full caption-bottom border-collapse text-sm", className)}
+      {...props}
+    />
+  )
+
+  if (noWrapper) {
+    return tableElement
+  }
+
   return (
     <div
       data-slot="table-container"
-      className={cn("relative w-full overflow-x-auto overflow-y-hidden", containerClassName)}
+      className={cn("relative w-full max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar", containerClassName)}
     >
-      <table
-        data-slot="table"
-        className={cn("w-full caption-bottom border-collapse text-sm", className)}
-        {...props}
-      />
+      {tableElement}
     </div>
   )
 }
@@ -32,7 +148,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "bg-muted/50 border-b border-border/80 [&_tr]:border-b-0",
+        "sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800 [&_tr]:border-b-0",
         className
       )}
       {...props}
@@ -178,4 +294,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  useSyncedHorizontalScroll,
 }

@@ -16,12 +16,17 @@ type CurrentUserContextValue = {
   refresh: () => Promise<void>
 }
 
+const ME_LOADING_TIMEOUT_MS = 8000
+const ME_TIMEOUT_MESSAGE =
+  "Timed out after 8 seconds while loading your account profile (/api/v1/me/). Verify the backend server is reachable and CORS allows localhost:3001."
+
 const CurrentUserContext = React.createContext<CurrentUserContextValue | null>(null)
 
 export function CurrentUserProvider({ children }: { children: React.ReactNode }) {
   const { userId, isSignedIn, isLoaded } = useAuth()
   const queryClient = useQueryClient()
   const meQuery = useMeQuery(isLoaded && !!isSignedIn, userId)
+  const [timedOut, setTimedOut] = React.useState(false)
 
   const prevUserIdRef = React.useRef<string | null | undefined>(undefined)
   const loggedClerkRef = React.useRef(false)
@@ -59,30 +64,48 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     prevUserIdRef.current = nextUserId
   }, [userId, isLoaded, queryClient])
 
+  const rawAccountLoading =
+    !isLoaded || (isSignedIn && (!userId || meQuery.isPending))
+
+  React.useEffect(() => {
+    if (!rawAccountLoading || meQuery.data || meQuery.error) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setTimedOut(true)
+    }, ME_LOADING_TIMEOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [rawAccountLoading, meQuery.data, meQuery.error])
+
   const refresh = React.useCallback(async () => {
+    setTimedOut(false)
     if (!isSignedIn || !userId) {
       queryClient.removeQueries({ queryKey: apiQueryKeys.me(userId) })
       return
     }
     await queryClient.invalidateQueries({ queryKey: apiQueryKeys.me(userId) })
+    await queryClient.refetchQueries({ queryKey: apiQueryKeys.me(userId) })
   }, [isSignedIn, userId, queryClient])
 
-  const accountLoading =
-    !isLoaded || (isSignedIn && (!userId || meQuery.isPending))
+  const hasTimedOut = timedOut && rawAccountLoading && !meQuery.data && !meQuery.error
+  const accountLoading = rawAccountLoading && !hasTimedOut
+  const errorMessage = meQuery.error
+    ? meQuery.error instanceof Error
+      ? meQuery.error.message
+      : "Failed to load profile"
+    : hasTimedOut
+      ? ME_TIMEOUT_MESSAGE
+      : null
 
   const value = React.useMemo(
     () => ({
       user: meQuery.data ?? null,
       role: (meQuery.data?.role as Role | undefined) ?? null,
       loading: accountLoading,
-      error: meQuery.error
-        ? meQuery.error instanceof Error
-          ? meQuery.error.message
-          : "Failed to load profile"
-        : null,
+      error: errorMessage,
       refresh,
     }),
-    [meQuery.data, meQuery.isPending, meQuery.error, accountLoading, refresh]
+    [meQuery.data, accountLoading, errorMessage, refresh]
   )
 
   return (

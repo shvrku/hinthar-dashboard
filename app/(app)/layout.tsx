@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server"
 import { AppAccessGate } from "@/components/app-access-gate"
 import { AppMain } from "@/components/app-main"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -8,19 +7,14 @@ import { BootstrapOverlay } from "@/components/bootstrap-overlay"
 import { NavigationProgress } from "@/components/navigation-progress"
 
 /**
- * Authenticated app shell. Resource-level Clerk gate replaces
- * middleware createRouteMatcher + auth.protect().
- *
- * unauthenticatedUrl keeps redirects on our /sign-in/ (with app OG meta)
- * instead of Clerk Account Portal (*.accounts.dev).
+ * Authenticated app shell. Server-side route protection lives in `proxy.ts`
+ * so `AppLayout` does not trigger a duplicate redirect while client auth hydrates.
  */
 export default async function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  await auth.protect({ unauthenticatedUrl: "/sign-in/" })
-
   return (
     <>
       {/* Viewport-fixed — above everything */}
@@ -29,9 +23,9 @@ export default async function AppLayout({
 
       <SidebarProvider defaultOpen={true} className="h-full w-full overflow-hidden">
         <AppSidebar />
-        <SidebarInset className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <SidebarInset className="flex flex-col flex-1 min-h-0 min-w-0 max-w-full overflow-hidden">
           <SiteHeader />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto overflow-x-hidden">
             <AppMain>
               <AppAccessGate>{children}</AppAccessGate>
             </AppMain>

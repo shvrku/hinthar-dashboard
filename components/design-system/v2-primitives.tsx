@@ -196,7 +196,7 @@ export function SystemHeader({
   return (
     <div
       className={cn(
-        "w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
+        "w-full max-w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
         className
       )}
     >
@@ -261,7 +261,16 @@ export function SystemHeader({
           <div className="flex flex-wrap items-center gap-4">
             {/* Inline Telemetry Metrics */}
             {metrics && metrics.length > 0 && (
-              <div className="flex items-center divide-x divide-border rounded-[2px] border border-border/80 bg-muted/25">
+              <div
+                className={cn(
+                  "grid divide-x divide-border rounded-[2px] border border-border/80 bg-muted/25 [&>*:nth-child(n+3)]:border-t [&>*:nth-child(n+3)]:border-border sm:[&>*:nth-child(n+3)]:border-t-0",
+                  metrics.length <= 2
+                    ? "grid-cols-2"
+                    : metrics.length === 3
+                      ? "grid-cols-2 sm:grid-cols-3"
+                      : "grid-cols-2 sm:grid-cols-4"
+                )}
+              >
                 {metrics.map((m, idx) => {
                   const toneClass =
                     METRIC_TONE_CLASSES[m.tone ?? "default"] ??
@@ -269,14 +278,14 @@ export function SystemHeader({
                   return (
                     <div
                       key={`${m.label}-${idx}`}
-                      className="flex flex-col px-3 py-1"
+                      className="flex min-w-0 flex-col px-3.5 py-1.5 text-right sm:text-left"
                     >
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <span className="whitespace-nowrap font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                         {m.label}
                       </span>
                       <span
                         className={cn(
-                          "font-mono text-sm font-bold tabular-nums leading-tight",
+                          "whitespace-nowrap font-mono text-sm font-bold tabular-nums leading-tight",
                           toneClass
                         )}
                       >
@@ -290,7 +299,7 @@ export function SystemHeader({
 
             {/* Far-right Actions */}
             {actions && (
-              <div className="flex items-center gap-2">{actions}</div>
+              <div className="flex flex-wrap items-center gap-2">{actions}</div>
             )}
           </div>
         </div>
@@ -382,7 +391,7 @@ export function DataModule({
   return (
     <div
       className={cn(
-        "w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
+        "w-full max-w-full min-w-0 rounded-sm border border-border bg-card overflow-hidden",
         className
       )}
     >
@@ -412,7 +421,7 @@ export function DataModule({
             </div>
           )}
           {filters && (
-            <div className="flex flex-wrap items-center gap-1.5">{filters}</div>
+            <div className="flex flex-wrap items-center gap-2">{filters}</div>
           )}
         </div>
 
@@ -447,7 +456,7 @@ export function DataModule({
       </div>
 
       {/* Body (flush 0px margin) */}
-      <div className="w-full overflow-x-auto">{children}</div>
+      <div className="w-full max-w-full min-w-0 overflow-x-auto custom-scrollbar">{children}</div>
 
       {/* Docked Footer Bar */}
       {(totalCount !== undefined || totalPages > 1 || onPageChange) && (
@@ -969,7 +978,7 @@ export function InspectorSheet({
       >
         {/* Tactical Header */}
         <SheetHeader className="border-b border-border bg-muted/25 px-5 py-4">
-          <div className="mb-1.5 flex items-center gap-2 pr-6">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2 pr-6">
             {code && <CodeChip accent>{code}</CodeChip>}
             {status && (
               <TelemetryTag status={resolvedTone}>{status.label}</TelemetryTag>
@@ -1024,7 +1033,7 @@ export function InspectorSheet({
         {/* Sticky Bottom Footer Bar */}
         {footerActions && (
           <SheetFooter className="mt-auto border-t border-border bg-muted/20 p-4">
-            <div className="flex w-full items-center justify-end gap-2">
+            <div className="flex w-full flex-wrap items-center justify-end gap-2">
               {footerActions}
             </div>
           </SheetFooter>

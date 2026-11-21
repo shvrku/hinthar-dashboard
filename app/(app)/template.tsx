@@ -13,7 +13,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
   // useLayoutEffect when `dependencies.length > 0`; switching `[]` ↔ `[pathname]`
   // on terminal navigation throws React #310 (more/fewer hooks than last render).
   const ref = useGsapEnter<HTMLDivElement>(
-    { y: 14, duration: durations.page },
+    { y: 14, opacity: 1, duration: durations.page },
     [pathname]
   )
 
@@ -31,6 +31,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
       key={pathname}
       className={cn("flex min-h-full w-full flex-1 flex-col origin-top")}
       data-gsap-enter
+      data-gsap-entered=""
     >
       {children}
     </div>

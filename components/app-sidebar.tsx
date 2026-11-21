@@ -28,6 +28,8 @@ import {
   Search,
   Settings,
   MoreVertical,
+  Banknote,
+  Layers,
 } from "lucide-react"
 
 import {
@@ -106,13 +108,27 @@ const staffWorkspaces = [
   },
   {
     title: "Academics",
-    url: "/classes",
+    url: "/academics",
     icon: GraduationCap,
+    isActive: (pathname: string) =>
+      pathname === "/academics" || pathname.startsWith("/academics/"),
+  },
+  {
+    title: "Cohorts & Classes",
+    url: "/classes",
+    icon: Layers,
     isActive: (pathname: string) =>
       pathname === "/classes" ||
       pathname.startsWith("/classes/") ||
       pathname === "/subjects" ||
       pathname.startsWith("/subjects/"),
+  },
+  {
+    title: "Payroll",
+    url: "/payroll",
+    icon: Banknote,
+    isActive: (pathname: string) =>
+      pathname === "/payroll" || pathname.startsWith("/payroll/"),
   },
   {
     title: "Directory",
@@ -147,6 +163,7 @@ const userSubItems = [
   { title: "Management", url: "/users/management", icon: UserCog },
   { title: "Match students", url: "/users/matching/students", icon: Link2 },
   { title: "Match teachers", url: "/users/matching/teachers", icon: Link2 },
+  { title: "Match parents", url: "/users/matching/parents", icon: Link2 },
 ]
 
 function isUsersSectionPath(pathname: string) {
@@ -176,6 +193,12 @@ function isUsersSubItemActive(pathname: string, url: string) {
       pathname.startsWith("/users/matching-teachers")
     )
   }
+  if (url === "/users/matching/parents") {
+    return (
+      pathname.startsWith("/users/matching/parents") ||
+      pathname.startsWith("/users/matching-parents")
+    )
+  }
   return pathname === url || pathname === `${url}/` || pathname.startsWith(`${url}/`)
 }
 
@@ -196,6 +219,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const showStaffNav = !accountLocked && !accountLoading && isStaffOrAbove(role)
   const showAdminNav = !accountLocked && !accountLoading && isAdmin(role)
   const showStudentNav = !accountLocked && !accountLoading && role === "student"
+  const showParentNav = !accountLocked && !accountLoading && role === "parent"
   const showTeacherNav = !accountLocked && !accountLoading && role === "teacher"
   const showTerminalNav = !accountLocked && !accountLoading && canCheckIn(role) && !showStaffNav
   const unmatchedStudent = role === "student" && account?.student_profile_id == null
@@ -207,7 +231,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const studentHomeHref = account?.student_profile_id
     ? `/students/${account.student_profile_id}`
     : "/pending"
-  const homeHref = accountLocked ? "/account-locked" : "/"
+  const homeHref = accountLocked
+    ? "/account-locked"
+    : role === "parent"
+      ? "/academics"
+      : "/"
 
   const closeMobileSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile(false)
@@ -361,6 +389,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <span>Home</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Exam Results"
+                  isActive={pathname === "/academics/parent" || pathname.startsWith("/academics/parent/")}
+                  render={<Link href="/academics/parent" onClick={handleNavClick} />}
+                >
+                  <GraduationCap />
+                  <span>Exam Results</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {schoolItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -373,6 +411,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : showParentNav ? (
+          <SidebarGroup>
+            <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              Parent Portal
+            </SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Exam Results & Schedule"
+                  isActive={pathname === "/academics" || pathname.startsWith("/academics/")}
+                  render={<Link href="/academics" onClick={handleNavClick} />}
+                  className={cn(
+                    "rounded-sm transition-colors",
+                    (pathname === "/academics" || pathname.startsWith("/academics/")) &&
+                      "font-semibold bg-sidebar-accent text-sidebar-accent-foreground"
+                  )}
+                >
+                  <GraduationCap className="size-4" />
+                  <span>Parent Portal</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
         ) : showTeacherNav ? (

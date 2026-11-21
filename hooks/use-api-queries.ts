@@ -1,8 +1,9 @@
 "use client"
 
+import * as React from "react"
 import { useAuth } from "@clerk/nextjs"
 import { useQuery } from "@tanstack/react-query"
-import { createApi } from "@/lib/api"
+import { createApi, getTokenWithTimeout } from "@/lib/api"
 
 /** Shared query keys — keep stable for cache hits across pages. */
 export const apiQueryKeys = {
@@ -15,7 +16,11 @@ export const apiQueryKeys = {
 }
 
 export function useApiToken() {
-  const { getToken, isSignedIn, isLoaded } = useAuth()
+  const { getToken: rawGetToken, isSignedIn, isLoaded } = useAuth()
+  const getToken = React.useCallback(
+    () => getTokenWithTimeout(rawGetToken),
+    [rawGetToken]
+  )
   return { getToken, isSignedIn: !!isSignedIn, isLoaded }
 }
 
@@ -25,9 +30,16 @@ export function useMeQuery(enabled = true, clerkUserId?: string | null) {
     queryKey: apiQueryKeys.me(clerkUserId),
     enabled: enabled && isLoaded && isSignedIn && !!clerkUserId,
     staleTime: 5 * 60_000,
+    retry: (failureCount, err) =>
+      failureCount < 1 &&
+      !(err instanceof Error && err.message.includes("Authentication token")),
     queryFn: async () => {
       const token = await getToken()
-      if (!token) throw new Error("No session token")
+      if (!token) {
+        throw new Error(
+          "Authentication token timed out or unavailable. Please retry or sign in again."
+        )
+      }
       return createApi(token).getMe()
     },
   })
