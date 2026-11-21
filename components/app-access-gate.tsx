@@ -145,7 +145,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
     } else if (accountLocked) {
       if (!isAccountLockedPath(pathname)) target = "/account-locked/"
     } else if (isAccountLockedPath(pathname)) {
-      target = "/"
+      target = isStaffOrAbove(role) ? "/overview/" : "/academics/"
     } else if (waitingForLink) {
       if (!isPendingPath(pathname) && !isAnnouncementsPath(pathname)) {
         target = "/pending/"
@@ -160,7 +160,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
         !isParentPortalPath(pathname) &&
         !isAnnouncementsPath(pathname)
       ) {
-        target = "/"
+        target = studentProfileId != null ? `/students/${studentProfileId}/` : "/pending/"
       }
     } else if (role === "parent") {
       if (!isParentPortalPath(pathname) && !isAnnouncementsPath(pathname)) {
@@ -171,7 +171,7 @@ export function AppAccessGate({ children }: { children: React.ReactNode }) {
         !isOwnTeacherHubPath(pathname, teacherProfileId) &&
         !isAnnouncementsPath(pathname)
       ) {
-        target = "/"
+        target = teacherProfileId != null ? `/teachers/${teacherProfileId}/` : "/pending/"
       }
     } else if (isStaffOrAbove(role) && isPendingPath(pathname)) {
       target = "/overview/"

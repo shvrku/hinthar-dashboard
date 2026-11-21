@@ -65,9 +65,9 @@ export function RequireRole({
     } else if (waitingForLink && pathname !== "/pending") {
       target = "/pending/"
     } else if (role === "student" && mode !== "student" && mode !== "parent_portal" && mode !== "any") {
-      if (pathname !== "/") {
-        target = "/"
-      }
+      target = user?.student_profile_id != null ? `/students/${user.student_profile_id}/` : "/pending/"
+    } else if (role === "teacher" && mode !== "any") {
+      target = user?.teacher_profile_id != null ? `/teachers/${user.teacher_profile_id}/` : "/pending/"
     } else if (role === "parent" && mode !== "parent" && mode !== "parent_portal" && mode !== "any") {
       if (pathname !== "/academics" && !pathname.startsWith("/academics/")) {
         target = "/academics/"
@@ -86,7 +86,17 @@ export function RequireRole({
     } else {
       lastRedirectRef.current = null
     }
-  }, [loading, role, waitingForLink, accountLocked, pathname, router, mode])
+  }, [
+    loading,
+    role,
+    waitingForLink,
+    accountLocked,
+    pathname,
+    router,
+    mode,
+    user?.student_profile_id,
+    user?.teacher_profile_id,
+  ])
 
   const defaultLabel =
     mode === "parent" || mode === "parent_portal" || role === "parent"
